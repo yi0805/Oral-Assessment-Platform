@@ -1,34 +1,26 @@
-import styled from "styled-components";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router";
 
-import Row from "./ui/Row";
 import GlobalStyle from "./styles/GlobalStyles";
-
-const H1 = styled.h1`
-  font-size: 30px;
-  font-weight: 600;
-  background-color: yellow;
-`;
+import Login from "./pages/Login";
+import Home from "./pages/Home";
+import PageNotFound from "./pages/PageNotFound";
+import AppLayout from "./ui/AppLayout";
 
 function App() {
   return (
     <>
       <GlobalStyle />
-      <div>
-        <H1>Hello world!</H1>
-      </div>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route index element={<Navigate replace to="Home" />} />
+            <Route path="Home" element={<Home />} />
+          </Route>
 
-      <Row type="vertical">
-        <Row type="vertical">
-          <p>Item 1</p>
-
-          <p>Item 2</p>
-        </Row>
-
-        <Row type="horizontal">
-          <p>Item 1</p>
-          <p>Item 2</p>
-        </Row>
-      </Row>
+          <Route path="Login" element={<Login />} />
+          <Route path="*" element={<PageNotFound />} />
+        </Routes>
+      </BrowserRouter>
     </>
   );
 }
