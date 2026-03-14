@@ -1,17 +1,16 @@
-# COMPSCI 399 Team 8 Capstone Project
+# React + Vite
 
-## Project Overview
-A simple end-to-end conversational assessment that can be piloted in a real course. 
-* Upload course materials and generate a small pool of questions (editable by instructor) 
-* Short text-based chat assessment with adaptive follow-up questions 
-* Secure recording and storage of full conversation transcripts 
-* Instructor dashboard to review sessions and add manual judgement and feedback comments
-* Automatic summary of each student’s demonstrated understanding (advisory only)
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-The project proposes to develop an AI-supported assessment tool that enables instructors to conduct secure, individualized voice or chat-based conversational assessments with students, replicating the authenticity of traditional oral examinations while allowing flexible, scalable delivery. 
+Currently, two official plugins are available:
 
-The system will automatically generate personalized questions based on course materials and student submissions, facilitate short interactive sessions, and record responses for later review. 
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-It will also generate automated outcome reports and insights summarizing each student’s demonstrated understanding.
+## React Compiler
 
-These outputs will assist instructors in making fair, evidence-based grading decisions and providing more targeted feedback.
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
