@@ -1,10 +1,11 @@
 import { BrowserRouter, Navigate, Routes, Route } from "react-router";
 
 import GlobalStyle from "./styles/GlobalStyles";
-import Login from "./pages/Login";
+import AppLayout from "./ui/AppLayout";
 import Home from "./pages/Home";
 import PageNotFound from "./pages/PageNotFound";
-import AppLayout from "./ui/AppLayout";
+import Login from "./pages/Login";
+import LoginForm from "./features/authentication/LoginForm";
 
 function App() {
   return (
@@ -13,11 +14,17 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route index element={<Navigate replace to="Home" />} />
-            <Route path="Home" element={<Home />} />
+            <Route index element={<Navigate replace to="home" />} />
+            <Route path="home" element={<Home />} />
           </Route>
 
-          <Route path="Login" element={<Login />} />
+          <Route path="login" element={<Login />} />
+          <Route path="login/student" element={<LoginForm role="student" />} />
+          <Route
+            path="login/instructor"
+            element={<LoginForm role="instructor" />}
+          />
+
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </BrowserRouter>
