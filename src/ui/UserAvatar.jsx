@@ -27,7 +27,7 @@ function UserAvatar() {
 
   return (
     <StyledUserAvatar>
-      <Avatar alt="UserAvatar" src="" />
+      <Avatar alt="UserAvatar" src="./public/WhereRU.png" />
       <Name>{name}</Name>
     </StyledUserAvatar>
   );

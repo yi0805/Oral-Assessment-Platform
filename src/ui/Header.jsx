@@ -58,7 +58,7 @@ function Header() {
     <StyledHeader>
       <Brand>
         <Title>WhereAU</Title>
-        <Logo src="xxx" alt="WhereAU Logo" />
+        <Logo src="./public/WhereRU.png" alt="WhereAU Logo" />
       </Brand>
       <UserContainer>
         <UserAvatar />
