@@ -1,26 +1,34 @@
 import { useNavigate } from "react-router";
-import { useMemo, useState } from "react";
 import styled from "styled-components";
 
-const Wrap = styled.div`
+const StyledLoginForm = styled.div`
+  min-height: 100vh;
   display: grid;
-  gap: var(--space-2xl);
+  place-items: center;
+  padding: var(--space-4xl) var(--space-xl);
 `;
 
 const Title = styled.h1`
   font-size: var(--font-size-xxl);
   color: var(--color-primary);
   text-transform: capitalize;
+  margin-bottom: var(--space-xl);
 `;
 
 const Form = styled.form`
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-l);
+  width: 100%;
+  max-width: 28rem;
+  padding: var(--space-4xl);
+  background: var(--color-light);
+  border-radius: 14px;
+  border: 1px solid var(--color-light-2);
 `;
 
 const Field = styled.label`
-  display: grid;
-  gap: var(--space-xs);
+  display: block;
 `;
 
 const Input = styled.input`
@@ -30,31 +38,22 @@ const Input = styled.input`
   border: 1px solid var(--color-light-2);
   background: var(--color-light);
   font-size: var(--font-size-default);
-  outline: none;
+
+  &::placeholder {
+    color: var(--color-dark-3-tint);
+  }
 
   &:focus {
     border-color: var(--color-secondary);
   }
 `;
 
-const ErrorBox = styled.div`
-  padding: var(--space-m) var(--space-l);
-  border-radius: 10px;
-  border: 1px solid var(--color-error);
-  background: var(--color-light);
-  color: var(--color-error);
-  line-height: 1.4;
-`;
-
 const Actions = styled.div`
-  display: flex;
-  gap: var(--space-l);
-  align-items: center;
-  justify-content: flex-end;
+  width: 100%;
+  margin-top: var(--space-m);
 `;
 
 const Button = styled.button`
-  appearance: none;
   border: 0;
   border-radius: 10px;
   padding: var(--space-l) var(--space-2xl);
@@ -63,80 +62,37 @@ const Button = styled.button`
   color: var(--color-light);
   font-weight: 700;
   cursor: pointer;
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.7;
-  }
+  width: 100%;
 `;
 
 function LoginForm({ role }) {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
 
-  const roleLabel = useMemo(() => {
-    if (role === "student") return "Student";
-    if (role === "instructor") return "Instructor";
-    return "User";
-  }, [role]);
-
-  function handleSubmit(e) {
+  const handleLogin = (e) => {
     e.preventDefault();
-    setError("");
-
-    const nextEmail = email.trim();
-    const nextPassword = password;
-
-    if (!nextEmail) {
-      setError("Please enter your email.");
-      return;
-    }
-    if (!nextPassword) {
-      setError("Please enter your password.");
-      return;
-    }
-
-    navigate(`/home?role=${encodeURIComponent(role || "")}`);
-  }
+    navigate(`/home`);
+  };
 
   return (
-    <Wrap>
-      <div>
-        <Title>{roleLabel} login</Title>
-      </div>
+    <StyledLoginForm>
+      <Title> login</Title>
 
-      <Form onSubmit={handleSubmit}>
+      <Form>
         <Field>
-          <Input
-            type="email"
-            autoComplete="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
+          <Input type="email" placeholder="Email" />
         </Field>
 
         <Field>
-          <Input
-            type="password"
-            autoComplete="current-password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <Input type="password" placeholder="Password" />
         </Field>
-
-        {error ? <ErrorBox role="alert">{error}</ErrorBox> : null}
 
         <Actions>
-          <Button type="submit" $role={role}>
+          <Button type="submit" $role={role} onClick={handleLogin}>
             Log in
           </Button>
         </Actions>
       </Form>
-    </Wrap>
+    </StyledLoginForm>
   );
 }
 

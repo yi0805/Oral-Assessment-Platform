@@ -32,12 +32,9 @@ function Siderbar() {
     <StyledSidebar>
       <Nav>
         <Item to="/home">Home</Item>
-        <Item to="/login">Login</Item>
-        <Item to="/register">Register</Item>
         <Item to="/profile">Profile</Item>
         <Item to="/settings">Settings</Item>
         <Item to="/help">Help</Item>
-        <Item to="/login">Login</Item>
       </Nav>
     </StyledSidebar>
   );
