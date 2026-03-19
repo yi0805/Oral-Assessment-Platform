@@ -1,15 +1,14 @@
 import styled from "styled-components";
 
-const P = styled.p`
-  padding: 1.6rem;
-  font-size: 1.6rem;
+const Styledhome = styled.section`
+  padding: var(--space-4xl);
 `;
 
 function Home() {
   return (
-    <>
-      <P>Main Content</P>
-    </>
+    <Styledhome>
+      <h1>Home Content</h1>
+    </Styledhome>
   );
 }
 

@@ -6,18 +6,22 @@ import Siderbar from "./Siderbar";
 
 const StyleAppLayout = styled.div`
   display: grid;
-  grid-template-columns: 15rem 1fr;
-  grid-template-rows: auto 1fr;
+  grid-template-columns: 16rem 1fr;
+  grid-template-rows: 4.8rem 1fr;
   grid-template-areas: "header header" "sidebar main";
   height: 100vh;
-  background-color: green;
+  background: var(--color-primary-tint);
 `;
 
 const Main = styled.main`
   grid-area: main;
+  overflow: auto;
+  padding: var(--space-3xl);
 `;
 
-const Container = styled.div``;
+const Container = styled.div`
+  min-height: 100%;
+`;
 
 function AppLayout() {
   return (

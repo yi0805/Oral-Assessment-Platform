@@ -2,29 +2,33 @@ import styled from "styled-components";
 
 const StyledUserAvatar = styled.div`
   display: flex;
-  flex-direction: column;
-  gap: 1.2rem;
+  gap: var(--space-m);
   align-items: center;
-  font-weight: 2rem;
-  font-size: 1.4rem;
-  justify-content: flex-end;
 `;
 
 const Avatar = styled.img`
   display: block;
-  width: 3.6rem;
+  width: 2.6rem;
   aspect-ratio: 1;
   object-fit: cover;
   object-position: center;
   border-radius: 50%;
-  outline: 2px solid;
+  border: 2px solid var(--color-secondary);
+`;
+
+const Name = styled.p`
+  font-size: var(--font-size-default);
+  color: var(--color-dark-2);
+  font-weight: 700;
 `;
 
 function UserAvatar() {
+  const name = "YI";
+
   return (
     <StyledUserAvatar>
-      <Avatar />
-      <p>User Name</p>
+      <Avatar alt="UserAvatar" src="" />
+      <Name>{name}</Name>
     </StyledUserAvatar>
   );
 }
