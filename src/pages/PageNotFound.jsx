@@ -8,10 +8,11 @@ const StyledPageNotFound = styled.div`
   background: var(--color-primary-tint);
 `;
 
-const Card = styled.div`
+const PageNotFoundCard = styled.div`
   display: flex;
   flex-direction: column;
   width: 50%;
+  max-width: 75ch;
   background: var(--color-light);
   border: 1px solid var(--color-light-2);
   border-radius: 16px;
@@ -28,7 +29,7 @@ const Text = styled.p`
   line-height: 1.5;
 `;
 
-const Actions = styled.div`
+const ActionsContainer = styled.div`
   display: flex;
   gap: var(--space-l);
   margin-top: var(--space-m);
@@ -54,20 +55,20 @@ const ButtonLink = styled(Link)`
 function PageNotFound() {
   return (
     <StyledPageNotFound>
-      <Card>
+      <PageNotFoundCard>
         <Title>404 - Page Not Found</Title>
         <Text>
           The page you’re looking for doesn’t exist. Use one of the options
           below to continue.
         </Text>
 
-        <Actions>
+        <ActionsContainer>
           <ButtonLink to="/home" $variant="primary">
             Go to Home
           </ButtonLink>
           <ButtonLink to="/login">Go to Login</ButtonLink>
-        </Actions>
-      </Card>
+        </ActionsContainer>
+      </PageNotFoundCard>
     </StyledPageNotFound>
   );
 }

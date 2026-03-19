@@ -7,11 +7,7 @@ const StyledUserAvatar = styled.div`
 `;
 
 const Avatar = styled.img`
-  display: block;
   width: 2.6rem;
-  aspect-ratio: 1;
-  object-fit: cover;
-  object-position: center;
   border-radius: 50%;
   border: 2px solid var(--color-secondary);
 `;

@@ -11,7 +11,8 @@ const StyledStudentPracticeModal = styled.div`
 `;
 
 const QuestionModal = styled.div`
-  width: min(48rem, 100%);
+  width: 100%;
+  max-width: 80ch;
   background: var(--color-light);
   border: 1px solid var(--color-light-2);
   border-radius: 14px;
@@ -27,11 +28,12 @@ const Title = styled.h2`
 const QuestionParagraph = styled.p`
   color: var(--color-dark-2);
   line-height: 1.5;
-  margin-top: var(--space-s);
+  margin-top: var(--space-m);
 `;
 
 const Input = styled.input`
   width: 100%;
+  max-width: 65ch;
   padding: var(--space-m) var(--space-l);
   border-radius: 10px;
   border: 1px solid var(--color-light-2);

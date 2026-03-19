@@ -10,7 +10,6 @@ const StyledLoginForm = styled.div`
 const Title = styled.h1`
   font-size: var(--font-size-xxl);
   color: var(--color-primary);
-  text-transform: capitalize;
   margin-bottom: var(--space-xl);
 `;
 
@@ -19,7 +18,7 @@ const Form = styled.form`
   flex-direction: column;
   gap: var(--space-l);
   width: 100%;
-  max-width: 28rem;
+  max-width: 60ch;
   padding: var(--space-4xl);
   background: var(--color-light);
   border-radius: 14px;
@@ -47,7 +46,7 @@ const Input = styled.input`
   }
 `;
 
-const Actions = styled.div`
+const ActionsContainer = styled.div`
   width: 100%;
   margin-top: var(--space-m);
 `;
@@ -75,7 +74,7 @@ function LoginForm({ role }) {
 
   return (
     <StyledLoginForm>
-      <Title> login</Title>
+      <Title> Login</Title>
 
       <Form>
         <Field>
@@ -86,11 +85,11 @@ function LoginForm({ role }) {
           <Input type="password" placeholder="Password" />
         </Field>
 
-        <Actions>
+        <ActionsContainer>
           <Button type="submit" $role={role} onClick={handleLogin}>
             Log in
           </Button>
-        </Actions>
+        </ActionsContainer>
       </Form>
     </StyledLoginForm>
   );

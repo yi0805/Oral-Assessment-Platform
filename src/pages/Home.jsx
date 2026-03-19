@@ -5,7 +5,7 @@ import styled from "styled-components";
 import InstructorDashboard from "../features/dashboard/InstructorDashboard";
 import StudentPractice from "../features/student/StudentPractice";
 
-const StyledHome = styled.section`
+const StyledHome = styled.div`
   padding: var(--space-4xl);
 `;
 

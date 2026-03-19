@@ -13,7 +13,7 @@ const Title = styled.h1`
   color: var(--color-primary);
 `;
 
-const Actions = styled.div`
+const ActionsContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
@@ -41,23 +41,18 @@ function LoginChooser() {
     <StyledLoginChooser>
       <Title>Select your role</Title>
 
-      <Actions>
-        <Button
-          type="button"
-          $variant="student"
-          onClick={() => navigate("/login/student")}
-        >
+      <ActionsContainer>
+        <Button $variant="student" onClick={() => navigate("/login/student")}>
           Student
         </Button>
 
         <Button
-          type="button"
           $variant="instructor"
           onClick={() => navigate("/login/instructor")}
         >
           Instructor
         </Button>
-      </Actions>
+      </ActionsContainer>
     </StyledLoginChooser>
   );
 }

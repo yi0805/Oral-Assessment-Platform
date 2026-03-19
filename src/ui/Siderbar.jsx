@@ -10,7 +10,8 @@ const StyledSidebar = styled.div`
 `;
 
 const Nav = styled.nav`
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: var(--space-m);
 `;
 

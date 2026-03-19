@@ -9,8 +9,9 @@ const StyledLogin = styled.div`
   background: var(--color-primary-tint);
 `;
 
-const Card = styled.div`
+const LoginCard = styled.div`
   width: 50%;
+  max-width: 75ch;
   background: var(--color-light);
   border: 1px solid var(--color-light-2);
   border-radius: 16px;
@@ -21,9 +22,9 @@ const Card = styled.div`
 function Login() {
   return (
     <StyledLogin>
-      <Card>
+      <LoginCard>
         <LoginChooser />
-      </Card>
+      </LoginCard>
     </StyledLogin>
   );
 }

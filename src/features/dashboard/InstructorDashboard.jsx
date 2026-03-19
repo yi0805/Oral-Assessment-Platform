@@ -67,22 +67,19 @@ export default function InstructorDashboard() {
 
       {courseNumber ? (
         <Table>
-          <thead>
-            <tr>
-              <th>Student</th>
-              <th>Score (out of 100)</th>
-              <th>Time</th>
+          <tr>
+            <th>Student</th>
+            <th>Score (out of 100)</th>
+            <th>Time</th>
+          </tr>
+
+          {instructorRows.map((r) => (
+            <tr key={r.name}>
+              <td>{r.name}</td>
+              <td>{r.score}</td>
+              <td>{r.time}</td>
             </tr>
-          </thead>
-          <tbody>
-            {instructorRows.map((r) => (
-              <tr key={r.name}>
-                <td>{r.name}</td>
-                <td>{r.score}</td>
-                <td>{r.time}</td>
-              </tr>
-            ))}
-          </tbody>
+          ))}
         </Table>
       ) : null}
     </StyledInstructorDashboard>

@@ -19,10 +19,6 @@ const Main = styled.main`
   padding: var(--space-3xl);
 `;
 
-const Container = styled.div`
-  min-height: 100%;
-`;
-
 function AppLayout() {
   return (
     <StyleAppLayout>
@@ -30,9 +26,7 @@ function AppLayout() {
       <Siderbar />
 
       <Main>
-        <Container>
-          <Outlet />
-        </Container>
+        <Outlet />
       </Main>
     </StyleAppLayout>
   );
