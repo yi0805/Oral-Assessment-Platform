@@ -69,6 +69,7 @@ function LoginForm({ role }) {
 
   const handleLogin = (e) => {
     e.preventDefault();
+    localStorage.setItem("role", role);
     navigate(`/home`);
   };
 
