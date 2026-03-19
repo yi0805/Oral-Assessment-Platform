@@ -62,7 +62,7 @@ export default function StudentPractice() {
           <Input
             value={courseNumber}
             onChange={(e) => setCourseNumber(e.target.value)}
-            placeholder="Enter course number (e.g. CS101)"
+            placeholder="Enter course number"
           />
           <Button type="button" onClick={open}>
             Start AI practice

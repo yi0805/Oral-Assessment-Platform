@@ -44,9 +44,9 @@ export default function InstructorDashboard() {
 
   const instructorRows = useMemo(
     () => [
-      { name: "Alice", score: 8, time: "Today" },
-      { name: "Ben", score: 6, time: "Yesterday" },
-      { name: "Chen", score: 9, time: "2 days ago" },
+      { name: "Alice", score: 80, time: "Today" },
+      { name: "Ben", score: 60, time: "Yesterday" },
+      { name: "Chen", score: 90, time: "2 days ago" },
     ],
     [],
   );

@@ -29,13 +29,15 @@ const Item = styled(NavLink)`
 `;
 
 function Siderbar() {
+  const role = localStorage.getItem("role");
+
   return (
     <StyledSidebar>
       <Nav>
         <Item to="/home">Home</Item>
-        <Item to="/profile">Profile</Item>
-        <Item to="/settings">Settings</Item>
-        <Item to="/help">Help</Item>
+        {role === "student" ? (
+          <Item to="/previous-assessment">Previous assessment</Item>
+        ) : null}
       </Nav>
     </StyledSidebar>
   );
