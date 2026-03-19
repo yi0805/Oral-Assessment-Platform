@@ -2,6 +2,253 @@ import { createGlobalStyle } from "styled-components";
 
 const GlobalStyle = createGlobalStyle`
 
+
+/*** Spacing Variables *****/
+:root {
+  --space-2xs: 3px;
+  --space-xs: 6px;
+  --space-s: 9px;
+  --space-m: 12px;
+  --space-l: 15px;
+  --space-xl: 18px;
+  --space-2xl: 21px;
+  --space-3xl: 24px;
+  --space-4xl: 48px;
+  --space-5xl: 60px;
+}
+
+/*** End Spacing Variables *****/
+/*** Font Size Variables *****/
+:root {
+  --font-size-s: 0.89rem;
+  --font-size-default: 1rem;
+  --font-size-l: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-xxl: 2rem;
+}
+
+/*** End Font Size Variables *****/
+/*** Common *****/
+/*** End Common *****/
+/*** Colors *****/
+:root {
+  /*tints*/
+  --color-waitemata: #0c0c48;
+  --color-waitemata-rgb: 12, 12, 72;
+  --color-waitemata-5-percent-opacity-tint: #f3f3f6;
+  --color-waitemata-10-percent-opacity-tint: #e7e7ed;
+  --color-waitemata-20-percent-opacity-tint: #ceceda;
+  --color-waitemata-30-percent-opacity-tint: #afafc3;
+  --color-waitemata-40-percent-opacity-tint: #9e9eb6;
+  --color-azure: #1f2bd4; /* Azure */
+  --color-azure-rgb: 31, 43, 212; /* Azure */
+  --color-azure-10-percent-opacity-tint: #e9eafb;
+  --color-azure-20-percent-opacity-tint: #d2d5f6;
+  --color-azure-30-percent-opacity-tint: #bcc0f3;
+  --color-azure-40-percent-opacity-tint: #a5aaee;
+  --color-mahina: #00caef; /* Mahina */
+  --color-mahina-rgb: 0, 202, 239; /* Mahina */
+  --color-mahina-10-percent-opacity-tint: #e6fafe;
+  --color-mahina-20-percent-opacity-tint: #ccf4fc;
+  --color-mahina-30-percent-opacity-tint: #b3f0fb;
+  --color-mahina-40-percent-opacity-tint: #99eaf9;
+  /*uoa blues*/
+  --color-primary: var(--color-waitemata, #0c0c48);
+  --color-primary-rgb: var(--color-waitemata-rgb, rgb(12, 12, 72));
+  --color-primary-tint: var(--color-waitemata-5-percent-opacity-tint, #f3f3f6);
+  --color-secondary: var(--color-azure, #1f2bd4);
+  --color-secondary-rgb: var(--color-azure-rgb, rgb(31, 43, 212));
+  --color-secondary-tint: var(--color-azure-10-percent-opacity-tint, #e9eafb);
+  --color-tertiary: var(--color-mahina, #00caef);
+  --color-tertiary-rgb: var(--color-mahina-rgb, rgb(0, 202, 239));
+  --color-tertiary-tint: var(var(--color-mahina-10-percent-opacity-tint), #e6fafe);
+  /*greys*/
+  /*light*/
+  --color-light: #ffffff;
+  --color-light-rgb: 255, 255, 255;
+  --color-light-1: #f2f2f2;
+  --color-light-1-rgb: 242, 242, 242;
+  --color-light-2: #bec3c4;
+  /*medium*/
+  --color-medium: #d9d9d9;
+  --color-medium-rgb: 217, 217, 217;
+  /*dark*/
+  --color-dark: #000000;
+  --color-dark-rgb: 0, 0, 0;
+  --color-dark-1: #4a4a4c;
+  --color-dark-1-rgb: 74, 74, 76;
+  --color-dark-2: #404040;
+  --color-dark-2-rgb: 64, 64, 64;
+  --color-dark-2-tint: #9f9f9f;
+  --color-dark-3: #333333;
+  --color-dark-3-rgb: 51, 51, 51;
+  --color-dark-3-tint: #747778;
+  /* success */
+  --color-success: #2ec95c;
+  --color-success-rgb: 42, 201, 92;
+  /* warning */
+  --color-warning: #fdd835;
+  --color-warning-rgb: 253, 216, 52;
+  /*error*/
+  --color-error: #ed0c0c;
+  --color-error-rgb: 237, 12, 12;
+  --color-error-toast: #f53d3d;
+}
+
+/*** End Colors *****/
+/*** Start Default color classes *****/
+.color-primary {
+  color: var(--color-primary);
+}
+
+.color-secondary {
+  color: var(--color-secondary);
+}
+
+.color-tertiary {
+  color: var(--color-tertiary);
+}
+
+.color-dark {
+  color: var(--color-dark);
+}
+
+.color-dark-1 {
+  color: var(--color-dark-1);
+}
+
+.color-dark-2 {
+  color: var(--color-dark-2);
+}
+
+.color-dark-3 {
+  color: var(--color-dark-3);
+}
+
+.color-dark-3-tint {
+  color: var(--color-dark-3-tint);
+}
+
+.color-medium {
+  color: var(--color-medium);
+}
+
+.color-light {
+  color: var(--color-light);
+}
+
+.color-light-1 {
+  color: var(--color-light-1);
+}
+
+.color-light-2 {
+  color: var(--color-light-2);
+}
+
+.color-error {
+  color: var(--color-error);
+}
+
+.color-success {
+  color: var(--color-success);
+}
+
+.color-warning {
+  color: var(--color-warning);
+}
+
+.border-primary {
+  border: 1px solid var(--color-primary);
+}
+
+.border-top-primary {
+  border-top: 1px solid var(--color-primary);
+}
+
+.border-right-primary {
+  border-bottom: 1px solid var(--color-primary);
+}
+
+.border-bottom-primary {
+  border-bottom: 1px solid var(--color-primary);
+}
+
+.border-left-primary {
+  border-left: 1px solid var(--color-primary);
+}
+
+.border-light-2 {
+  border: 1px solid var(--color-light-2);
+}
+
+.border-top-light-2 {
+  border-top: 1px solid var(--color-light-2);
+}
+
+.border-right-light-2 {
+  border-right: 1px solid var(--color-light-2);
+}
+
+.border-bottom-light-2 {
+  border-bottom: 1px solid var(--color-light-2);
+}
+
+.border-left-light-2 {
+  border-left: 1px solid var(--color-light-2);
+}
+
+.border-error {
+  border: 2px solid var(--color-error);
+}
+
+.border-bottom-error {
+  border-bottom: 2px solid var(--color-error);
+}
+
+.background-primary {
+  background-color: var(--color-primary);
+}
+
+.background-secondary {
+  background-color: var(--color-secondary);
+}
+
+.background-tertiary {
+  background-color: var(--color-tertiary);
+}
+
+.background-dark {
+  background-color: var(--color-dark);
+}
+
+.background-dark-1 {
+  background-color: var(--color-dark-1);
+}
+
+.background-dark-2 {
+  background-color: var(--color-dark-2);
+}
+
+.background-dark-3 {
+  background-color: var(--color-dark-3);
+}
+
+.background-medium {
+  background-color: var(--color-medium);
+}
+
+.background-light {
+  background-color: var(--color-light);
+}
+
+.background-light-1 {
+  background-color: var(--color-primary-tint);
+}
+
+.background-light-2 {
+  background-color: var(--color-light-2);
+}
+
 *,
 *::before,
 *::after {
