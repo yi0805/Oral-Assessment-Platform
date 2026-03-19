@@ -8,12 +8,15 @@ const StyledLoginChooser = styled.div`
 `;
 
 const Title = styled.h1`
+  text-align: center;
   font-size: var(--font-size-xxl);
   color: var(--color-primary);
 `;
 
 const Actions = styled.div`
   display: flex;
+  justify-content: center;
+  align-items: center;
   gap: var(--space-l);
   margin-top: var(--space-m);
 `;

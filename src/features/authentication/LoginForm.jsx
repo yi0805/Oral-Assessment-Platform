@@ -2,10 +2,9 @@ import { useNavigate } from "react-router";
 import styled from "styled-components";
 
 const StyledLoginForm = styled.div`
-  min-height: 100vh;
   display: grid;
   place-items: center;
-  padding: var(--space-4xl) var(--space-xl);
+  padding: var(--space-5xl) var(--space-xl);
 `;
 
 const Title = styled.h1`
