@@ -10,11 +10,11 @@ function LoginChooser() {
 
   return (
     <Stack>
-      <Heading type="login">Select your role</Heading>
+      <Heading $variant="centered">Select your role</Heading>
 
-      <ActionsContainer type="login">
+      <ActionsContainer $variant="centered">
         <ButtonLink
-          $variation="student"
+          $variant="primary"
           to="/home"
           onClick={() => handleChooseRole("student")}
         >
@@ -22,7 +22,7 @@ function LoginChooser() {
         </ButtonLink>
 
         <ButtonLink
-          $variation="instructor"
+          $variant="tertiary"
           to="/home"
           onClick={() => handleChooseRole("instructor")}
         >

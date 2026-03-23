@@ -21,7 +21,11 @@ const Item = styled(NavLink)`
   text-decoration: none;
   color: var(--color-dark-2);
   padding: var(--space-m) var(--space-l);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
+
+  &:hover:not(.active) {
+    background: var(--color-primary-tint);
+  }
 
   &.active {
     background: var(--color-secondary-tint);

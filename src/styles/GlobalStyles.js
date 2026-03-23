@@ -2,7 +2,6 @@ import { createGlobalStyle } from "styled-components";
 
 const GlobalStyle = createGlobalStyle`
 
-
 /*** Spacing Variables *****/
 :root {
   --space-2xs: 3px;
@@ -28,8 +27,21 @@ const GlobalStyle = createGlobalStyle`
 }
 
 /*** End Font Size Variables *****/
-/*** Common *****/
-/*** End Common *****/
+/*** Border Radius *****/
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+/*** End Border Radius *****/
+/*** Shadows *****/
+:root {
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 10px 30px rgba(var(--color-primary-rgb), 0.12);
+}
+
+/*** End Shadows *****/
 /*** Colors *****/
 :root {
   /*tints*/
@@ -103,8 +115,21 @@ const GlobalStyle = createGlobalStyle`
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+}
 
-  transition: background-color 0.3s, border 0.3s;
+body {
+  font-family: "Poppins", sans-serif;
+  color: var(--color-dark-2);
+  font-size: var(--font-size-default);
+  line-height: 1.6;
+}
+
+input,
+button,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
 }
 `;
 

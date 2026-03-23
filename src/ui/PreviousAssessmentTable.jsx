@@ -1,42 +1,18 @@
-import styled, { css } from "styled-components";
+import styled from "styled-components";
 
 import Table from "./Table";
+import Badge from "./Badge";
 
-const scoreTypes = {
-  pass: css`
-    color: var(--color-success);
-  `,
-  fail: css`
-    color: var(--color-primary);
-  `,
-};
-
-const Score = styled.span`
+const ScoreText = styled.span`
   font-weight: 700;
-
-  ${({ score }) => (score >= 60 ? scoreTypes.pass : scoreTypes.fail)}
+  color: ${({ $pass }) =>
+    $pass ? "var(--color-success)" : "var(--color-primary)"};
 `;
 
-const statusTypes = {
-  completed: css`
-    background: rgba(var(--color-success-rgb), 0.12);
-    color: var(--color-success);
-  `,
-  pending: css`
-    background: var(--color-secondary-tint);
-    color: var(--color-secondary);
-  `,
-};
-
-const Status = styled.span`
-  padding: var(--space-xs);
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: var(--font-size-s);
-
-  ${({ status }) =>
-    status === "Completed" ? statusTypes.completed : statusTypes.pending}
-`;
+function getStatusVariant(status) {
+  if (status === "Completed") return "success";
+  return "info";
+}
 
 function PreviousAssessmentTable({ values }) {
   return (
@@ -58,10 +34,12 @@ function PreviousAssessmentTable({ values }) {
             <td>{row.title}</td>
             <td>{row.date}</td>
             <td>
-              <Score score={row.score}>{row.score}</Score>
+              <ScoreText $pass={row.score >= 60}>{row.score}</ScoreText>
             </td>
             <td>
-              <Status status={row.status}>{row.status}</Status>
+              <Badge $variant={getStatusVariant(row.status)}>
+                {row.status}
+              </Badge>
             </td>
           </tr>
         ))}

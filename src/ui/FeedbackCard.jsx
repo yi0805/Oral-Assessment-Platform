@@ -3,10 +3,13 @@ import BodyText from "./BodyText";
 
 const Card = styled.div`
   border: 1px solid var(--color-light-2);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: var(--space-xl);
-  margin-bottom: var(--space-xl);
   background: var(--color-primary-tint);
+
+  & + & {
+    margin-top: var(--space-l);
+  }
 `;
 
 const Title = styled.h3`

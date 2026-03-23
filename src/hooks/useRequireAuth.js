@@ -9,7 +9,6 @@ function useRequireAuth() {
     if (!role) navigate("/login");
   }, [navigate, role]);
 
-  console.log("Here", role);
   return role;
 }
 

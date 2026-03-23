@@ -1,6 +1,6 @@
 import styled, { css } from "styled-components";
 
-const inputTypes = {
+const variants = {
   modal: css`
     width: 100%;
     max-width: 65ch;
@@ -10,11 +10,17 @@ const inputTypes = {
 
 const Input = styled.input`
   padding: var(--space-m) var(--space-l);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-light-2);
-  font-size: var(--font-size-default);
+  background: var(--color-light);
 
-  ${({ $variant }) => inputTypes[$variant]}
+  &:focus {
+    outline: none;
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 0 2px var(--color-secondary-tint);
+  }
+
+  ${({ $variant }) => variants[$variant]}
 `;
 
 export default Input;

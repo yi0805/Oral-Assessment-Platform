@@ -1,9 +1,9 @@
 import styled, { css } from "styled-components";
 
-const cardTypes = {
+const variants = {
   login: css`
     padding: var(--space-4xl);
-    box-shadow: 0 10px 30px rgba(var(--color-primary-rgb), 0.12);
+    box-shadow: var(--shadow-md);
   `,
   notFound: css`
     display: flex;
@@ -18,9 +18,9 @@ const BaseCard = styled.div`
   max-width: 75ch;
   background: var(--color-light);
   border: 1px solid var(--color-light-2);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
 
-  ${(props) => cardTypes[props.type]};
+  ${({ $variant }) => variants[$variant]}
 `;
 
 export default BaseCard;

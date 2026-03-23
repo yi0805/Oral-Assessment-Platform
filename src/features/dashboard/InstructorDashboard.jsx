@@ -14,7 +14,7 @@ export default function InstructorDashboard() {
 
   return (
     <ContentCard>
-      <Heading>Instructor dashboard</Heading>
+      <Heading $variant="page">Instructor dashboard</Heading>
 
       <Selector
         value={courseNumber}

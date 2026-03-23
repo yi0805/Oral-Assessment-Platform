@@ -1,8 +1,12 @@
 import styled, { css } from "styled-components";
 
-const ActionsContainerTypes = {
-  login: css`
+const variants = {
+  centered: css`
     justify-content: center;
+    align-items: center;
+  `,
+  end: css`
+    justify-content: flex-end;
     align-items: center;
   `,
 };
@@ -13,7 +17,7 @@ const ActionsContainer = styled.div`
   margin-top: var(--space-m);
   flex-wrap: wrap;
 
-  ${(props) => ActionsContainerTypes[props.type]}
+  ${({ $variant }) => variants[$variant]}
 `;
 
 export default ActionsContainer;

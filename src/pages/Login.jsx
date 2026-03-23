@@ -5,7 +5,7 @@ import StandaloneLayout from "../ui/StandaloneLayout";
 function Login() {
   return (
     <StandaloneLayout>
-      <BaseCard type="login">
+      <BaseCard $variant="login">
         <LoginChooser />
       </BaseCard>
     </StandaloneLayout>

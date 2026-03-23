@@ -23,7 +23,7 @@ export default function StudentPractice() {
   return (
     <>
       <ContentCard>
-        <Heading type="student">Student dashboard</Heading>
+        <Heading $variant="page">Student dashboard</Heading>
 
         <InlineGroup>
           <Input

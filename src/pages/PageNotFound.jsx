@@ -8,18 +8,18 @@ import ButtonLink from "../ui/ButtonLink";
 function PageNotFound() {
   return (
     <StandaloneLayout>
-      <BaseCard type="notFound">
+      <BaseCard $variant="notFound">
         <Heading>404 - Page Not Found</Heading>
         <BodyText>
-          The page you're looking for doesn't exist. Use one of the options
-          below to continue.
+          The page you&apos;re looking for doesn&apos;t exist. Use one of the
+          options below to continue.
         </BodyText>
 
         <ActionsContainer>
-          <ButtonLink to="/home" $variation="primary">
+          <ButtonLink to="/home" $variant="primary">
             Go to Home
           </ButtonLink>
-          <ButtonLink to="/login" $variation="secondary">
+          <ButtonLink to="/login" $variant="secondary">
             Go to Login
           </ButtonLink>
         </ActionsContainer>

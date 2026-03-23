@@ -20,7 +20,7 @@ function UserAvatar() {
 
   return (
     <InlineGroup>
-      <Avatar alt="UserAvatar" src="./public/WhereRU.png" />
+      <Avatar alt="UserAvatar" src="/WhereRU.png" />
       <Name>{name}</Name>
     </InlineGroup>
   );
