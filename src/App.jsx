@@ -6,7 +6,6 @@ import Home from "./pages/Home";
 import PreviousAssessment from "./pages/PreviousAssessment";
 import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
-import LoginForm from "./features/authentication/LoginForm";
 
 function App() {
   return (
@@ -25,11 +24,6 @@ function App() {
           </Route>
 
           <Route path="login" element={<Login />} />
-          <Route path="login/student" element={<LoginForm role="student" />} />
-          <Route
-            path="login/instructor"
-            element={<LoginForm role="instructor" />}
-          />
 
           <Route path="*" element={<PageNotFound />} />
         </Routes>

@@ -1,59 +1,35 @@
-import { useNavigate } from "react-router";
-import styled from "styled-components";
-
-const StyledLoginChooser = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xl);
-`;
-
-const Title = styled.h1`
-  text-align: center;
-  font-size: var(--font-size-xxl);
-  color: var(--color-primary);
-`;
-
-const ActionsContainer = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: var(--space-l);
-  margin-top: var(--space-m);
-`;
-
-const Button = styled.button`
-  border: 0;
-  border-radius: 12px;
-  padding: var(--space-l) var(--space-2xl);
-  font-weight: 700;
-  cursor: pointer;
-  color: var(--color-light);
-  background: ${({ $variant }) =>
-    $variant === "student"
-      ? "var(--color-secondary)"
-      : "var(--color-tertiary)"};
-`;
+import Stack from "../../ui/Stack";
+import Heading from "../../ui/Heading";
+import ActionsContainer from "../../ui/ActionsContainer";
+import ButtonLink from "../../ui/ButtonLink";
 
 function LoginChooser() {
-  const navigate = useNavigate();
+  const handleChooseRole = (role) => {
+    localStorage.setItem("role", role);
+  };
 
   return (
-    <StyledLoginChooser>
-      <Title>Select your role</Title>
+    <Stack>
+      <Heading type="login">Select your role</Heading>
 
-      <ActionsContainer>
-        <Button $variant="student" onClick={() => navigate("/login/student")}>
+      <ActionsContainer type="login">
+        <ButtonLink
+          $variation="student"
+          to="/home"
+          onClick={() => handleChooseRole("student")}
+        >
           Student
-        </Button>
+        </ButtonLink>
 
-        <Button
-          $variant="instructor"
-          onClick={() => navigate("/login/instructor")}
+        <ButtonLink
+          $variation="instructor"
+          to="/home"
+          onClick={() => handleChooseRole("instructor")}
         >
           Instructor
-        </Button>
+        </ButtonLink>
       </ActionsContainer>
-    </StyledLoginChooser>
+    </Stack>
   );
 }
 

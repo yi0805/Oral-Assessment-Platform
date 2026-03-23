@@ -22,11 +22,11 @@ const Brand = styled.div`
 const Title = styled.h1`
   font-size: var(--font-size-xl);
   color: var(--color-primary);
-  line-height: 1.1;
 `;
 
 const Logo = styled.img`
-  width: 4rem;
+  width: 100%;
+  max-width: 8ch;
   height: 2rem;
 `;
 

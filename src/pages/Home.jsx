@@ -1,6 +1,6 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router";
 import styled from "styled-components";
+
+import useRequireAuth from "../hooks/useRequireAuth";
 
 import InstructorDashboard from "../features/dashboard/InstructorDashboard";
 import StudentPractice from "../features/student/StudentPractice";
@@ -10,12 +10,7 @@ const StyledHome = styled.div`
 `;
 
 function Home() {
-  const navigate = useNavigate();
-  const role = localStorage.getItem("role");
-
-  useEffect(() => {
-    if (!role) navigate("/login");
-  }, [navigate, role]);
+  const role = useRequireAuth();
 
   return (
     <StyledHome>

@@ -1,44 +1,11 @@
 import { useState } from "react";
-import styled from "styled-components";
 
 import StudentPracticeModal from "./StudentPracticeModal";
-
-const StyledStudentPractice = styled.div`
-  max-width: 56rem;
-  background: var(--color-light);
-  border: 1px solid var(--color-light-2);
-  border-radius: 14px;
-  padding: var(--space-4xl);
-`;
-
-const Title = styled.h1`
-  font-size: var(--font-size-xxl);
-  color: var(--color-primary);
-  margin-bottom: var(--space-xl);
-`;
-
-const CourseContainer = styled.div`
-  display: flex;
-  gap: var(--space-m);
-  align-items: center;
-`;
-
-const Input = styled.input`
-  padding: var(--space-m) var(--space-l);
-  border-radius: 10px;
-  border: 1px solid var(--color-light-2);
-  font-size: var(--font-size-default);
-`;
-
-const Button = styled.button`
-  border: 0;
-  border-radius: 10px;
-  padding: var(--space-m) var(--space-2xl);
-  font-weight: 700;
-  cursor: pointer;
-  color: var(--color-light);
-  background: var(--color-secondary);
-`;
+import ContentCard from "../../ui/ContentCard";
+import Heading from "../../ui/Heading";
+import InlineGroup from "../../ui/InlineGroup";
+import Input from "../../ui/Input";
+import Button from "../../ui/Button";
 
 export default function StudentPractice() {
   const [courseNumber, setCourseNumber] = useState("");
@@ -55,10 +22,10 @@ export default function StudentPractice() {
 
   return (
     <>
-      <StyledStudentPractice>
-        <Title>Student dashboard</Title>
+      <ContentCard>
+        <Heading type="student">Student dashboard</Heading>
 
-        <CourseContainer>
+        <InlineGroup>
           <Input
             value={courseNumber}
             onChange={(e) => setCourseNumber(e.target.value)}
@@ -67,8 +34,8 @@ export default function StudentPractice() {
           <Button type="button" onClick={open}>
             Start AI practice
           </Button>
-        </CourseContainer>
-      </StyledStudentPractice>
+        </InlineGroup>
+      </ContentCard>
 
       <StudentPracticeModal
         isOpen={isOpen}

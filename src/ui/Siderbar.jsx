@@ -1,11 +1,13 @@
 import styled from "styled-components";
 import { NavLink } from "react-router";
 
+import useRequireAuth from "../hooks/useRequireAuth";
+
 const StyledSidebar = styled.div`
   background: var(--color-light);
   border-right: 1px solid var(--color-light-2);
   padding: var(--space-3xl) var(--space-xl);
-  height: 100%;
+  min-height: 100%;
   grid-area: sidebar;
 `;
 
@@ -29,7 +31,7 @@ const Item = styled(NavLink)`
 `;
 
 function Siderbar() {
-  const role = localStorage.getItem("role");
+  const role = useRequireAuth();
 
   return (
     <StyledSidebar>
