@@ -31,8 +31,8 @@ export default function StudentPractice() {
             onChange={(e) => setCourseNumber(e.target.value)}
             placeholder="Enter course number"
           />
-          <Button type="button" onClick={open}>
-            Start AI practice
+          <Button className="btn-fill-effect" type="button" onClick={open}>
+                      Start AI practice 
           </Button>
         </InlineGroup>
       </ContentCard>

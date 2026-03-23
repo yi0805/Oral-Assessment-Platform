@@ -51,7 +51,7 @@ function Sidebar() {
   return (
     <StyledSidebar>
       <Nav>
-        <Item to="/home">Home</Item>
+        <Item to="/home">Courses</Item>
         {role === "student" ? (
           <Item to="/previous-assessment">Previous assessment</Item>
         ) : null}

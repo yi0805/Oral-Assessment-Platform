@@ -1,7 +1,37 @@
 import { createGlobalStyle } from "styled-components";
 
 const GlobalStyle = createGlobalStyle`
+.btn-fill-effect {
+  /* 1. Dynamic Background: Use 'transparent' or your base color for the right side */
+  /* We use 50%/50% split for the transition math */
+  background: linear-gradient(to right, var(--color-primary) 50%, transparent 50%);
+  background-size: 200% 100%;
+  
+  /* 2. Start at the 'transparent' side (right) */
+  background-position: right bottom;
+  
+  /* 3. Base Styles */
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+  
+  /* Explicitly set the base background color if it's not inherited */
+  background-color: transparent; 
 
+  /* 4. Smooth transition */
+  transition: all 0.5s ease-out;
+  cursor: pointer;
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
+
+.btn-fill-effect:hover {
+  /* 5. Slide the navy (left side) into view */
+  background-position: left bottom;
+  
+  /* 6. Invert text color */
+  color: #ffffff;
+}
 /*** Spacing Variables *****/
 :root {
   --space-2xs: 3px;
