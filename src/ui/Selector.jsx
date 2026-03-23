@@ -1,6 +1,9 @@
 import styled from "styled-components";
 
 const Select = styled.select`
+  display: block;
+  width: 100%;
+  max-width: 40ch;
   padding: var(--space-m) var(--space-l);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-light-2);

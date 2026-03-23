@@ -10,7 +10,7 @@ const ContentCard = styled.div`
   background: var(--color-light);
   border: 1px solid var(--color-light-2);
   border-radius: var(--radius-lg);
-  padding: var(--space-4xl);
+  padding: clamp(var(--space-3xl), 4vw, var(--space-4xl));
   width: 100%;
   max-width: 120ch;
 

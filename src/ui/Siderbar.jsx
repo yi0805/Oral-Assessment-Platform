@@ -9,12 +9,23 @@ const StyledSidebar = styled.div`
   padding: var(--space-3xl) var(--space-xl);
   min-height: 100%;
   grid-area: sidebar;
+
+  @media (max-width: 768px) {
+    min-height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-light-2);
+    padding: var(--space-m) var(--space-xl);
+  }
 `;
 
 const Nav = styled.nav`
   display: flex;
   flex-direction: column;
   gap: var(--space-m);
+
+  @media (max-width: 768px) {
+    flex-direction: row;
+  }
 `;
 
 const Item = styled(NavLink)`

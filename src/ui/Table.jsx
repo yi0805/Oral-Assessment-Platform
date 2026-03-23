@@ -1,10 +1,15 @@
 import styled from "styled-components";
 
-const Table = styled.table`
+const TableWrapper = styled.div`
   width: 100%;
   max-width: 90ch;
-  border-collapse: collapse;
+  overflow-x: auto;
   margin-top: var(--space-xl);
+`;
+
+const StyledTable = styled.table`
+  width: 100%;
+  border-collapse: collapse;
 
   th,
   td {
@@ -25,5 +30,13 @@ const Table = styled.table`
     background: var(--color-primary-tint);
   }
 `;
+
+function Table({ children, ...props }) {
+  return (
+    <TableWrapper>
+      <StyledTable {...props}>{children}</StyledTable>
+    </TableWrapper>
+  );
+}
 
 export default Table;
