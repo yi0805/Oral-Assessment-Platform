@@ -1,7 +1,9 @@
 import styled from "styled-components";
 import { useNavigate } from "react-router";
+import { googleLogout } from "@react-oauth/google";
 
 import UserAvatar from "./UserAvatar";
+import Button from "./Button";
 
 const StyledHeader = styled.header`
   display: flex;
@@ -22,11 +24,11 @@ const Brand = styled.div`
 const Title = styled.h1`
   font-size: var(--font-size-xl);
   color: var(--color-primary);
-  line-height: 1.1;
 `;
 
 const Logo = styled.img`
-  width: 4rem;
+  width: 100%;
+  max-width: 8ch;
   height: 2rem;
 `;
 
@@ -36,21 +38,14 @@ const UserContainer = styled.div`
   gap: var(--space-l);
 `;
 
-const Logout = styled.button`
-  border: 1px solid var(--color-light-2);
-  background: var(--color-light);
-  border-radius: 10px;
-  padding: var(--space-s) var(--space-l);
-  font-weight: 700;
-  cursor: pointer;
-  color: var(--color-primary);
-`;
-
 function Header() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
     localStorage.removeItem("role");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userPicture");
+    googleLogout();
     navigate("/login");
   };
 
@@ -58,11 +53,13 @@ function Header() {
     <StyledHeader>
       <Brand>
         <Title>WhereAU</Title>
-        <Logo src="./public/WhereRU.png" alt="WhereAU Logo" />
+        <Logo src="/WhereRU.png" alt="WhereAU Logo" />
       </Brand>
       <UserContainer>
         <UserAvatar />
-        <Logout onClick={handleLogout}>Logout</Logout>
+        <Button $variant="secondary" onClick={handleLogout}>
+          Logout
+        </Button>
       </UserContainer>
     </StyledHeader>
   );

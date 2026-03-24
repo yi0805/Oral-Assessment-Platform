@@ -6,7 +6,8 @@ import Home from "./pages/Home";
 import PreviousAssessment from "./pages/PreviousAssessment";
 import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
-import LoginForm from "./features/authentication/LoginForm";
+import StudentAssignments from "./features/student/StudentAssignments";
+import StudentAssessment from "./features/student/StudentAssessment";
 
 function App() {
   return (
@@ -22,14 +23,17 @@ function App() {
               path="previous-assessment"
               element={<PreviousAssessment />}
             />
+            <Route
+              path="courses/:courseId/assignments"
+              element={<StudentAssignments />}
+            />
+            <Route
+              path="courses/:courseId/assessments/:assessmentId"
+              element={<StudentAssessment />}
+            />
           </Route>
 
           <Route path="login" element={<Login />} />
-          <Route path="login/student" element={<LoginForm role="student" />} />
-          <Route
-            path="login/instructor"
-            element={<LoginForm role="instructor" />}
-          />
 
           <Route path="*" element={<PageNotFound />} />
         </Routes>

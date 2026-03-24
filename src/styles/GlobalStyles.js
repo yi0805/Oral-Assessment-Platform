@@ -1,8 +1,37 @@
 import { createGlobalStyle } from "styled-components";
 
 const GlobalStyle = createGlobalStyle`
+.btn-fill-effect {
+  /* 1. Dynamic Background: Use 'transparent' or your base color for the right side */
+  /* We use 50%/50% split for the transition math */
+  background: linear-gradient(to right, var(--color-primary) 50%, transparent 50%);
+  background-size: 200% 100%;
+  
+  /* 2. Start at the 'transparent' side (right) */
+  background-position: right bottom;
+  
+  /* 3. Base Styles */
+  border: 2px solid var(--color-primary);
+  color: var(--color-primary);
+  
+  /* Explicitly set the base background color if it's not inherited */
+  background-color: transparent; 
 
+  /* 4. Smooth transition */
+  transition: all 0.5s ease-out;
+  cursor: pointer;
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
 
+.btn-fill-effect:hover {
+  /* 5. Slide the navy (left side) into view */
+  background-position: left bottom;
+  
+  /* 6. Invert text color */
+  color: #ffffff;
+}
 /*** Spacing Variables *****/
 :root {
   --space-2xs: 3px;
@@ -28,8 +57,21 @@ const GlobalStyle = createGlobalStyle`
 }
 
 /*** End Font Size Variables *****/
-/*** Common *****/
-/*** End Common *****/
+/*** Border Radius *****/
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+/*** End Border Radius *****/
+/*** Shadows *****/
+:root {
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 10px 30px rgba(var(--color-primary-rgb), 0.12);
+}
+
+/*** End Shadows *****/
 /*** Colors *****/
 :root {
   /*tints*/
@@ -103,8 +145,21 @@ const GlobalStyle = createGlobalStyle`
   box-sizing: border-box;
   padding: 0;
   margin: 0;
+}
 
-  transition: background-color 0.3s, border 0.3s;
+body {
+  font-family: "Poppins", sans-serif;
+  color: var(--color-dark-2);
+  font-size: var(--font-size-default);
+  line-height: 1.6;
+}
+
+input,
+button,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
 }
 `;
 

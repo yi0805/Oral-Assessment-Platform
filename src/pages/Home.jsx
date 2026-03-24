@@ -1,27 +1,12 @@
-import { useEffect } from "react";
-import { useNavigate } from "react-router";
-import styled from "styled-components";
+import useRequireAuth from "../hooks/useRequireAuth";
 
 import InstructorDashboard from "../features/dashboard/InstructorDashboard";
-import StudentPractice from "../features/student/StudentPractice";
-
-const StyledHome = styled.div`
-  padding: var(--space-4xl);
-`;
+import StudentHome from "../features/student/StudentHome";
 
 function Home() {
-  const navigate = useNavigate();
-  const role = localStorage.getItem("role");
+  const role = useRequireAuth();
 
-  useEffect(() => {
-    if (!role) navigate("/login");
-  }, [navigate, role]);
-
-  return (
-    <StyledHome>
-      {role === "instructor" ? <InstructorDashboard /> : <StudentPractice />}
-    </StyledHome>
-  );
+  return role === "instructor" ? <InstructorDashboard /> : <StudentHome />;
 }
 
 export default Home;

@@ -1,13 +1,10 @@
 import styled from "styled-components";
 
-const StyledUserAvatar = styled.div`
-  display: flex;
-  gap: var(--space-m);
-  align-items: center;
-`;
+import InlineGroup from "./InlineGroup";
 
 const Avatar = styled.img`
-  width: 2.6rem;
+  width: 100%;
+  max-width: 5ch;
   border-radius: 50%;
   border: 2px solid var(--color-secondary);
 `;
@@ -19,13 +16,14 @@ const Name = styled.p`
 `;
 
 function UserAvatar() {
-  const name = "YI";
+  const name = localStorage.getItem("userName") || "User";
+  const picture = localStorage.getItem("userPicture") || "/WhereRU.png";
 
   return (
-    <StyledUserAvatar>
-      <Avatar alt="UserAvatar" src="./public/WhereRU.png" />
+    <InlineGroup>
+      <Avatar alt="UserAvatar" src={picture} referrerPolicy="no-referrer" />
       <Name>{name}</Name>
-    </StyledUserAvatar>
+    </InlineGroup>
   );
 }
 

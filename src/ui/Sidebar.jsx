@@ -1,25 +1,42 @@
 import styled from "styled-components";
 import { NavLink } from "react-router";
 
+import useRequireAuth from "../hooks/useRequireAuth";
+
 const StyledSidebar = styled.div`
   background: var(--color-light);
   border-right: 1px solid var(--color-light-2);
   padding: var(--space-3xl) var(--space-xl);
-  height: 100%;
+  min-height: 100%;
   grid-area: sidebar;
+
+  @media (max-width: 768px) {
+    min-height: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-light-2);
+    padding: var(--space-m) var(--space-xl);
+  }
 `;
 
 const Nav = styled.nav`
   display: flex;
   flex-direction: column;
   gap: var(--space-m);
+
+  @media (max-width: 768px) {
+    flex-direction: row;
+  }
 `;
 
 const Item = styled(NavLink)`
   text-decoration: none;
   color: var(--color-dark-2);
   padding: var(--space-m) var(--space-l);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
+
+  &:hover:not(.active) {
+    background: var(--color-primary-tint);
+  }
 
   &.active {
     background: var(--color-secondary-tint);
@@ -28,13 +45,13 @@ const Item = styled(NavLink)`
   }
 `;
 
-function Siderbar() {
-  const role = localStorage.getItem("role");
+function Sidebar() {
+  const role = useRequireAuth();
 
   return (
     <StyledSidebar>
       <Nav>
-        <Item to="/home">Home</Item>
+        <Item to="/home">Courses</Item>
         {role === "student" ? (
           <Item to="/previous-assessment">Previous assessment</Item>
         ) : null}
@@ -43,4 +60,4 @@ function Siderbar() {
   );
 }
 
-export default Siderbar;
+export default Sidebar;
