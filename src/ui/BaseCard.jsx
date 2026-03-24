@@ -1,5 +1,7 @@
 import styled, { css } from "styled-components";
 
+// For standalone card
+
 const variants = {
   login: css`
     padding: var(--space-4xl);

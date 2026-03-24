@@ -6,6 +6,8 @@ import Home from "./pages/Home";
 import PreviousAssessment from "./pages/PreviousAssessment";
 import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
+import StudentAssignments from "./features/student/StudentAssignments";
+import StudentAssessment from "./features/student/StudentAssessment";
 
 function App() {
   return (
@@ -20,6 +22,14 @@ function App() {
             <Route
               path="previous-assessment"
               element={<PreviousAssessment />}
+            />
+            <Route
+              path="courses/:courseId/assignments"
+              element={<StudentAssignments />}
+            />
+            <Route
+              path="courses/:courseId/assessments/:assessmentId"
+              element={<StudentAssessment />}
             />
           </Route>
 

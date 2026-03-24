@@ -1,5 +1,7 @@
 import styled, { css } from "styled-components";
 
+//Wrap normal content
+
 const variants = {
   modal: css`
     max-width: 65ch;

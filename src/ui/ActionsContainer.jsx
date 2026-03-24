@@ -1,5 +1,7 @@
 import styled, { css } from "styled-components";
 
+//Button container with variants for different layouts (centered, end-aligned)
+
 const variants = {
   centered: css`
     justify-content: center;

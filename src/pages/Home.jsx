@@ -1,12 +1,12 @@
 import useRequireAuth from "../hooks/useRequireAuth";
 
 import InstructorDashboard from "../features/dashboard/InstructorDashboard";
-import StudentPractice from "../features/student/StudentPractice";
+import StudentHome from "../features/student/StudentHome";
 
 function Home() {
   const role = useRequireAuth();
 
-  return role === "instructor" ? <InstructorDashboard /> : <StudentPractice />;
+  return role === "instructor" ? <InstructorDashboard /> : <StudentHome />;
 }
 
 export default Home;
