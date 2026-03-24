@@ -1,24 +1,35 @@
-import { useRef } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
-import { useGoogleLogin } from "@react-oauth/google";
+import { useGoogleOAuth } from "@react-oauth/google";
 
 import Stack from "../../ui/Stack";
 import Heading from "../../ui/Heading";
 import ActionsContainer from "../../ui/ActionsContainer";
 import Button from "../../ui/Button";
 
+const REDIRECT_URI = `${window.location.origin}/login`;
+
 function LoginChooser() {
   const navigate = useNavigate();
-  const pendingRole = useRef(null);
+  const { clientId } = useGoogleOAuth();
 
-  const googleLogin = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
+  useEffect(() => {
+    const hash = window.location.hash.substring(1);
+    if (!hash) return;
+
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get("access_token");
+    if (!accessToken) return;
+
+    window.history.replaceState({}, document.title, window.location.pathname);
+
+    async function handleRedirectResponse() {
       try {
         const res = await fetch(
           "https://www.googleapis.com/oauth2/v3/userinfo",
           {
             headers: {
-              Authorization: `Bearer ${tokenResponse.access_token}`,
+              Authorization: `Bearer ${accessToken}`,
             },
           },
         );
@@ -26,20 +37,31 @@ function LoginChooser() {
         if (!res.ok) throw new Error("Failed to fetch user info");
 
         const userInfo = await res.json();
-        localStorage.setItem("role", pendingRole.current);
         localStorage.setItem("userName", userInfo.name);
         localStorage.setItem("userPicture", userInfo.picture);
+
         navigate("/home");
       } catch (err) {
         console.error("Fetch user info error:", err);
       }
-    },
-    onError: (error) => console.log("Google login failed:", error),
-  });
+    }
+
+    handleRedirectResponse();
+  }, [navigate]);
 
   const handleChooseRole = (role) => {
-    pendingRole.current = role;
-    googleLogin();
+    localStorage.setItem("role", role);
+
+    const authParams = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: REDIRECT_URI,
+      response_type: "token",
+      scope: "openid profile email",
+      include_granted_scopes: "true",
+      prompt: "select_account",
+    });
+
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${authParams}`;
   };
 
   return (

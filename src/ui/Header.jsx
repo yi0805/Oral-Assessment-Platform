@@ -1,5 +1,6 @@
 import styled from "styled-components";
 import { useNavigate } from "react-router";
+import { googleLogout } from "@react-oauth/google";
 
 import UserAvatar from "./UserAvatar";
 import Button from "./Button";
@@ -44,6 +45,7 @@ function Header() {
     localStorage.removeItem("role");
     localStorage.removeItem("userName");
     localStorage.removeItem("userPicture");
+    googleLogout();
     navigate("/login");
   };
 
