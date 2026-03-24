@@ -8,39 +8,60 @@ import SearchBar from "../../ui/SearchBar";
 
 const SearchWrapper = styled.div`
   margin-bottom: var(--space-xl);
+  right: 0;
+`;
+
+const Container = styled.div`
+  height: auto;
+  border-radius: var(--radius-md);
+  max-width: 100%;
+  background: white;
+  padding: var(--space-3xl);
+  margin: 10px 0;
 `;
 
 const CourseGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(365px, 1fr));
   gap: var(--space-xl);
 `;
 
 const CourseCard = styled.div`
-  border: 1px solid var(--color-light-2);
-  border-radius: 12px;
-  background: var(--color-light);
+  border-radius: var(--radius-md);
+  background: linear-gradient(to top right, #d2faf6, ${({ $color }) => $color} 63%);
   cursor: pointer;
-`;
-
-const CardBanner = styled.div`
-  height: 100px;
-  background: ${({ $color }) => $color};
+  height: 16rem;
+  width: 24rem;
+  position: relative;
+  box-shadow: 5px 8px 8px 0 #1e1e2132;
 `;
 
 const CardBody = styled.div`
   padding: var(--space-m);
+  position: absolute;
+  bottom: 0;
+  background: white;
+  width: 100%;
+  min-height: 170px;
+  border-radius: 0 0 12px 12px;
 `;
 
 const CourseCode = styled.p`
-  margin: 0 0 0.3rem 0;
+  font-size: var(--font-size-s);
   font-weight: 600;
-  color: var(--color-primary);
+  margin: 0 0 0.3rem 0;
+  color: var(--color-secondary);
 `;
 
-const CourseName = styled.p`
+const CourseName = styled.h3`
   margin: 0;
-  color: var(--color-dark-2);
+  font-weight: 600;
+  color: var(--color-dark);
+`;
+
+const CourseDesc = styled.p`
+  margin: 0 0 0.3rem 0;
+  colour: var(--color-dark-2);
 `;
 
 const EmptyState = styled.p`
@@ -60,33 +81,38 @@ export default function StudentHome() {
 
   return (
     <>
-      <Heading $variant="page">My Courses</Heading>
-
-      <SearchWrapper>
-        <SearchBar
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search courses..."
-        />
-      </SearchWrapper>
+      <Container>
+        <Heading $variant="page">My Courses</Heading>
+        <SearchWrapper>
+          <SearchBar
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search courses..."
+          />
+        </SearchWrapper>
+      </Container>
 
       {filtered.length === 0 ? (
         <EmptyState>No courses match your search.</EmptyState>
       ) : (
-        <CourseGrid>
-          {filtered.map((course) => (
-            <CourseCard
-              key={course.id}
-              onClick={() => navigate(`/courses/${course.id}/assignments`)}
-            >
-              <CardBanner $color={course.color} />
-              <CardBody>
-                <CourseCode>{course.code}</CourseCode>
-                <CourseName>{course.name}</CourseName>
-              </CardBody>
-            </CourseCard>
-          ))}
-        </CourseGrid>
+        <Container>
+          <CourseGrid>
+            {filtered.map((course) => (
+              <CourseCard
+                key={course.id}
+                $color={course.color}
+                onClick={() => navigate(`/courses/${course.id}/assignments`)}
+              >
+                {/* <CardBanner $color={course.color} /> */}
+                <CardBody>
+                  <CourseCode>{course.code}</CourseCode>
+                  <CourseName>{course.name}</CourseName>
+                  <CourseDesc>a short description of anything ^^</CourseDesc>
+                </CardBody>
+              </CourseCard>
+            ))}
+          </CourseGrid>
+        </Container>
       )}
     </>
   );
