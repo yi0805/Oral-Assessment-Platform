@@ -9,6 +9,14 @@ import SearchBar from "../../ui/SearchBar";
 const SearchWrapper = styled.div`
   margin-bottom: var(--space-xl);
   right: 0;
+  float: right;
+  width: 460px;
+`;
+
+const Head = styled.div`
+  flex: 1;
+  flex-direction: row;
+  overflow: hidden;  
 `;
 
 const Container = styled.div`
@@ -17,7 +25,7 @@ const Container = styled.div`
   max-width: 100%;
   background: white;
   padding: var(--space-3xl);
-  margin: 10px 0;
+  margin: 0 0 10px 0;
 `;
 
 const CourseGrid = styled.div`
@@ -28,7 +36,7 @@ const CourseGrid = styled.div`
 
 const CourseCard = styled.div`
   border-radius: var(--radius-md);
-  background: linear-gradient(to top right, #d2faf6, ${({ $color }) => $color} 63%);
+  background: radial-gradient(ellipse at left top, #d2faf6, ${({ $color }) => $color} 45%);
   cursor: pointer;
   height: 16rem;
   width: 24rem;
@@ -61,7 +69,7 @@ const CourseName = styled.h3`
 
 const CourseDesc = styled.p`
   margin: 0 0 0.3rem 0;
-  colour: var(--color-dark-2);
+  colour: var(--color-dark-3-tint);
 `;
 
 const EmptyState = styled.p`
@@ -82,14 +90,17 @@ export default function StudentHome() {
   return (
     <>
       <Container>
-        <Heading $variant="page">My Courses</Heading>
-        <SearchWrapper>
-          <SearchBar
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search courses..."
-          />
-        </SearchWrapper>
+        <Head>
+          <Heading $variant="page">My Courses</Heading>
+          <SearchWrapper>
+            <SearchBar
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search courses..."
+            />
+          </SearchWrapper>
+        </Head>
+        <CourseDesc>Welcome and play with our website!</CourseDesc>
       </Container>
 
       {filtered.length === 0 ? (

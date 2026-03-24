@@ -17,7 +17,7 @@ const StyledHeader = styled.header`
 
 const Brand = styled.div`
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: var(--space-2xs);
 `;
 
@@ -28,8 +28,8 @@ const Title = styled.h1`
 
 const Logo = styled.img`
   width: 100%;
-  max-width: 8ch;
-  height: 2rem;
+  max-width: 9ch;
+  height: 2.5rem;
 `;
 
 const UserContainer = styled.div`
@@ -52,8 +52,8 @@ function Header() {
   return (
     <StyledHeader>
       <Brand>
-        <Title>WhereAU</Title>
         <Logo src="/WhereRU.png" alt="WhereAU Logo" />
+        <Title>WhereRU</Title>
       </Brand>
       <UserContainer>
         <UserAvatar />

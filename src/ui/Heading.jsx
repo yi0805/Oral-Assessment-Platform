@@ -15,7 +15,7 @@ const Heading = styled.h1`
   font-size: var(--font-size-xl);
   margin-bottom: var(--space-xl);
   overflow-wrap: break-word;
-
+  float: left;
   ${({ $variant }) => variants[$variant]}
 `;
 
