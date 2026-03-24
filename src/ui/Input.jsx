@@ -1,5 +1,7 @@
 import styled, { css } from "styled-components";
 
+import { formControlFocus } from "./styles/shared";
+
 const variants = {
   modal: css`
     width: 100%;
@@ -14,11 +16,7 @@ const Input = styled.input`
   border: 1px solid var(--color-light-2);
   background: var(--color-light);
 
-  &:focus {
-    outline: none;
-    border-color: var(--color-secondary);
-    box-shadow: 0 0 0 2px var(--color-secondary-tint);
-  }
+  ${formControlFocus}
 
   ${({ $variant }) => variants[$variant]}
 `;

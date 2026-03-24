@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import ContentCard from "../../ui/ContentCard";
 import Heading from "../../ui/Heading";
@@ -9,8 +9,6 @@ import InstructorTable from "../../ui/InstructorTable";
 
 export default function InstructorDashboard() {
   const [courseNumber, setCourseNumber] = useState("");
-
-  const overView = useMemo(() => studentData, []);
 
   return (
     <ContentCard>
@@ -28,7 +26,7 @@ export default function InstructorDashboard() {
         ))}
       </Selector>
 
-      {courseNumber ? <InstructorTable values={overView} /> : null}
+      {courseNumber ? <InstructorTable values={studentData} /> : null}
     </ContentCard>
   );
 }

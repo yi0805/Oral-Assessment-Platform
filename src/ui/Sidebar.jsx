@@ -45,7 +45,7 @@ const Item = styled(NavLink)`
   }
 `;
 
-function Siderbar() {
+function Sidebar() {
   const role = useRequireAuth();
 
   return (
@@ -60,4 +60,4 @@ function Siderbar() {
   );
 }
 
-export default Siderbar;
+export default Sidebar;

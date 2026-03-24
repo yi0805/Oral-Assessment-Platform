@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import Input from "../../ui/Input";
 import ContentCard from "../../ui/ContentCard";
@@ -24,25 +24,23 @@ export default function StudentPracticeModal({
   courseNumber,
 }) {
   const [questionIndex, setQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState(Array(10).fill(""));
-
-  const questionData = useMemo(() => questions, []);
+  const [answers, setAnswers] = useState(Array(questions.length).fill(""));
 
   if (!isOpen) return null;
 
-  const title = `AI practice (${questionIndex + 1}/10)`;
-  const question = questionData[questionIndex];
+  const title = `AI practice (${questionIndex + 1}/${questions.length})`;
+  const question = questions[questionIndex];
   const answer = answers[questionIndex];
 
   const canGoBack = questionIndex > 0;
-  const isLast = questionIndex === 9;
+  const isLast = questionIndex === questions.length - 1;
 
   const setCurrentAnswer = (value) => {
     setAnswers((ans) => ans.map((a, i) => (i === questionIndex ? value : a)));
   };
 
   function next() {
-    setQuestionIndex((i) => Math.min(i + 1, 9));
+    setQuestionIndex((i) => Math.min(i + 1, questions.length - 1));
   }
 
   function back() {

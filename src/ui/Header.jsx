@@ -42,6 +42,8 @@ function Header() {
 
   const handleLogout = () => {
     localStorage.removeItem("role");
+    localStorage.removeItem("userName");
+    localStorage.removeItem("userPicture");
     navigate("/login");
   };
 

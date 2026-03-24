@@ -1,5 +1,7 @@
 import styled from "styled-components";
 
+import { formControlFocus } from "./styles/shared";
+
 const Select = styled.select`
   display: block;
   width: 100%;
@@ -10,11 +12,7 @@ const Select = styled.select`
   background: var(--color-light);
   cursor: pointer;
 
-  &:focus {
-    outline: none;
-    border-color: var(--color-secondary);
-    box-shadow: 0 0 0 2px var(--color-secondary-tint);
-  }
+  ${formControlFocus}
 `;
 
 function Selector({ children, ...props }) {

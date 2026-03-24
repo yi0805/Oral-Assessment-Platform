@@ -2,7 +2,7 @@ import { Outlet } from "react-router";
 import styled from "styled-components";
 
 import Header from "./Header";
-import Siderbar from "./Siderbar";
+import Sidebar from "./Sidebar";
 
 const StyleAppLayout = styled.div`
   display: grid;
@@ -30,7 +30,7 @@ function AppLayout() {
   return (
     <StyleAppLayout>
       <Header />
-      <Siderbar />
+      <Sidebar />
 
       <Main>
         <Outlet />

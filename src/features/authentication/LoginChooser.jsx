@@ -12,9 +12,27 @@ function LoginChooser() {
   const pendingRole = useRef(null);
 
   const googleLogin = useGoogleLogin({
-    onSuccess: () => {
-      localStorage.setItem("role", pendingRole.current);
-      navigate("/home");
+    onSuccess: async (tokenResponse) => {
+      try {
+        const res = await fetch(
+          "https://www.googleapis.com/oauth2/v3/userinfo",
+          {
+            headers: {
+              Authorization: `Bearer ${tokenResponse.access_token}`,
+            },
+          },
+        );
+
+        if (!res.ok) throw new Error("Failed to fetch user info");
+
+        const userInfo = await res.json();
+        localStorage.setItem("role", pendingRole.current);
+        localStorage.setItem("userName", userInfo.name);
+        localStorage.setItem("userPicture", userInfo.picture);
+        navigate("/home");
+      } catch (err) {
+        console.error("Login error:", err);
+      }
     },
     onError: (error) => console.log("Google login failed:", error),
   });

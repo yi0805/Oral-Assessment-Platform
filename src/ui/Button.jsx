@@ -1,5 +1,7 @@
 import styled, { css } from "styled-components";
 
+import { focusRing } from "./styles/shared";
+
 const variants = {
   primary: css`
     background: var(--color-secondary);
@@ -37,10 +39,7 @@ const Button = styled.button`
     opacity: 0.9;
   }
 
-  &:focus-visible {
-    outline: 2px solid var(--color-secondary);
-    outline-offset: 2px;
-  }
+  ${focusRing}
 
   &:disabled {
     opacity: 0.45;

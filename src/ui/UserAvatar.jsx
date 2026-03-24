@@ -16,11 +16,12 @@ const Name = styled.p`
 `;
 
 function UserAvatar() {
-  const name = "YI";
+  const name = localStorage.getItem("userName") || "User";
+  const picture = localStorage.getItem("userPicture") || "/WhereRU.png";
 
   return (
     <InlineGroup>
-      <Avatar alt="UserAvatar" src="/WhereRU.png" />
+      <Avatar alt="UserAvatar" src={picture} referrerPolicy="no-referrer" />
       <Name>{name}</Name>
     </InlineGroup>
   );

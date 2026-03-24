@@ -1,11 +1,9 @@
-import { useMemo } from "react";
-
 import useRequireAuth from "../hooks/useRequireAuth";
 
 import Stack from "../ui/Stack";
 import StatsContainer from "../ui/StatsContainer";
 import Stats from "../ui/Stats";
-import PreviousAssessmentScore from "../data/PreviousassessmentScore";
+import PreviousAssessmentScore from "../data/previousAssessmentScore";
 import ContentCard from "../ui/ContentCard";
 import Heading from "../ui/Heading";
 import PreviousAssessmentTable from "../ui/PreviousAssessmentTable";
@@ -14,14 +12,14 @@ import FeedbackCard from "../ui/FeedbackCard";
 function PreviousAssessment() {
   useRequireAuth();
 
-  const assessmentRows = useMemo(() => PreviousAssessmentScore, []);
-
-  const totalAssessments = assessmentRows.length;
+  const totalAssessments = PreviousAssessmentScore.length;
   const averageScore = Math.round(
-    assessmentRows.reduce((sum, row) => sum + row.score, 0) /
-      assessmentRows.length,
+    PreviousAssessmentScore.reduce((sum, row) => sum + row.score, 0) /
+      PreviousAssessmentScore.length,
   );
-  const bestScore = Math.max(...assessmentRows.map((row) => row.score));
+  const bestScore = Math.max(
+    ...PreviousAssessmentScore.map((row) => row.score),
+  );
 
   return (
     <Stack>
@@ -34,7 +32,7 @@ function PreviousAssessment() {
       <ContentCard>
         <Heading>Assessment history</Heading>
 
-        <PreviousAssessmentTable values={assessmentRows} />
+        <PreviousAssessmentTable values={PreviousAssessmentScore} />
       </ContentCard>
 
       <ContentCard>
