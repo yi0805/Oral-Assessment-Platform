@@ -1,18 +1,34 @@
 import { Outlet } from "react-router";
 import styled from "styled-components";
 
-const H1 = styled.h1`
-  background-color: red;
-  padding: 20px 20px;
-  margin-bottom: 30px;
+import Header from "./Header";
+import Siderbar from "./Siderbar";
+
+const StyleAppLayout = styled.div`
+  display: grid;
+  grid-template-columns: 16rem 1fr;
+  grid-template-rows: 4.8rem 1fr;
+  grid-template-areas: "header header" "sidebar main";
+  height: 100vh;
+  background: var(--color-primary-tint);
+`;
+
+const Main = styled.main`
+  grid-area: main;
+  overflow: auto;
+  padding: var(--space-3xl);
 `;
 
 function AppLayout() {
   return (
-    <div>
-      <H1>AppLayout</H1>
-      <Outlet />
-    </div>
+    <StyleAppLayout>
+      <Header />
+      <Siderbar />
+
+      <Main>
+        <Outlet />
+      </Main>
+    </StyleAppLayout>
   );
 }
 

@@ -1,33 +1,26 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router";
 import styled from "styled-components";
 
-import Row from "../ui/Row";
+import InstructorDashboard from "../features/dashboard/InstructorDashboard";
+import StudentPractice from "../features/student/StudentPractice";
 
-const H1 = styled.h1`
-  font-size: 30px;
-  font-weight: 600;
-  background-color: yellow;
+const StyledHome = styled.div`
+  padding: var(--space-4xl);
 `;
 
 function Home() {
+  const navigate = useNavigate();
+  const role = localStorage.getItem("role");
+
+  useEffect(() => {
+    if (!role) navigate("/login");
+  }, [navigate, role]);
+
   return (
-    <>
-      <div>
-        <H1>Hello world!</H1>
-      </div>
-
-      <Row type="vertical">
-        <Row type="vertical">
-          <p>Item 1</p>
-
-          <p>Item 2</p>
-        </Row>
-
-        <Row type="horizontal">
-          <p>Item 1</p>
-          <p>Item 2</p>
-        </Row>
-      </Row>
-    </>
+    <StyledHome>
+      {role === "instructor" ? <InstructorDashboard /> : <StudentPractice />}
+    </StyledHome>
   );
 }
 
