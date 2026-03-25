@@ -4,7 +4,6 @@ import styled from "styled-components";
 
 import { useGradebook } from "../hooks/useGradebook";
 import useRequireAuth from "../hooks/useRequireAuth";
-import BodyText from "../ui/BodyText";
 import Button from "../ui/Button";
 import ContentCard from "../ui/ContentCard";
 import Heading from "../ui/Heading";
@@ -34,9 +33,15 @@ const FileRow = styled.div`
 
 const FileInput = styled.input`
   font-size: var(--font-size-s);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs);
+  border: 1px solid var(--color-border);
 `;
 
 const QuestionsPanel = styled.div`
+  display: flex;
+  flex-direction: column;
   margin-top: var(--space-3xl);
   padding: var(--space-xl);
   border: 1px solid var(--color-light-2);
@@ -106,12 +111,8 @@ function InstructorUpdateAssessment() {
   }
 
   return (
-    <ContentCard>
+    <ContentCard style={{ display: "flex", flexDirection: "column" }}>
       <Heading $variant="page">Update Assessment</Heading>
-      <BodyText>
-        Pick a course, enter the assessment details, and upload the PDF. For
-        now, the question generation is just mocked for demo purposes.
-      </BodyText>
 
       <form onSubmit={handleSubmit}>
         <FormStack>
@@ -164,11 +165,6 @@ function InstructorUpdateAssessment() {
               onChange={handleFileChange}
               required
             />
-            {fileName ? (
-              <BodyText style={{ margin: 0, fontSize: "var(--font-size-s)" }}>
-                Chosen file: {fileName}
-              </BodyText>
-            ) : null}
           </FileRow>
 
           <Button type="submit" $variant="primary" disabled={loading}>
@@ -189,10 +185,6 @@ function InstructorUpdateAssessment() {
           >
             Generated questions
           </Heading>
-
-          <BodyText as="p" style={{ margin: 0 }}>
-            These are the questions saved with this assessment.
-          </BodyText>
 
           <QuestionList>
             {questions.map((question, index) => (
