@@ -7,8 +7,10 @@ const StyledSidebar = styled.div`
   background: var(--color-light);
   border-right: 1px solid var(--color-light-2);
   padding: var(--space-3xl) var(--space-xl);
-  min-height: 100%;
+  min-height: 90%;
   grid-area: sidebar;
+  border-radius: 12px;
+  margin: 10px 5px;
 
   @media (max-width: 768px) {
     min-height: auto;

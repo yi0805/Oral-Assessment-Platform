@@ -10,7 +10,7 @@ const StyleAppLayout = styled.div`
   grid-template-rows: auto 1fr;
   grid-template-areas: "header header" "sidebar main";
   height: 100vh;
-  background: var(--color-primary-tint);
+  background: #2574ce21;
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
@@ -22,7 +22,7 @@ const StyleAppLayout = styled.div`
 const Main = styled.main`
   grid-area: main;
   overflow: auto;
-  padding: var(--space-3xl);
+  padding: 10px var(--space-3xl);
   min-width: 0;
 `;
 
