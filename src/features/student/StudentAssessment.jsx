@@ -2,8 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams } from "react-router";
 import styled from "styled-components";
 
-import mockCourses from "../../data/mockCourses";
-import mockAssessments from "../../data/mockAssessments";
+import { useGradebook } from "../../hooks/useGradebook";
 import Heading from "../../ui/Heading";
 import Button from "../../ui/Button";
 import ButtonLink from "../../ui/ButtonLink";
@@ -56,6 +55,18 @@ const SmallButton = styled(Button)`
   min-width: 44px;
 `;
 
+const ScoreBanner = styled.div`
+  max-width: 800px;
+  margin-bottom: var(--space-l);
+  padding: var(--space-m) var(--space-l);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-success);
+  background: rgba(var(--color-success-rgb), 0.12);
+  color: var(--color-dark-2);
+  font-size: var(--font-size-s);
+  font-weight: 700;
+`;
+
 const MOCK_RESPONSES = [
   "Can you explain that a bit more?",
   "Good answer. What is your reason for that?",
@@ -67,10 +78,18 @@ const MOCK_RESPONSES = [
 export default function StudentAssessment() {
   const { courseId, assessmentId } = useParams();
   const messagesEndRef = useRef(null);
+  const { allCourses, getAssessmentsForCourse, getPublishedScoreForStudent } =
+    useGradebook();
+  const userName = localStorage.getItem("userName") || "";
 
-  const course = mockCourses.find((c) => c.id === courseId);
-  const assessments = mockAssessments[courseId] || [];
+  const course = allCourses.find((c) => c.id === courseId);
+  const assessments = getAssessmentsForCourse(courseId);
   const assessment = assessments.find((a) => a.id === assessmentId);
+  const publishedScore = getPublishedScoreForStudent(
+    courseId,
+    assessmentId,
+    userName,
+  );
 
   const [messages, setMessages] = useState(() => [
     {
@@ -131,32 +150,42 @@ export default function StudentAssessment() {
         {course ? `${course.code} - ${assessment?.name}` : "Assessment"}
       </Heading>
 
-      <ChatContainer>
-        <MessagesArea>
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} $isUser={msg.isUser}>
-              {msg.text}
-            </MessageBubble>
-          ))}
-          <div ref={messagesEndRef} />
-        </MessagesArea>
+      {publishedScore != null ? (
+        <ScoreBanner>
+          Your published score for this assessment: {publishedScore}%
+        </ScoreBanner>
+      ) : (
+        <ChatContainer>
+          <MessagesArea>
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id} $isUser={msg.isUser}>
+                {msg.text}
+              </MessageBubble>
+            ))}
+            <div ref={messagesEndRef} />
+          </MessagesArea>
 
-        <InputArea onSubmit={handleSend}>
-          <SmallButton type="button" onClick={handleVoice} $variant="secondary">
-            {recording ? "Stop" : "Mic"}
-          </SmallButton>
+          <InputArea onSubmit={handleSend}>
+            <SmallButton
+              type="button"
+              onClick={handleVoice}
+              $variant="secondary"
+            >
+              {recording ? "Stop" : "Mic"}
+            </SmallButton>
 
-          <ChatInput
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your answer"
-          />
+            <ChatInput
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Type your answer"
+            />
 
-          <SmallButton type="submit" $variant="primary">
-            Send
-          </SmallButton>
-        </InputArea>
-      </ChatContainer>
+            <SmallButton type="submit" $variant="primary">
+              Send
+            </SmallButton>
+          </InputArea>
+        </ChatContainer>
+      )}
     </>
   );
 }

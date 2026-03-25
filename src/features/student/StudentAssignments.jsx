@@ -2,8 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import styled from "styled-components";
 
-import mockCourses from "../../data/mockCourses";
-import mockAssessments from "../../data/mockAssessments";
+import { useGradebook } from "../../hooks/useGradebook";
 import Heading from "../../ui/Heading";
 import SearchBar from "../../ui/SearchBar";
 import ButtonLink from "../../ui/ButtonLink";
@@ -57,9 +56,10 @@ export default function StudentAssignments() {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
+  const { allCourses, getAssessmentsForCourse } = useGradebook();
 
-  const course = mockCourses.find((c) => c.id === courseId);
-  const assessments = mockAssessments[courseId] || [];
+  const course = allCourses.find((c) => c.id === courseId);
+  const assessments = getAssessmentsForCourse(courseId);
 
   const filtered = assessments.filter((assessment) =>
     assessment.name.toLowerCase().includes(search.toLowerCase()),

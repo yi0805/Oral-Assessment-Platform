@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import styled from "styled-components";
 
-import mockCourses from "../../data/mockCourses";
+import { useGradebook } from "../../hooks/useGradebook";
 import Heading from "../../ui/Heading";
 import SearchBar from "../../ui/SearchBar";
 
@@ -51,8 +51,9 @@ const EmptyState = styled.p`
 export default function StudentHome() {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
+  const { allCourses } = useGradebook();
 
-  const filtered = mockCourses.filter(
+  const filtered = allCourses.filter(
     (course) =>
       course.code.toLowerCase().includes(search.toLowerCase()) ||
       course.name.toLowerCase().includes(search.toLowerCase()),

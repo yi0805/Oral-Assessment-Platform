@@ -55,6 +55,9 @@ function Sidebar() {
         {role === "student" ? (
           <Item to="/previous-assessment">Previous assessment</Item>
         ) : null}
+        {role === "instructor" ? (
+          <Item to="/instructor/update-assessment">Update assessment</Item>
+        ) : null}
       </Nav>
     </StyledSidebar>
   );
