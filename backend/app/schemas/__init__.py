@@ -1,0 +1,24 @@
+"""Central schema registry. Import all Pydantic models for easy access."""
+from app.schemas.enums import *
+from app.schemas.user import UserCreate, UserUpdate, UserOut, UserBrief
+from app.schemas.course import (
+    CourseCreate, CourseUpdate, CourseOut, CourseBrief,
+    EnrollmentCreate, EnrollmentOut, StudentListItem,
+)
+from app.schemas.material import (
+    MaterialUploadResponse, MaterialOut, MaterialStatusOut, MaterialListItem,
+    ChunkOut, RAGSearchRequest, RAGSearchResult, RAGSearchResponse,
+)
+from app.schemas.rubric import RubricCreate, RubricUpdate, RubricOut, RubricBrief
+from app.schemas.question import (
+    QuestionCreate, QuestionUpdate, QuestionOut,
+    QuestionPoolCreate, QuestionPoolGenerateRequest, QuestionPoolOut, QuestionPoolBrief,
+)
+from app.schemas.assessment import (
+    AssessmentConfigCreate, AssessmentConfigUpdate, AssessmentConfigOut, AssessmentConfigBrief,
+    SessionStartResponse, StudentResponseRequest, StudentResponseResponse,
+    SessionOut, SessionBrief, SessionQuestionItemOut, TranscriptMessageOut, FullTranscriptOut,
+)
+from app.schemas.feedback import (
+    AISummaryOut, FeedbackCreate, FeedbackUpdate, FeedbackOut, StudentResultsOut,
+)
