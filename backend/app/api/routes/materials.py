@@ -11,24 +11,22 @@ Endpoints:
 Pipeline flow triggered by upload:
   upload → extracting → chunking → embedding → ready
   (see app/services/material_pipeline.py)
-
-TODO:
-- POST upload endpoint with multipart/form-data
-- S3 upload via boto3 (or local file storage for dev)
-- Background task to trigger pipeline
-- GET list and detail endpoints
-- Status polling endpoint
 """
+import logging
 from uuid import UUID, uuid4
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.material import Material
 from app.models.course import Course
-from app.schemas.material import MaterialUploadResponse, MaterialOut, MaterialStatusOut, MaterialListItem
+from app.models.material import Material
+from app.schemas.material import MaterialListItem, MaterialOut, MaterialStatusOut, MaterialUploadResponse
+from app.services import s3_client
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 ALLOWED_FILE_TYPES = {"pdf", "pptx", "docx", "txt"}
 MIME_MAP = {
@@ -52,59 +50,73 @@ async def upload_material(
     db: Session = Depends(get_db),
 ):
     """
-    Upload a course material file (PDF for MVP).
+    Upload a course material file.
     1. Validate file type
-    2. Generate S3 key and upload to S3 (or local storage in dev)
+    2. Upload bytes to configured storage backend
     3. Create materials row with status='uploaded'
     4. Trigger background processing pipeline
     """
-    # Verify course exists
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
 
-    # Validate file type
     filename = file.filename or "unknown"
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if extension not in ALLOWED_FILE_TYPES:
         raise HTTPException(
             status_code=422,
-            detail=f"File type '{extension}' not supported. Allowed: {ALLOWED_FILE_TYPES}",
+            detail=f"File type '{extension}' not supported. Allowed: {sorted(ALLOWED_FILE_TYPES)}",
         )
 
-    # Read file content
     file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=422, detail="Uploaded file is empty")
+
     material_id = uuid4()
+    storage_key = s3_client.generate_key(course_id, material_id, filename)
+    content_type = file.content_type or MIME_MAP.get(extension) or "application/octet-stream"
 
-    # S3 key convention: courses/{course_id}/materials/{material_id}/{filename}
-    storage_key = f"courses/{course_id}/materials/{material_id}/{filename}"
+    try:
+        s3_client.upload_file(
+            file_bytes,
+            storage_key,
+            content_type=content_type,
+            metadata={
+                "course_id": str(course_id),
+                "material_id": str(material_id),
+                "title": title,
+            },
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=f"Storage upload failed: {exc}") from exc
 
-    # TODO: Upload to S3 via app.services.s3_client
-    # For local dev, save to a local directory instead
-    # s3_client.upload_file(file_bytes, storage_key)
-
-    # Create database record
     material = Material(
         id=material_id,
         course_id=course_id,
-        # uploaded_by=current_user.id,  # TODO: wire auth
-        uploaded_by=UUID("a0000000-0000-0000-0000-000000000001"),  # Temp: seed instructor
+        uploaded_by=UUID("a0000000-0000-0000-0000-000000000001"),  # TODO: replace with auth user
         title=title,
         original_filename=filename,
         file_type=extension,
-        mime_type=MIME_MAP.get(extension),
+        mime_type=content_type,
         storage_key=storage_key,
         file_size_bytes=len(file_bytes),
         processing_status="uploaded",
     )
-    db.add(material)
-    db.commit()
-    db.refresh(material)
 
-    # Trigger background processing pipeline
+    try:
+        db.add(material)
+        db.commit()
+        db.refresh(material)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        try:
+            s3_client.delete_file(storage_key)
+        except Exception:  # noqa: BLE001
+            logger.exception("Rollback cleanup failed for storage key=%s", storage_key)
+        raise HTTPException(status_code=500, detail="Material metadata could not be saved") from exc
+
+    # Leave pipeline disabled until extraction/chunking is ready for every file type.
     # background_tasks.add_task(material_pipeline.run_pipeline, material.id)
-    # TODO: uncomment when material_pipeline service is implemented
-
     return material
 
 
@@ -140,14 +152,16 @@ def get_material_status(material_id: UUID, db: Session = Depends(get_db)):
 
 @router.delete("/materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_material(material_id: UUID, db: Session = Depends(get_db)):
-    """Soft-delete a material and its S3 object."""
+    """Delete a material and remove the object from the configured storage backend."""
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
         raise HTTPException(status_code=404, detail="Material not found")
 
-    # TODO: Delete from S3 via s3_client.delete_file(material.storage_key)
+    try:
+        s3_client.delete_file(material.storage_key)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=f"Storage delete failed: {exc}") from exc
 
     db.delete(material)
     db.commit()
     return None
-
