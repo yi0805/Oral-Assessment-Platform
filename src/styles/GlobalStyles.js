@@ -138,29 +138,29 @@ const GlobalStyle = createGlobalStyle`
 }
 
 /*** End Colors *****/
-
+/* 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
   padding: 0;
   margin: 0;
-}
+} */
 
-body {
+/* body {
   font-family: "Poppins", sans-serif;
   color: var(--color-dark-2);
   font-size: var(--font-size-default);
   line-height: 1.6;
-}
+} */
 
-input,
+/* input,
 button,
 select,
 textarea {
   font: inherit;
   color: inherit;
-}
+} */
 `;
 
 export default GlobalStyle;

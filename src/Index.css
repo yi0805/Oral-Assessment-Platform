@@ -1,2 +1,27 @@
 @import "tailwindcss";
 @import "@heroui/styles";
+
+body {
+  font-family: "Inter", sans-serif;
+}
+
+.headline-font {
+  font-family: "Manrope", sans-serif;
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+    "FILL" 0,
+    "wght" 400,
+    "GRAD" 0,
+    "opsz" 24;
+}
+
+.glass-effect {
+  backdrop-filter: blur(16px);
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+.text-glow {
+  text-shadow: 0 0 20px rgba(79, 96, 115, 0.1);
+}

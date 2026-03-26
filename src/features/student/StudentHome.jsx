@@ -16,7 +16,7 @@ const SearchWrapper = styled.div`
 const Head = styled.div`
   flex: 1;
   flex-direction: row;
-  overflow: hidden;  
+  overflow: hidden;
 `;
 
 const Container = styled.div`
@@ -36,7 +36,11 @@ const CourseGrid = styled.div`
 
 const CourseCard = styled.div`
   border-radius: var(--radius-md);
-  background: radial-gradient(ellipse at left top, #d2faf6, ${({ $color }) => $color} 45%);
+  background: radial-gradient(
+    ellipse at left top,
+    #d2faf6,
+    ${({ $color }) => $color} 45%
+  );
   cursor: pointer;
   height: 16rem;
   width: 24rem;
