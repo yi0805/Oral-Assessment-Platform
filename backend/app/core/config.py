@@ -1,14 +1,19 @@
 """Application configuration loaded from environment variables."""
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     database_url: str = "postgresql://project20:localdev123@localhost:5432/project20_dev"
 
+    # Storage
+    storage_backend: str = "local"  # local | s3
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
+    aws_session_token: str = ""
     aws_region: str = "ap-southeast-2"
-    s3_bucket_name: str = "project20-materials"
+    aws_profile_name: str = ""
+    s3_bucket_name: str = "team8-project20-materials"
+    s3_endpoint_url: str = ""
 
     openai_api_key: str = ""
 
@@ -23,9 +28,11 @@ class Settings(BaseSettings):
     port: int = 8000
     debug: bool = True
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()
