@@ -52,7 +52,7 @@ function LoginButton({ role }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Student
         </h2>
-        <ul className="mx-auto mb-8 max-w-xs text-left font-body text-sm leading-relaxed text-on-surface-variant list-disc pl-5 space-y-2">
+        <ul className="mx-auto mb-8 max-w-xs text-left font-body text-sm leading-relaxed text-on-surface-variant list-none space-y-2">
                <li>
                    <span className="font-bold">Access</span> your assigned oral exams
                </li>
@@ -95,7 +95,7 @@ function LoginButton({ role }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Instructor
         </h2>
-        <ul className="mx-auto mb-8 max-w-xs text-left font-body text-sm leading-relaxed text-on-surface-variant list-disc pl-5 space-y-2">
+        <ul className="mx-auto mb-8 max-w-xs text-left font-body text-sm leading-relaxed text-on-surface-variant list-none space-y-2">
              <li>
                   <span className="font-bold">Manage</span> course curriculums
              </li>
