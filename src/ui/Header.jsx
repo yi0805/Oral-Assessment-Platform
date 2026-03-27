@@ -19,7 +19,7 @@ function Header() {
     <header className="fixed top-0 z-40 flex h-16 w-full items-center justify-between bg-[#f8f9fa] px-8 dark:bg-slate-900">
       <div className="flex items-center gap-8">
         <span className="headline-font text-xl font-bold tracking-tight text-[#4f6073] dark:text-white">
-          ScholarCurator
+          WhereRU
         </span>
       </div>
       <div className="flex items-center gap-4">
