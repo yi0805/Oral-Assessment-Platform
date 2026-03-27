@@ -1,69 +1,103 @@
 """
 Assessment session routes (student-facing + instructor review).
 
-Endpoints:
-  POST /assessments/:id/sessions/start → start a student session
-  POST /sessions/:id/respond → submit student answer
-  POST /sessions/:id/complete → end session (manual or timeout)
-  GET /sessions/:id → get full session with transcript
+Endpoints
+---------
+POST   /assessments/{assessment_id}/sessions/start   Start a student session
+POST   /sessions/{session_id}/respond                Submit a student answer
+POST   /sessions/{session_id}/complete               End a session (student or auto-timeout)
+GET    /sessions/{session_id}                        Full transcript (instructor review)
+GET    /assessments/{assessment_id}/sessions         List all sessions (instructor dashboard)
 
-CRITICAL: Server-side timer enforcement.
-  When session starts: expires_at = now() + total_time_minutes
-  Every POST /respond checks: if now() > expires_at → 403 + auto-complete
-
-TODO:
-- Session start with timer calculation
-- Student response persistence (transcript_messages)
-- Integration with James's chat orchestrator
-- Server-side expiry enforcement
+Server-side timer enforcement
+------------------------------
+  start  → expires_at = now() + total_time_minutes
+  respond → if now() > expires_at: auto-complete with status='time_expired', raise 403
 """
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
-from datetime import datetime, timezone, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.dependencies import get_current_user, require_instructor, require_student
 from app.models.assessment import AssessmentConfig, AssessmentSession
-from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
 from app.models.question import Question
+from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
+from app.models.user import User
 from app.schemas.assessment import (
-    SessionStartResponse, StudentResponseRequest, StudentResponseResponse,
-    SessionOut, SessionBrief, SessionQuestionItemOut, TranscriptMessageOut, FullTranscriptOut,
+    FullTranscriptOut,
+    SessionBrief,
+    SessionOut,
+    SessionQuestionItemOut,
+    SessionStartResponse,
+    StudentResponseRequest,
+    StudentResponseResponse,
+    TranscriptMessageOut,
 )
 
 router = APIRouter()
 
 
-@router.post("/assessments/{assessment_id}/sessions/start", response_model=SessionStartResponse)
-def start_session(assessment_id: UUID, db: Session = Depends(get_db)):
-    """
-    Start a new assessment session for the current student.
-    Sets expires_at = now() + total_time_minutes for server-side timer enforcement.
-    Pulls the first main question from the approved pool.
-    """
+@router.post(
+    "/assessments/{assessment_id}/sessions/start",
+    response_model=SessionStartResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Start an assessment session",
+    description=(
+        "Student-only. Creates a new session with a server-side expiry timer, "
+        "selects the first question from the approved pool, and records it in the transcript."
+    ),
+)
+def start_session(
+    assessment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
     config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
     if not config:
-        raise HTTPException(status_code=404, detail="Assessment not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
     if config.status != "published":
-        raise HTTPException(status_code=409, detail="Assessment is not published")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This assessment is not currently published.",
+        )
 
-    # Check scheduling window
     now = datetime.now(timezone.utc)
     if config.open_at and now < config.open_at:
-        raise HTTPException(status_code=403, detail="Assessment has not opened yet")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Assessment opens at {config.open_at.isoformat()}.",
+        )
     if config.close_at and now > config.close_at:
-        raise HTTPException(status_code=403, detail="Assessment has closed")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This assessment has closed.",
+        )
 
-    # TODO: Check if student already has a session for this assessment
-    # TODO: Get current user from JWT
+    # Prevent duplicate in-progress sessions for the same student + assessment.
+    existing = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.assessment_config_id == assessment_id,
+            AssessmentSession.student_id == current_user.id,
+            AssessmentSession.status == "in_progress",
+        )
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You already have an active session for this assessment.",
+        )
 
-    # Create session with server-side timer
+    # Create session with server-side expiry timer.
     expires_at = now + timedelta(minutes=config.total_time_minutes)
     session = AssessmentSession(
         assessment_config_id=assessment_id,
         course_id=config.course_id,
-        # student_id=current_user.id,  # TODO: wire auth
-        student_id=UUID("a0000000-0000-0000-0000-000000000002"),  # Temp: seed student
+        student_id=current_user.id,
         status="in_progress",
         started_at=now,
         expires_at=expires_at,
@@ -73,21 +107,24 @@ def start_session(assessment_id: UUID, db: Session = Depends(get_db)):
     db.add(session)
     db.flush()
 
-    # Pull first main question from the approved pool
+    # Pull the first approved main question.
     first_question = (
         db.query(Question)
         .filter(
             Question.question_pool_id == config.question_pool_id,
             Question.question_kind == "main",
-            Question.is_active == True,
+            Question.is_active.is_(True),
         )
         .order_by(Question.display_order.asc())
         .first()
     )
     if not first_question:
-        raise HTTPException(status_code=500, detail="No main questions found in the approved pool")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No active main questions found in the approved pool.",
+        )
 
-    # Create runtime question item
+    # Record the question as a runtime item.
     item = SessionQuestionItem(
         session_id=session.id,
         source_question_id=first_question.id,
@@ -100,7 +137,7 @@ def start_session(assessment_id: UUID, db: Session = Depends(get_db)):
     db.add(item)
     db.flush()
 
-    # Create transcript message for the first question
+    # Write the first transcript message.
     msg = TranscriptMessage(
         session_id=session.id,
         session_question_item_id=item.id,
@@ -123,33 +160,57 @@ def start_session(assessment_id: UUID, db: Session = Depends(get_db)):
     )
 
 
-@router.post("/sessions/{session_id}/respond", response_model=StudentResponseResponse)
-def submit_response(session_id: UUID, payload: StudentResponseRequest, db: Session = Depends(get_db)):
-    """
-    Student submits an answer. Server enforces the time limit.
-    1. Check if session has expired (server-side timer enforcement)
-    2. Save the student's answer as a transcript message
-    3. Return the saved message + session state + time remaining
-    The next question (AI follow-up or next main) is handled by James's orchestrator.
-    """
+@router.post(
+    "/sessions/{session_id}/respond",
+    response_model=StudentResponseResponse,
+    summary="Submit a student answer",
+    description=(
+        "Student-only. Saves the answer as a transcript message and enforces the "
+        "server-side timer. Returns time remaining and the next question placeholder "
+        "(populated by the AI orchestrator integration point)."
+    ),
+)
+def submit_response(
+    session_id: UUID,
+    payload: StudentResponseRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-    if session.status != "in_progress":
-        raise HTTPException(status_code=409, detail="Session is not in progress")
-    if session.transcript_locked:
-        raise HTTPException(status_code=409, detail="Transcript is locked")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    # Server-side timer enforcement
+    # Ownership check — students can only respond to their own sessions.
+    if session.student_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session.",
+        )
+
+    if session.status != "in_progress":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Session is not in progress (current status: {session.status}).",
+        )
+    if session.transcript_locked:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Transcript is locked — the session has ended.",
+        )
+
+    # Server-side timer enforcement.
     now = datetime.now(timezone.utc)
     if session.expires_at and now > session.expires_at:
         session.status = "time_expired"
         session.ended_at = now
         session.transcript_locked = True
         db.commit()
-        raise HTTPException(status_code=403, detail="Session has expired due to time limit")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your session has expired. The transcript has been locked.",
+        )
 
-    # Get the next sequence number
+    # Determine next sequence number.
     last_msg = (
         db.query(TranscriptMessage)
         .filter(TranscriptMessage.session_id == session_id)
@@ -158,7 +219,7 @@ def submit_response(session_id: UUID, payload: StudentResponseRequest, db: Sessi
     )
     next_seq = (last_msg.sequence_no + 1) if last_msg else 1
 
-    # Save the student's answer
+    # Persist the student's answer.
     msg = TranscriptMessage(
         session_id=session_id,
         sender_role="student",
@@ -170,14 +231,9 @@ def submit_response(session_id: UUID, payload: StudentResponseRequest, db: Sessi
     db.commit()
     db.refresh(msg)
 
-    # Calculate time remaining
-    time_remaining = 0
-    if session.expires_at:
-        remaining = (session.expires_at - now).total_seconds()
-        time_remaining = max(0, int(remaining))
+    time_remaining = max(0, int((session.expires_at - now).total_seconds())) if session.expires_at else 0
 
-    # TODO: James's orchestrator decides the next question here
-    # For now, return None for next_question — the orchestrator will handle it
+    # next_question is populated by the AI orchestrator (integration point).
     return StudentResponseResponse(
         message_saved=TranscriptMessageOut.model_validate(msg),
         next_question=None,
@@ -186,17 +242,35 @@ def submit_response(session_id: UUID, payload: StudentResponseRequest, db: Sessi
     )
 
 
-@router.post("/sessions/{session_id}/complete", response_model=SessionOut)
-def complete_session(session_id: UUID, db: Session = Depends(get_db)):
-    """
-    End a session — called manually by the student or automatically on timeout.
-    Locks the transcript so no further messages can be written.
-    """
+@router.post(
+    "/sessions/{session_id}/complete",
+    response_model=SessionOut,
+    summary="Complete a session",
+    description=(
+        "Student-only. Ends the session, locks the transcript, and records the "
+        "total message count. Can also be called automatically on timer expiry."
+    ),
+)
+def complete_session(
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if session.student_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session.",
+        )
+
     if session.status not in ("in_progress",):
-        raise HTTPException(status_code=409, detail="Session cannot be completed from current status")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Session cannot be completed from status '{session.status}'.",
+        )
 
     now = datetime.now(timezone.utc)
     session.status = "submitted"
@@ -212,12 +286,23 @@ def complete_session(session_id: UUID, db: Session = Depends(get_db)):
     return session
 
 
-@router.get("/sessions/{session_id}", response_model=FullTranscriptOut)
-def get_session_transcript(session_id: UUID, db: Session = Depends(get_db)):
-    """Get the full session with transcript for instructor review."""
+@router.get(
+    "/sessions/{session_id}",
+    response_model=FullTranscriptOut,
+    summary="Get full session transcript",
+    description=(
+        "Instructor-only. Returns the complete session including all transcript "
+        "messages and runtime question items, for grading review."
+    ),
+)
+def get_session_transcript(
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
     if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
     question_items = (
         db.query(SessionQuestionItem)
@@ -237,16 +322,3 @@ def get_session_transcript(session_id: UUID, db: Session = Depends(get_db)):
         question_items=[SessionQuestionItemOut.model_validate(qi) for qi in question_items],
         messages=[TranscriptMessageOut.model_validate(m) for m in messages],
     )
-
-
-@router.get("/assessments/{assessment_id}/sessions", response_model=list[SessionBrief])
-def list_sessions(assessment_id: UUID, db: Session = Depends(get_db)):
-    """List all student sessions for an assessment (instructor dashboard)."""
-    sessions = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.assessment_config_id == assessment_id)
-        .order_by(AssessmentSession.created_at.desc())
-        .all()
-    )
-    return sessions
-

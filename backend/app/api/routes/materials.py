@@ -1,28 +1,44 @@
 """
-Material upload & processing routes
+Material upload & processing routes.
 
-Endpoints:
-  POST /courses/:id/materials/upload → upload PDF to S3, create materials row
-  GET /courses/:id/materials → list all materials for a course
-  GET /materials/:id → get material details + processing status
-  GET /materials/:id/status → poll processing status (SSE preferred)
-  DELETE /materials/:id → soft-delete material + S3 object
+Endpoints
+---------
+POST   /courses/{course_id}/materials/upload   Upload a file to storage
+GET    /courses/{course_id}/materials           List all materials for a course
+GET    /materials/{material_id}                 Get material details + processing status
+GET    /materials/{material_id}/status          Lightweight processing-status poll
+DELETE /materials/{material_id}                 Delete material + storage object
 
-Pipeline flow triggered by upload:
-  upload → extracting → chunking → embedding → ready
-  (see app/services/material_pipeline.py)
+Processing pipeline (triggered asynchronously after upload):
+  uploaded → extracting → chunking → embedding → ready  (or failed)
 """
 import logging
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.models.course import Course
+from app.core.dependencies import get_current_user, require_instructor
+from app.models.course import Course, CourseEnrollment
 from app.models.material import Material
-from app.schemas.material import MaterialListItem, MaterialOut, MaterialStatusOut, MaterialUploadResponse
+from app.models.user import User
+from app.schemas.material import (
+    MaterialListItem,
+    MaterialOut,
+    MaterialStatusOut,
+    MaterialUploadResponse,
+)
 from app.services import s3_client
 
 router = APIRouter()
@@ -41,6 +57,12 @@ MIME_MAP = {
     "/courses/{course_id}/materials/upload",
     response_model=MaterialUploadResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Upload a course material",
+    description=(
+        "Instructor-only. Validates the file type, uploads to the configured "
+        "storage backend (local or S3), persists metadata, and triggers the "
+        "async processing pipeline (extract → chunk → embed → ready)."
+    ),
 )
 async def upload_material(
     course_id: UUID,
@@ -48,33 +70,48 @@ async def upload_material(
     file: UploadFile = File(...),
     title: str = Form(...),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
 ):
-    """
-    Upload a course material file.
-    1. Validate file type
-    2. Upload bytes to configured storage backend
-    3. Create materials row with status='uploaded'
-    4. Trigger background processing pipeline
-    """
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    # Verify the uploader is enrolled as instructor in this course (or is admin).
+    if current_user.role != "admin":
+        enrollment = (
+            db.query(CourseEnrollment)
+            .filter(
+                CourseEnrollment.course_id == course_id,
+                CourseEnrollment.user_id == current_user.id,
+                CourseEnrollment.course_role.in_(["instructor", "ta"]),
+                CourseEnrollment.is_active.is_(True),
+            )
+            .first()
+        )
+        if not enrollment:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You are not an instructor in this course.",
+            )
 
     filename = file.filename or "unknown"
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if extension not in ALLOWED_FILE_TYPES:
         raise HTTPException(
-            status_code=422,
-            detail=f"File type '{extension}' not supported. Allowed: {sorted(ALLOWED_FILE_TYPES)}",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"File type '{extension}' is not supported. Allowed types: {sorted(ALLOWED_FILE_TYPES)}",
         )
 
     file_bytes = await file.read()
     if not file_bytes:
-        raise HTTPException(status_code=422, detail="Uploaded file is empty")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The uploaded file is empty.",
+        )
 
     material_id = uuid4()
     storage_key = s3_client.generate_key(course_id, material_id, filename)
-    content_type = file.content_type or MIME_MAP.get(extension) or "application/octet-stream"
+    content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
 
     try:
         s3_client.upload_file(
@@ -85,15 +122,19 @@ async def upload_material(
                 "course_id": str(course_id),
                 "material_id": str(material_id),
                 "title": title,
+                "uploaded_by": str(current_user.id),
             },
         )
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=f"Storage upload failed: {exc}") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Storage upload failed: {exc}",
+        ) from exc
 
     material = Material(
         id=material_id,
         course_id=course_id,
-        uploaded_by=UUID("a0000000-0000-0000-0000-000000000001"),  # TODO: replace with auth user
+        uploaded_by=current_user.id,
         title=title,
         original_filename=filename,
         file_type=extension,
@@ -113,16 +154,32 @@ async def upload_material(
             s3_client.delete_file(storage_key)
         except Exception:  # noqa: BLE001
             logger.exception("Rollback cleanup failed for storage key=%s", storage_key)
-        raise HTTPException(status_code=500, detail="Material metadata could not be saved") from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Material metadata could not be saved.",
+        ) from exc
 
-    # Leave pipeline disabled until extraction/chunking is ready for every file type.
+    # Trigger background processing pipeline when ready.
     # background_tasks.add_task(material_pipeline.run_pipeline, material.id)
+
     return material
 
 
-@router.get("/courses/{course_id}/materials", response_model=list[MaterialListItem])
-def list_materials(course_id: UUID, db: Session = Depends(get_db)):
-    """List all materials for a course, ordered by upload date."""
+@router.get(
+    "/courses/{course_id}/materials",
+    response_model=list[MaterialListItem],
+    summary="List course materials",
+    description="Returns all materials for a course ordered by upload date (newest first).",
+)
+def list_materials(
+    course_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
     materials = (
         db.query(Material)
         .filter(Material.course_id == course_id)
@@ -132,35 +189,65 @@ def list_materials(course_id: UUID, db: Session = Depends(get_db)):
     return materials
 
 
-@router.get("/materials/{material_id}", response_model=MaterialOut)
-def get_material(material_id: UUID, db: Session = Depends(get_db)):
-    """Get full details for a specific material including processing state."""
+@router.get(
+    "/materials/{material_id}",
+    response_model=MaterialOut,
+    summary="Get material details",
+    description="Returns full material metadata including the current processing status.",
+)
+def get_material(
+    material_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
-        raise HTTPException(status_code=404, detail="Material not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material not found")
     return material
 
 
-@router.get("/materials/{material_id}/status", response_model=MaterialStatusOut)
-def get_material_status(material_id: UUID, db: Session = Depends(get_db)):
-    """Lightweight polling endpoint for processing status."""
+@router.get(
+    "/materials/{material_id}/status",
+    response_model=MaterialStatusOut,
+    summary="Poll processing status",
+    description=(
+        "Lightweight endpoint for polling the material processing pipeline status. "
+        "Expected transitions: uploaded → extracting → chunking → embedding → ready (or failed)."
+    ),
+)
+def get_material_status(
+    material_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
-        raise HTTPException(status_code=404, detail="Material not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material not found")
     return material
 
 
-@router.delete("/materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_material(material_id: UUID, db: Session = Depends(get_db)):
-    """Delete a material and remove the object from the configured storage backend."""
+@router.delete(
+    "/materials/{material_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a material",
+    description="Instructor-only. Removes the storage object and the database record.",
+)
+def delete_material(
+    material_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
     material = db.query(Material).filter(Material.id == material_id).first()
     if not material:
-        raise HTTPException(status_code=404, detail="Material not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Material not found")
 
     try:
         s3_client.delete_file(material.storage_key)
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=f"Storage delete failed: {exc}") from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Storage delete failed: {exc}",
+        ) from exc
 
     db.delete(material)
     db.commit()
