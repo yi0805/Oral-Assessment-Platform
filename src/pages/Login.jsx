@@ -26,29 +26,29 @@ function Login() {
             Advanced Oral Assessment Platform
           </p>
         </header>
-      </main>
 
-      <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
-        <LoginButton role="student" />
-        <LoginButton role="instructor" />
-      </div>
-
-      <footer class="mt-20 flex flex-col items-center gap-4 text-center">
-        <div class="flex gap-8 text-sm font-medium text-on-surface-variant">
-          <a class="transition-colors hover:text-primary" href="#">
-            Help Center
-          </a>
-          <a class="transition-colors hover:text-primary" href="#">
-            Privacy Policy
-          </a>
-          <a class="transition-colors hover:text-primary" href="#">
-            Accessibility
-          </a>
+        <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
+          <LoginButton role="student" />
+          <LoginButton role="instructor" />
         </div>
-        <p class="font-body text-xs text-outline">
-          © 2026 WhereRU. All rights reserved.
-        </p>
-      </footer>
+
+        <footer className="mt-20 flex flex-col items-center gap-4 text-center">
+          <div className="flex gap-8 text-sm font-medium text-on-surface-variant">
+            <a className="transition-colors hover:text-primary" href="#">
+              Help Center
+            </a>
+            <a className="transition-colors hover:text-primary" href="#">
+              Privacy Policy
+            </a>
+            <a className="transition-colors hover:text-primary" href="#">
+              Accessibility
+            </a>
+          </div>
+          <p className="font-body text-xs text-outline">
+            © 2026 WhereRU. All rights reserved.
+          </p>
+        </footer>
+      </main>
 
       <div className="fixed bottom-8 right-8 flex items-center gap-3 rounded-full border border-outline-variant/10 bg-surface-container-low px-4 py-2 shadow-sm">
         <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500"></div>

@@ -28,14 +28,12 @@ const Main = styled.main`
 
 function AppLayout() {
   return (
-    <StyleAppLayout>
+    <>
       <Header />
+      <div className="fixed top-16 z-40 h-[1px] w-full bg-[#eaeff1]"></div>
       <Sidebar />
-
-      <Main>
-        <Outlet />
-      </Main>
-    </StyleAppLayout>
+      <Outlet />
+    </>
   );
 }
 
