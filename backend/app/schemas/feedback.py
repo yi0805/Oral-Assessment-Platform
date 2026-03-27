@@ -15,7 +15,7 @@ class AISummaryOut(BaseModel):
     - Strengths and gaps clearly identified
     - Advisory only (suggested grade, never auto-assigned)
     """
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
     id: UUID
     session_id: UUID
