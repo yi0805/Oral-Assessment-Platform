@@ -10,7 +10,8 @@ const ScoreText = styled.span`
 `;
 
 function getStatusVariant(status) {
-  if (status === "Completed") return "success";
+    {/*return green if the assignment grade is reviewed and published by the instructor */ }
+  if (status === "Published") return "success";
   return "info";
 }
 
