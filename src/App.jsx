@@ -23,7 +23,7 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="home" element={<Home />} />
               <Route
-                path="previous-assessment"
+                path="student/previous-assessments"
                 element={<PreviousAssessment />}
               />
               <Route
