@@ -7,8 +7,6 @@ import mockAssessments from "../../data/mockAssessments";
 export default function StudentAssessment() {
   const navigate = useNavigate();
   const { studentName, courseId, assessmentId } = useLocation().state || {};
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [typedAnswer, setTypedAnswer] = useState("");
 
   const assessment = mockAssessments.find(
     (a) =>
@@ -17,26 +15,12 @@ export default function StudentAssessment() {
       a.assessment === assessmentId,
   );
 
-  const totalQuestions = assessment.questions.length;
-  const currentQuestion = assessment.questions[currentQuestionIndex];
-  const progressPercent = ((currentQuestionIndex + 1) / totalQuestions) * 100;
-
   const handleLogout = () => {
     localStorage.removeItem("role");
     localStorage.removeItem("userName");
     localStorage.removeItem("userPicture");
     googleLogout();
     navigate("/login");
-  };
-
-  const handleSubmitAnswer = () => {
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-      setTypedAnswer("");
-    } else {
-      assessment.status = "Completed";
-      navigate(`/student/${courseId}`, { state: { studentName, courseId } });
-    }
   };
 
   function getSecondsFromDuration(durationText) {
@@ -113,17 +97,16 @@ export default function StudentAssessment() {
               <div className="absolute left-0 top-0 h-full w-2 bg-primary"></div>
               <div className="mb-6 flex items-center gap-3">
                 <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                  Question 4 of 10
                 </span>
                 <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-container">
-                  <div
-                    className="h-full bg-primary"
-                    style={{ width: `${progressPercent}%` }}
-                  ></div>
+                  <div className="h-full w-[40%] bg-primary"></div>
                 </div>
               </div>
               <h2 className="mb-4 font-headline text-2xl font-semibold leading-snug text-on-background">
-                {currentQuestion}
+                "Explain the concept of 'Crowding Out' in the context of
+                expansionary fiscal policy. How does it impact private
+                investment levels?"
               </h2>
             </div>
 
@@ -163,8 +146,6 @@ export default function StudentAssessment() {
                   className="block w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-4 pl-12 pr-4 font-body text-sm placeholder:text-outline-variant focus:border-primary focus:ring-primary"
                   placeholder="Type your response here if you prefer not to use voice..."
                   rows="4"
-                  value={typedAnswer}
-                  onChange={(e) => setTypedAnswer(e.target.value)}
                 ></textarea>
               </div>
             </div>
@@ -176,54 +157,53 @@ export default function StudentAssessment() {
                 <h3 className="mb-4 font-headline text-xs font-bold uppercase tracking-widest text-on-surface-variant">
                   Assessment Progress
                 </h3>
-
                 <div className="space-y-3">
-                  {assessment.questions.map((question, index) => (
-                    <div
-                      key={index}
-                      className={`flex items-center justify-between text-sm ${
-                        index === currentQuestionIndex
-                          ? "font-semibold"
-                          : index < currentQuestionIndex
-                            ? "text-on-surface"
-                            : "text-outline"
-                      }`}
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-on-surface">Question 1</span>
+                    <span
+                      className="material-symbols-outlined text-sm text-secondary"
+                      data-weight="fill"
+                      style={{ fontVariationSettings: '"FILL" 1' }}
                     >
-                      <span
-                        className={
-                          index === currentQuestionIndex
-                            ? "text-primary"
-                            : "text-on-surface"
-                        }
-                      >
-                        Question {index + 1}
-                      </span>
-
-                      {index < currentQuestionIndex ? (
-                        <span
-                          className="material-symbols-outlined text-sm text-secondary"
-                          style={{ fontVariationSettings: '"FILL" 1' }}
-                        >
-                          check_circle
-                        </span>
-                      ) : index === currentQuestionIndex ? (
-                        <div className="h-2 w-2 rounded-full bg-primary"></div>
-                      ) : (
-                        <span className="material-symbols-outlined text-sm">
-                          radio_button_unchecked
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                      check_circle
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-on-surface">Question 2</span>
+                    <span
+                      className="material-symbols-outlined text-sm text-secondary"
+                      data-weight="fill"
+                      style={{ fontVariationSettings: '"FILL" 1' }}
+                    >
+                      check_circle
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-on-surface">Question 3</span>
+                    <span
+                      className="material-symbols-outlined text-sm text-secondary"
+                      data-weight="fill"
+                      style={{ fontVariationSettings: '"FILL" 1' }}
+                    >
+                      check_circle
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm font-semibold">
+                    <span className="text-primary">Question 4</span>
+                    <div className="h-2 w-2 rounded-full bg-primary"></div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm text-outline">
+                    <span>Question 5</span>
+                    <span className="material-symbols-outlined text-sm">
+                      radio_button_unchecked
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="flex flex-col gap-3">
-              <button
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-sm transition-all hover:bg-primary-dim active:scale-[0.98]"
-                onClick={handleSubmitAnswer}
-              >
+              <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-sm transition-all hover:bg-primary-dim active:scale-[0.98]">
                 Submit Answer
                 <span className="material-symbols-outlined text-sm">send</span>
               </button>

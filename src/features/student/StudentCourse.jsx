@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { NavLink, useLocation } from "react-router";
+import { NavLink, useLocation, useNavigate } from "react-router";
 
 import getAssessmentByCourseAndStudent from "../../utils/getAssessmentByCourseAndStudent";
 import getEarliestAssessment from "../../utils/getEarliestAssessment";
 
-export default function StudentAssignments() {
+export default function StudentCourse() {
   const [isOpen, setIsOpen] = useState(false);
+  const [assessmentId, setAssessmentId] = useState(null);
+  const navigate = useNavigate();
 
   const { studentName, courseId } = useLocation().state || {};
 
@@ -15,8 +17,6 @@ export default function StudentAssignments() {
   const sortedAssessments = [...assessments].sort(
     (a, b) => new Date(a.deadline) - new Date(b.deadline),
   );
-
-  console.log(sortedAssessments);
 
   return (
     <>
@@ -63,7 +63,10 @@ export default function StudentAssignments() {
                 <div
                   key={index}
                   className="group col-span-12 cursor-pointer lg:col-span-8"
-                  onClick={() => setIsOpen(true)}
+                  onClick={() => {
+                    setIsOpen(true);
+                    setAssessmentId(assessment.assessment);
+                  }}
                 >
                   <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8 transition-all hover:shadow-2xl hover:shadow-primary/5">
                     <div className="absolute right-0 top-0 p-8">
@@ -136,7 +139,10 @@ export default function StudentAssignments() {
                 <div
                   key={index}
                   className="group col-span-12 cursor-pointer lg:col-span-4"
-                  onClick={() => setIsOpen(true)}
+                  onClick={() => {
+                    setIsOpen(true);
+                    setAssessmentId(assessment.assessment);
+                  }}
                 >
                   <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
                     <div>
@@ -170,7 +176,10 @@ export default function StudentAssignments() {
               <div
                 key={index}
                 className="group col-span-12 cursor-pointer md:col-span-4 lg:col-span-3"
-                onClick={() => setIsOpen(true)}
+                onClick={() => {
+                  setIsOpen(true);
+                  setAssessmentId(assessment.assessment);
+                }}
               >
                 <div className="rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-lg">
                   <span className="material-symbols-outlined mb-4 text-primary">
@@ -192,132 +201,6 @@ export default function StudentAssignments() {
               </div>
             );
           })}
-
-          {/* <div
-            className="group col-span-12 cursor-pointer lg:col-span-8"
-            onClick={() => setIsOpen(true)}
-          >
-            <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8 transition-all hover:shadow-2xl hover:shadow-primary/5">
-              <div className="absolute right-0 top-0 p-8">
-                <span className="rounded-full bg-primary-container px-3 py-1 text-[10px] font-bold tracking-wider text-on-primary-container">
-                  FEATURED
-                </span>
-              </div>
-              <div>
-                <span
-                  className="material-symbols-outlined mb-4 text-4xl text-primary"
-                  style={{ fontVariationSettings: '"FILL" 1' }}
-                >
-                  analytics
-                </span>
-                <h2 className="mb-2 text-2xl font-bold text-on-surface">
-                  Quantitative Models in Fiscal Policy
-                </h2>
-                <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
-                  A comprehensive evaluation of multi-variable fiscal frameworks
-                  and their impact on emerging markets. Requires advanced
-                  calculus foundations.
-                </p>
-              </div>
-              <div className="mt-12 flex items-center justify-between">
-                <div className="flex gap-8">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                      Duration
-                    </span>
-                    <span className="text-sm font-semibold text-on-surface">
-                      120 Minutes
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                      Questions
-                    </span>
-                    <span className="text-sm font-semibold text-on-surface">
-                      45 MCQ + 2 Essay
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                      Weight
-                    </span>
-                    <span className="text-sm font-semibold text-on-surface">
-                      25% Final Grade
-                    </span>
-                  </div>
-                </div>
-                <button className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-xs font-bold text-on-primary transition-transform group-hover:translate-x-1">
-                  START NOW
-                  <span className="material-symbols-outlined text-sm">
-                    arrow_forward
-                  </span>
-                </button>
-              </div>
-
-              <div className="absolute -bottom-10 -right-10 opacity-5 transition-opacity group-hover:opacity-10">
-                <span className="material-symbols-outlined text-[200px]">
-                  history_edu
-                </span>
-              </div>
-            </div>
-          </div> */}
-
-          {/* <div
-            className="group col-span-12 cursor-pointer lg:col-span-4"
-            onClick={() => setIsOpen(true)}
-          >
-            <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
-              <div>
-                <div className="mb-6 flex items-start justify-between">
-                  <span className="material-symbols-outlined text-2xl text-secondary">
-                    database
-                  </span>
-                  <span className="rounded bg-error/10 px-2 py-1 text-[10px] font-bold text-error">
-                    DUE SOON
-                  </span>
-                </div>
-                <h3 className="mb-2 text-lg font-bold text-on-surface">
-                  Dataset Analysis: Asian Markets
-                </h3>
-                <p className="text-xs leading-relaxed text-on-surface-variant">
-                  Interpret and visualize the provided CSV data for market
-                  volatility between 2018-2023.
-                </p>
-              </div>
-              <div className="mt-8">
-                <div className="mb-4 h-1.5 w-full rounded-full bg-surface-container">
-                  <div className="h-1.5 w-0 rounded-full bg-primary transition-all duration-1000"></div>
-                </div>
-                <div className="flex items-center justify-between text-[10px] font-bold text-outline">
-                  <span>NOT STARTED</span>
-                  <span>0% COMPLETE</span>
-                </div>
-              </div>
-            </div>
-          </div> */}
-
-          {/* <div
-            className="group col-span-12 cursor-pointer md:col-span-4 lg:col-span-3"
-            onClick={() => setIsOpen(true)}
-          >
-            <div className="rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-lg">
-              <span className="material-symbols-outlined mb-4 text-primary">
-                menu_book
-              </span>
-              <h3 className="mb-1 font-bold text-on-surface">
-                Literature Review
-              </h3>
-              <p className="mb-6 text-xs text-on-surface-variant">
-                Keynesian vs Classical critiques.
-              </p>
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
-                <span className="material-symbols-outlined text-sm">
-                  schedule
-                </span>{" "}
-                45 Min
-              </div>
-            </div>
-          </div> */}
         </div>
       </main>
 
@@ -341,8 +224,9 @@ export default function StudentAssignments() {
                 Ready to begin?
               </h2>
               <p className="px-4 text-sm text-on-surface-variant">
-                Once started, you will have exactly 120 minutes to complete the
-                assessment. Ensure you have a stable internet connection.
+                Once you start the assessment, you will only have one attempt to
+                complete it. Please make sure you have a stable internet
+                connection before starting.
               </p>
             </div>
             <div className="mb-10 space-y-4">
@@ -372,7 +256,18 @@ export default function StudentAssignments() {
               </div>
             </div>
             <div className="flex flex-col gap-3">
-              <button className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95">
+              <button
+                className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
+                onClick={() =>
+                  navigate(`/student/${courseId}/${assessmentId}`, {
+                    state: {
+                      studentName,
+                      courseId,
+                      assessmentId,
+                    },
+                  })
+                }
+              >
                 START ASSESSMENT
               </button>
               <button
