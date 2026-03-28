@@ -52,17 +52,10 @@ function LoginButton({ role }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Student
         </h2>
-        <ul class="mx-auto mb-8 max-w-xs space-y-1 text-center font-body text-sm leading-relaxed text-on-surface-variant">
-          <li class="before:mr-2 before:content-['•']">
-            Access your assigned oral exams
-          </li>
-          <li class="before:mr-2 before:content-['•']">
-            Review your session history
-          </li>
-          <li class="before:mr-2 before:content-['•']">
-            View personalized feedback
-          </li>
-        </ul>
+        <p className="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
+          Access your assigned oral exams, review your session history, and view
+          personalized feedback.
+        </p>
         <div className="flex items-center justify-center gap-2 font-semibold text-primary transition-all duration-300 group-hover:gap-4">
           <span>Continue to Portal</span>
           <span className="material-symbols-outlined text-lg">
@@ -95,17 +88,10 @@ function LoginButton({ role }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Instructor
         </h2>
-        <ul class="mx-auto mb-8 max-w-xs space-y-1 text-center font-body text-sm leading-relaxed text-on-surface-variant">
-          <li class="before:mr-2 before:content-['•']">
-            Manage course curriculums
-          </li>
-          <li class="before:mr-2 before:content-['•']">
-            Design assessment rubrics
-          </li>
-          <li class="before:mr-2 before:content-['•']">
-            Grade student performances
-          </li>
-        </ul>
+        <p className="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
+          Manage course curriculums, design assessment rubrics, and grade
+          student oral performances.
+        </p>
         <div className="flex items-center justify-center gap-2 font-semibold text-secondary transition-all duration-300 group-hover:gap-4">
           <span>Curator Portal</span>
           <span className="material-symbols-outlined text-lg">

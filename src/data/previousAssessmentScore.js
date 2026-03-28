@@ -5,7 +5,7 @@ const PreviousAssessmentScore = [
     title: "An Introduction to Practical Computing",
     date: "18 Mar 2026",
     score: 20,
-    status: "Completed",
+    status: "Graded",
   },
   {
     id: 2,
@@ -13,7 +13,7 @@ const PreviousAssessmentScore = [
     title: "Computer Organisation",
     date: "15 Mar 2026",
     score: 76,
-    status: "Completed",
+    status: "Graded",
   },
   {
     id: 3,
@@ -21,7 +21,7 @@ const PreviousAssessmentScore = [
     title: "Operating Systems",
     date: "11 Mar 2026",
     score: 92,
-    status: "Completed",
+    status: "Graded",
   },
   {
     id: 4,
@@ -29,8 +29,8 @@ const PreviousAssessmentScore = [
     title: "Introduction to Computer Systems",
     date: "08 Mar 2026",
     score: 81,
-    status: "Reviewed",
-  },
+    status: "Submitted",
+    },
 ];
 
 export default PreviousAssessmentScore;

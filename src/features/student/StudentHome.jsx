@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
 
 import SearchCouse from "../../ui/SearchCouse";
 import getStudentByName from "../../utils/getStudentByname";
@@ -17,8 +16,6 @@ export default function StudentHome() {
   const filteredCouses = courses.filter((course) =>
     course.id.toLowerCase().includes(search.toLowerCase()),
   );
-
-  const navigate = useNavigate();
 
   return (
     <main className="min-h-screen pt-16 md:ml-64">
@@ -61,8 +58,9 @@ export default function StudentHome() {
           {filteredCouses.map((course, index) => (
             <CourseCard
               key={course.id}
-              id={course.id}
-              name={course.name}
+              courseId={course.id}
+              courseName={course.name}
+              studentName={student.studentName}
               index={index}
               description={course.description}
             />

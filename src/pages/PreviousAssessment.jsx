@@ -8,6 +8,7 @@ import ContentCard from "../ui/ContentCard";
 import Heading from "../ui/Heading";
 import PreviousAssessmentTable from "../ui/PreviousAssessmentTable";
 import FeedbackCard from "../ui/FeedbackCard";
+import ScoreBarChart from "../ui/BarChart";
 
 function PreviousAssessment() {
   useRequireAuth();
@@ -19,15 +20,21 @@ function PreviousAssessment() {
   );
   const bestScore = Math.max(
     ...PreviousAssessmentScore.map((row) => row.score),
-  );
+    );
 
-  return (
+
+    return (
     <Stack>
       <StatsContainer>
         <Stats title="Total Assessments" value={totalAssessments} />
         <Stats title="Average Score" value={averageScore} />
         <Stats title="Best Score" value={bestScore} />
-      </StatsContainer>
+       </StatsContainer>
+
+     <ContentCard>
+           <Heading>Score Overview</Heading>
+           <ScoreBarChart scores={PreviousAssessmentScore } />
+     </ContentCard>
 
       <ContentCard>
         <Heading>Assessment history</Heading>
