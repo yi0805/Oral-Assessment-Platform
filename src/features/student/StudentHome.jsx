@@ -1,135 +1,72 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
-import styled from "styled-components";
 
-import { useGradebook } from "../../hooks/useGradebook";
-import Heading from "../../ui/Heading";
-import SearchBar from "../../ui/SearchBar";
-
-const SearchWrapper = styled.div`
-  margin-bottom: var(--space-xl);
-  right: 0;
-  float: right;
-  width: 460px;
-`;
-
-const Head = styled.div`
-  flex: 1;
-  flex-direction: row;
-  overflow: hidden;
-`;
-
-const Container = styled.div`
-  height: auto;
-  border-radius: var(--radius-md);
-  max-width: 100%;
-  background: white;
-  padding: var(--space-3xl);
-  margin: 0 0 10px 0;
-`;
-
-const CourseGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(365px, 1fr));
-  gap: var(--space-xl);
-`;
-
-const CourseCard = styled.div`
-  border-radius: var(--radius-md);
-  background: radial-gradient(
-    ellipse at left top,
-    #d2faf6,
-    ${({ $color }) => $color} 45%
-  );
-  cursor: pointer;
-  height: 16rem;
-  width: 24rem;
-  position: relative;
-  box-shadow: 5px 8px 8px 0 #1e1e2132;
-`;
-
-const CardBody = styled.div`
-  padding: var(--space-m);
-  position: absolute;
-  bottom: 0;
-  background: white;
-  width: 100%;
-  min-height: 170px;
-  border-radius: 0 0 12px 12px;
-`;
-
-const CourseCode = styled.p`
-  font-size: var(--font-size-s);
-  font-weight: 600;
-  margin: 0 0 0.3rem 0;
-  color: var(--color-secondary);
-`;
-
-const CourseName = styled.h3`
-  margin: 0;
-  font-weight: 600;
-  color: var(--color-dark);
-`;
-
-const CourseDesc = styled.p`
-  margin: 0 0 0.3rem 0;
-  colour: var(--color-dark-3-tint);
-`;
-
-const EmptyState = styled.p`
-  margin-top: var(--space-l);
-  color: var(--color-dark-2);
-`;
+import SearchCouse from "../../ui/SearchCouse";
+import getStudentByName from "../../utils/getStudentByname";
+import getCoursesByStudent from "../../utils/getCoursesByStudent";
+import CourseCard from "../../ui/CourseCard";
 
 export default function StudentHome() {
-  const [search, setSearch] = useState("");
-  const navigate = useNavigate();
-  const { allCourses } = useGradebook();
+  const userName = localStorage.getItem("userName");
 
-  const filtered = allCourses.filter(
-    (course) =>
-      course.code.toLowerCase().includes(search.toLowerCase()) ||
-      course.name.toLowerCase().includes(search.toLowerCase()),
+  const student = getStudentByName(userName);
+  const courses = getCoursesByStudent(student);
+
+  const [search, setSearch] = useState("");
+
+  const filteredCouses = courses.filter((course) =>
+    course.id.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
-    <>
-      <Container>
-        <Head>
-          <Heading $variant="page">My Courses</Heading>
-          <SearchWrapper>
-            <SearchBar
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search courses..."
-            />
-          </SearchWrapper>
-        </Head>
-        <CourseDesc>Welcome and play with our website!</CourseDesc>
-      </Container>
+    <main className="min-h-screen pt-16 md:ml-64">
+      <div className="mx-auto max-w-7xl px-8 py-12">
+        <div className="mb-12">
+          <h1 className="headline-font text-4xl font-extrabold tracking-tight text-on-surface">
+            My Courses
+          </h1>
+        </div>
 
-      {filtered.length === 0 ? (
-        <EmptyState>No courses match your search.</EmptyState>
-      ) : (
-        <Container>
-          <CourseGrid>
-            {filtered.map((course) => (
-              <CourseCard
-                key={course.id}
-                $color={course.color}
-                onClick={() => navigate(`/courses/${course.id}/assignments`)}
-              >
-                {/* <CardBanner $color={course.color} /> */}
-                <CardBody>
-                  <CourseCode>{course.code}</CourseCode>
-                  <CourseName>{course.name}</CourseName>
-                  <CourseDesc>a short description of anything ^^</CourseDesc>
-                </CardBody>
-              </CourseCard>
-            ))}
-          </CourseGrid>
-        </Container>
-      )}
-    </>
+        <div className="mb-16 grid grid-cols-1 gap-6 lg:grid-cols-12">
+          <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] lg:col-span-8">
+            <div className="relative z-10 flex h-full flex-col justify-center">
+              <h2 className="headline-font mb-3 text-2xl font-bold text-primary">
+                Welcome back, {userName}
+              </h2>
+              <p className="max-w-xl leading-relaxed text-on-surface-variant">
+                Manage your academic journey from one central workspace. Here
+                you can browse your active enrollments, view your assessments,
+                and prepare for upcoming evaluations.
+              </p>
+            </div>
+
+            <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full bg-primary-container/30 blur-3xl"></div>
+          </div>
+          <div className="flex flex-col justify-center gap-6 rounded-xl bg-surface-container p-8 lg:col-span-4">
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                Search Curriculum
+              </label>
+              <SearchCouse
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          {filteredCouses.map((course, index) => (
+            <CourseCard
+              key={course.id}
+              courseId={course.id}
+              courseName={course.name}
+              studentName={student.studentName}
+              index={index}
+              description={course.description}
+            />
+          ))}
+        </div>
+      </div>
+    </main>
   );
 }

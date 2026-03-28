@@ -1,8 +1,7 @@
 import useRequireAuth from "../hooks/useRequireAuth";
 
-import InstructorDashboard from "../features/dashboard/InstructorDashboard";
 import StudentHome from "../features/student/StudentHome";
-import InstructorHome from "../features/dashboard/InstructorHome";
+import InstructorHome from "../features/instructor/InstructorHome";
 
 function Home() {
   const role = useRequireAuth();

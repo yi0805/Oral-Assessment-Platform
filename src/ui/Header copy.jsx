@@ -5,8 +5,7 @@ function Header() {
   const navigate = useNavigate();
 
   const userPicture = localStorage.getItem("userPicture");
-    const userName = localStorage.getItem("userName");
-    const role = localStorage.getItem("role");
+  const userName = localStorage.getItem("userName");
 
   const handleLogout = () => {
     localStorage.removeItem("role");
@@ -24,7 +23,7 @@ function Header() {
         </span>
       </div>
       <div className="flex items-center gap-4">
-        <div className="mr-4 flex items-center gap-2">
+        <div className="mr-4 flex gap-2">
           <button className="rounded-full p-2 text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95">
             <span
               className="material-symbols-outlined"
@@ -37,15 +36,12 @@ function Header() {
             <span className="material-symbols-outlined" data-icon="help">
               help
             </span>
-           </button>
-           <p className="headline-font text-sm font-semibold text-on-surface self-center capitalize">
-                {role}
-           </p>
+          </button>
         </div>
         <div className="flex items-center gap-3 border-l border-outline-variant/20 pl-4">
           <div className="hidden text-right sm:block">
             <p className="headline-font text-sm font-semibold text-on-surface">
-                 {userName}
+              {userName}
             </p>
           </div>
           <img

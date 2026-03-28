@@ -8,9 +8,8 @@ import InstructorUpdateAssessment from "./pages/InstructorUpdateAssessment";
 import PreviousAssessment from "./pages/PreviousAssessment";
 import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
-import StudentAssignments from "./features/student/StudentAssignments";
+import StudentCourse from "./features/student/StudentCourse";
 import StudentAssessment from "./features/student/StudentAssessment";
-
 function App() {
   return (
     <GradebookProvider>
@@ -22,6 +21,8 @@ function App() {
 
             <Route element={<AppLayout />}>
               <Route path="home" element={<Home />} />
+
+              <Route path="student/:courseId" element={<StudentCourse />} />
               <Route
                 path="student/previous-assessments"
                 element={<PreviousAssessment />}
@@ -30,19 +31,15 @@ function App() {
                 path="instructor/update-assessment"
                 element={<InstructorUpdateAssessment />}
               />
-              <Route
-                path="courses/:courseId/assignments"
-                element={<StudentAssignments />}
-              />
-              <Route
-                path="courses/:courseId/assessments/:assessmentId"
-                element={<StudentAssessment />}
-              />
             </Route>
 
             <Route path="login" element={<Login />} />
-
             <Route path="*" element={<PageNotFound />} />
+
+            <Route
+              path="student/:courseId/:assessment"
+              element={<StudentAssessment />}
+            />
           </Routes>
         </BrowserRouter>
       </>
