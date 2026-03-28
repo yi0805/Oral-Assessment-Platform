@@ -38,6 +38,7 @@ from urllib.parse import urlencode
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -48,6 +49,98 @@ from app.models.user import User
 from app.schemas.user import UserOut
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Dev-only token endpoint (DEBUG=true only — never available in production)
+# ---------------------------------------------------------------------------
+
+class _DevTokenRequest(BaseModel):
+    email: str
+    role: str | None = None   # auto-resolved if omitted
+
+
+class _DevTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: str
+    user: dict
+
+
+@router.post(
+    "/dev-token",
+    response_model=_DevTokenResponse,
+    summary="[DEV ONLY] Issue a JWT directly",
+    description=(
+        "**Available only when DEBUG=true.** "
+        "Creates or upserts a user by email, assigns the role you specify "
+        "(or auto-resolves it from env-var rules), and returns a signed JWT. "
+        "Use this to bypass the Google OAuth flow during local development and testing. "
+        "This endpoint is automatically disabled when DEBUG=false."
+    ),
+)
+def dev_token(
+    payload: _DevTokenRequest,
+    db: Session = Depends(get_db),
+):
+    if not settings.debug:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not found.",   # deliberately opaque in production
+        )
+
+    email = payload.email.strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="A valid email address is required.",
+        )
+
+    # Resolve role: explicit override → env-var rules → student
+    if payload.role and payload.role in ("student", "instructor", "admin"):
+        role = payload.role
+    else:
+        role = resolve_role_for_new_user(email)
+
+    # Upsert user (no google_sub in dev mode — use email as unique key)
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        # Update role if explicitly supplied, otherwise keep existing role
+        if payload.role and payload.role in ("student", "instructor", "admin"):
+            user.role = role
+        else:
+            role = user.role    # keep existing role
+        db.commit()
+        db.refresh(user)
+    else:
+        user = User(
+            google_sub=f"dev-{email}",    # placeholder sub for dev accounts
+            email=email,
+            full_name=email.split("@")[0].replace(".", " ").title(),
+            role=role,
+            status="active",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    token = create_access_token(
+        user_id=str(user.id),
+        role=user.role,
+        email=user.email,
+    )
+
+    return _DevTokenResponse(
+        access_token=token,
+        role=user.role,
+        user={
+            "id": str(user.id),
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+        },
+    )
+
 
 # ---------------------------------------------------------------------------
 # Google OAuth constants
@@ -248,13 +341,26 @@ def google_callback(
         )
 
     # ------------------------------------------------------------------
-    # 3. CSRF check — state must match the cookie we set in /google/login
+    # 3. CSRF check — state must match the cookie we set in /google/login.
+    #    In DEBUG mode the check is relaxed: we only verify that a state
+    #    value was provided (we skip the cookie comparison).  This avoids
+    #    localhost 127.0.0.1 ↔ localhost cookie-domain mismatch issues
+    #    that are harmless in a dev environment.
+    #    In production (DEBUG=false) the full cookie comparison is enforced.
     # ------------------------------------------------------------------
-    if not oauth_state or not secrets.compare_digest(state, oauth_state):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid OAuth state — possible CSRF attempt. Please try logging in again.",
-        )
+    if settings.debug:
+        # Dev: just confirm that Google sent a non-empty state back.
+        if not state:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing state parameter from Google.",
+            )
+    else:
+        if not oauth_state or not secrets.compare_digest(state, oauth_state):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid OAuth state — possible CSRF attempt. Please try logging in again.",
+            )
 
     # ------------------------------------------------------------------
     # 4. Exchange the authorization code for tokens
