@@ -165,6 +165,17 @@ export default function StudentAssessment() {
                   rows="4"
                   value={typedAnswer}
                   onChange={(e) => setTypedAnswer(e.target.value)}
+                  onCopy={(e) => e.preventDefault()}
+                  onPaste={(e) => e.preventDefault()}
+                  onCut={(e) => e.preventDefault()}
+                  onKeyDown={(e) => {
+                    if (
+                      (e.ctrlKey || e.metaKey) &&
+                      ["c", "v", "x"].includes(e.key.toLowerCase())
+                    ) {
+                      e.preventDefault();
+                    }
+                  }}
                 ></textarea>
               </div>
             </div>
