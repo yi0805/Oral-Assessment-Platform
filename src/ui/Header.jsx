@@ -44,7 +44,7 @@ function Header() {
             <p className="headline-font text-sm font-semibold text-on-surface">
               {userName}
             </p>
-            <p class="text-xs text-on-surface-variant">{role}</p>
+            <p className="text-xs text-on-surface-variant">{role}</p>
           </div>
           <img
             alt="User profile avatar"

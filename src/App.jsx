@@ -5,7 +5,7 @@ import GlobalStyle from "./styles/GlobalStyles";
 import AppLayout from "./ui/AppLayout";
 import Home from "./pages/Home";
 import InstructorUpdateAssessment from "./pages/InstructorUpdateAssessment";
-import PreviousAssessment from "./pages/PreviousAssessment";
+import StudentPreviousAssessment from "./features/student/StudentPreviousAssessment";
 import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
 import StudentCourse from "./features/student/StudentCourse";
@@ -25,7 +25,7 @@ function App() {
               <Route path="student/:courseId" element={<StudentCourse />} />
               <Route
                 path="student/previous-assessments"
-                element={<PreviousAssessment />}
+                element={<StudentPreviousAssessment />}
               />
               <Route
                 path="instructor/update-assessment"
@@ -37,7 +37,7 @@ function App() {
             <Route path="*" element={<PageNotFound />} />
 
             <Route
-              path="student/:courseId/:assessment"
+              path="student/:courseId/:assessmentId"
               element={<StudentAssessment />}
             />
           </Routes>
