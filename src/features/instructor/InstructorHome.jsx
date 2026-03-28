@@ -3,118 +3,8 @@ import styled from "styled-components";
 
 import { useGradebook } from "../../hooks/useGradebook";
 import ContentCard from "../../ui/ContentCard";
-import Heading from "../../ui/Heading";
-import SearchBar from "../../ui/SearchBar";
-import Button from "../../ui/Button";
-import Input from "../../ui/Input";
 
 import InstructorCourseDashboard from "./InstructorCourseDashboard";
-
-const TopBar = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-l);
-  margin-bottom: var(--space-xl);
-`;
-
-const SearchWrap = styled.div`
-  flex: 1;
-  min-width: 200px;
-  max-width: 420px;
-  margin-left: auto;
-`;
-
-const CourseGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-xl);
-`;
-
-const CourseCard = styled.button`
-  background: radial-gradient(
-    ellipse at left top,
-    #d2faf6,
-    ${({ $color }) => $color} 45%
-  );
-`;
-
-const CardPhoto = styled.div`
-  height: 120px;
-  background: ${({ $color }) => $color};
-  border-radius: 12px 12px 0 0;
-`;
-
-const CardFooter = styled.div`
-  padding: var(--space-m);
-`;
-
-const CourseName = styled.p`
-  margin: 0;
-  font-weight: 600;
-  color: var(--color-primary);
-`;
-
-const AddCourseCard = styled.button`
-  border: 2px dashed var(--color-light-2);
-  border-radius: 12px;
-  background: var(--color-primary-tint);
-  min-height: 168px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--font-size-xxl);
-  font-weight: 700;
-  color: var(--color-secondary);
-  cursor: pointer;
-  font: inherit;
-
-  &:hover {
-    border-color: var(--color-secondary);
-    background: var(--color-secondary-tint);
-  }
-
-  &:focus-visible {
-    outline: 2px solid var(--color-secondary);
-    outline-offset: 2px;
-  }
-`;
-
-const EmptyState = styled.p`
-  margin-top: var(--space-l);
-  color: var(--color-dark-2);
-`;
-
-const FormStack = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-m);
-  margin-top: var(--space-l);
-  max-width: 40ch;
-`;
-
-const FormActions = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-m);
-  margin-top: var(--space-m);
-`;
-
-const AddPanel = styled.div`
-  border: 1px solid var(--color-light-2);
-  border-radius: var(--radius-md);
-  padding: var(--space-xl);
-  margin-bottom: var(--space-xl);
-  background: var(--color-primary-tint);
-`;
-
-const FieldLabel = styled.label`
-  display: block;
-  font-size: var(--font-size-s);
-  color: var(--color-dark-2);
-  margin-bottom: var(--space-xs);
-`;
 
 function InstructorHome() {
   const { allCourses, addCourse } = useGradebook();
@@ -124,19 +14,27 @@ function InstructorHome() {
   const [courseCode, setCourseCode] = useState("");
   const [courseName, setCourseName] = useState("");
   const [courseDesc, setCourseDesc] = useState("");
-
+  
+  
+  const images = [
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuDfgr_pP5i7hQoboiS_DsxFRPWBpPHlHpUXumClpddDt2JX7BsTy1RucSS9hAnXPHskftAHFN-qV7kXv61MwoKaNkxvqx41RxJsHnItt2OmhV9TcIGhNkjwwWJDIJBpGx1OVaevsdmzLdL53qdnBksk7Ks2vMWDlbrBRf0JdHg25PrboJ2OYXhx8vTxAta6zZTLt7dT2JXlzV-OxVl6RPR0-L5aXHJxzBKh-c8MTw86BqkmHDoPdgqjbfQS5aA-OmT8pNhuXzlc9KnW",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuB_TjDjVsjnTlwmwB0gDWQ-U-AahXp_b8lpZ14Py7eMk63zOzkUqUQY-fl84SbQNLlfXPTSiOIRYU2xEJifhcY4N89ZTCr_TgabEFJOIB3cWQ6Z3jbHwc1PgxOq1jlbQ8iDTpIqVZygzlUnDqyjLMls7D0mxC5SVAM72ouBfbQxbsry7nnfEvvz4N_98td94vnn2IeNKd1h7VtcH-K_2IxLA3Oyj9lJSAjpyhlIt1Q2PNLzsuWcShb3aU5ul55WCaN6KbiRdFrrKkwr",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuBkdEcmqThK9dB3ArCqjwxvzz0_opItvI_4i5g5B7fE9L9qJWK4DObWAy-H_so9vgD-23qb2yHLjtLT9BFh8XFyu04NVBfRxEjOqvlsjG3M9Tp-oMfFMp3zlWeSnECBfU5vCdos9eKFWh-_NoPZekYd2X7W54Bx7_PW4XYDBzoIZO3qPpmkeTUlMHXH2wQV1sjNGM9M4JUfQFKSxVpQ4edkqmDEPnWfGhBSdPhq-DcrNyUu3HFuMvugK6n5-f_mGHhyk5M-V3F7jXAS",
+      "https://lh3.googleusercontent.com/aida-public/AB6AXuD3shRtSi9buB-3A-lLTQ-XDY7NQG2J-VCj0tz2hARiNzaRoOFQrXO9Wl68MzBMooDvHYVyHO_AFPzg-dzGNVkNiWxfHaCW5dK13_iHPu2I1ShEejxdAYAe4Jnmr4FWg-mgmZKoifN0QGfj5cBQNLdYT2deMzRZY2xM_a-Y8SbUmZHORRYEYRhk9R6f0TbxWHcn4IZ0YmXGfhHXADRdSOMKeCtdWd57cobtYtdTZKLkprfY_hZlHhTroGscGQlV6tj67fIz5x3pPsoA",
+    ];
+  
   const shownCourses = useMemo(() => {
     const value = search.trim().toLowerCase();
-
+    
     if (!value) return allCourses;
-
+    
     return allCourses.filter(
       (course) =>
         course.code.toLowerCase().includes(value) ||
-        course.name.toLowerCase().includes(value) ||
-        (course.description &&
-          course.description.toLowerCase().includes(value)),
-    );
+      course.name.toLowerCase().includes(value) ||
+      (course.description &&
+        course.description.toLowerCase().includes(value)),
+      );
   }, [allCourses, search]);
 
   function handleAddCourse(e) {
@@ -169,125 +67,16 @@ function InstructorHome() {
   }
 
   return (
-    // <ContentCard>
-    //   <TopBar>
-    //     <Heading $variant="page" style={{ marginBottom: 0 }}>
-    //       My Courses
-    //     </Heading>
-
-    //     <SearchWrap>
-    //       <SearchBar
-    //         value={search}
-    //         onChange={(e) => setSearch(e.target.value)}
-    //         placeholder="Search by course code or name"
-    //       />
-    //     </SearchWrap>
-    //   </TopBar>
-
-    //   {showAddForm && (
-    //     <AddPanel>
-    //       <Heading
-    //         as="h2"
-    //         $variant="page"
-    //         style={{
-    //           fontSize: "var(--font-size-l)",
-    //           marginBottom: "var(--space-m)",
-    //         }}
-    //       >
-    //         Add Course
-    //       </Heading>
-
-    //       <form onSubmit={handleAddCourse}>
-    //         <FormStack>
-    //           <div>
-    //             <FieldLabel htmlFor="new-course-code">Course code</FieldLabel>
-    //             <Input
-    //               id="new-course-code"
-    //               value={courseCode}
-    //               onChange={(e) => setCourseCode(e.target.value)}
-    //               placeholder="e.g. COMPSCI 101"
-    //               required
-    //             />
-    //           </div>
-
-    //           <div>
-    //             <FieldLabel htmlFor="new-course-name">Course name</FieldLabel>
-    //             <Input
-    //               id="new-course-name"
-    //               value={courseName}
-    //               onChange={(e) => setCourseName(e.target.value)}
-    //               placeholder="e.g. Intro to CS"
-    //               required
-    //             />
-    //           </div>
-
-    //           <div>
-    //             <FieldLabel htmlFor="new-course-desc">
-    //               Description (optional)
-    //             </FieldLabel>
-    //             <Input
-    //               id="new-course-desc"
-    //               value={courseDesc}
-    //               onChange={(e) => setCourseDesc(e.target.value)}
-    //               placeholder="Short course description"
-    //             />
-    //           </div>
-    //         </FormStack>
-
-    //         <FormActions>
-    //           <Button type="submit" $variant="primary">
-    //             Add course
-    //           </Button>
-    //           <Button
-    //             type="button"
-    //             $variant="secondary"
-    //             onClick={() => setShowAddForm(false)}
-    //           >
-    //             Cancel
-    //           </Button>
-    //         </FormActions>
-    //       </form>
-    //     </AddPanel>
-    //   )}
-
-    //   {shownCourses.length === 0 && <EmptyState>No courses found.</EmptyState>}
-
-    //   <CourseGrid>
-    //     {shownCourses.map((course) => (
-    //       <CourseCard
-    //         key={course.id}
-    //         type="button"
-    //         onClick={() => setSelectedCourse(course)}
-    //       >
-    //         <CardPhoto $color={course.color} />
-    //         <CardFooter>
-    //           <CourseName>{course.name}</CourseName>
-    //         </CardFooter>
-    //       </CourseCard>
-    //     ))}
-
-    //     <AddCourseCard
-    //       type="button"
-    //       onClick={() => setShowAddForm(true)}
-    //       aria-label="Add course"
-    //     >
-    //       +
-    //     </AddCourseCard>
-    //   </CourseGrid>
-    // </ContentCard>
-    <>
-    
-    <main className="min-h-screen bg-surface pl-64 pt-24">
-    
+    <>    
+    <main className="min-h-screen bg-surface pl-64 pt-24">    
       <div className="mx-auto max-w-7xl px-10 pb-20">
-
         <header
           className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end"
         >
           <div>
             <span
               className="mb-2 block text-[11px] font-bold uppercase tracking-[0.2em] text-secondary"
-              >Curator Dashboard</span
+              >Dashboard</span
             >
             <h1
               className="font-headline text-4xl font-extrabold tracking-tight text-on-surface"
@@ -302,51 +91,32 @@ function InstructorHome() {
             </p>
           </div>
         </header>
-        <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
+        
+        <div class="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
           <div
-            className="rounded-xl border border-outline-variant/5 bg-surface-container-lowest p-6 shadow-sm"
+            class="rounded-xl border border-outline-variant/5 bg-surface-container-lowest p-6 shadow-sm"
           >
             <p
-              className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
-            >
-              Active Students
-            </p>
-            <p className="font-headline text-3xl font-bold text-primary">1,248</p>
-          </div>
-          <div
-            className="rounded-xl border border-outline-variant/5 bg-surface-container-lowest p-6 shadow-sm"
-          >
-            <p
-              className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
-            >
-              Avg. Completion
-            </p>
-            <p className="font-headline text-3xl font-bold text-primary">84%</p>
-          </div>
-          <div
-            className="rounded-xl border border-outline-variant/5 bg-surface-container-lowest p-6 shadow-sm"
-          >
-            <p
-              className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+              class="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
             >
               Pending Reviews
             </p>
-            <p className="font-headline text-3xl font-bold text-error">12</p>
+            <p class="font-headline text-3xl font-bold text-error">12</p>
           </div>
         </div>
+        
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {shownCourses.map((course) => (
+          {shownCourses.map((course, index) => (
           <button key={course.id} 
             className="group flex flex-col overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary/5"
             onClick={() => setSelectedCourse(course)}
           >
             <div className="relative h-48 overflow-hidden bg-gradient-to-tl}">
-              {/* <img
-                alt="Introduction to Quantum Algorithms"
+              <img
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 data-alt="abstract artistic visualization of quantum computing particles and glowing neural networks in shades of deep blue and silver"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuDLbme1-qtM-UiAbbRFvXko7Ur40IJU1CBzy3M3WHfExnXfRas6WWB04oszNzkn0HIuIQqS95c0mvlebbnGtYYO7g1P_aKSA4_eo8JxtbzCni53M6QEMqFFm_Cpc4k4tR2VRuS2xq_JvfHWyyfbOBdKJBFovrjTHxTlBWnp9o3X5dVGN3QIXrgZ5KbGFEuLn6l13JL7-rYWoW4OA7lvh9w9C30C_hUWpOKEnJV6A-_tyaYBGPQn9-PchQud7QYn1QVyWuVaXBoY9VFk"
-              /> */}
+                src={images[index % images.length]}
+              />
               <div
                 className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary backdrop-blur-md"
               >
@@ -367,11 +137,10 @@ function InstructorHome() {
               >
                 {course.description}
               </p>
-              <div
+              {/* <div
                 className="flex items-center justify-between border-t border-outline-variant/10 pt-6"
-              >
-                
-                {/* <button
+              >                
+                <button
                   className="group/btn flex items-center gap-1 text-sm font-bold text-primary hover:underline"
                 >
                   Manage Course
@@ -379,12 +148,26 @@ function InstructorHome() {
                     className="material-symbols-outlined text-sm transition-transform group-hover/btn:translate-x-1"
                     >arrow_forward</span
                   >
-                </button> */}
-              </div>
+                </button>
+              </div> */}
             </div>
           </button>
           ))}
-          
+          <div
+            class="group flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-outline-variant/30 p-8 text-center transition-all duration-300 hover:border-primary/50 hover:bg-primary-container/10"
+          >
+            <div
+              class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container transition-all group-hover:bg-primary group-hover:text-on-primary"
+            >
+              <span class="material-symbols-outlined text-3xl">add</span>
+            </div>
+            <h3 class="font-headline text-lg font-bold text-on-surface">
+              Initialize New Course
+            </h3>
+            <p class="mt-2 font-body text-sm text-on-surface-variant">
+              Create a new academic syllabus and invite teaching assistants.
+            </p>
+          </div>
         </div>
       </div>
     </main>
