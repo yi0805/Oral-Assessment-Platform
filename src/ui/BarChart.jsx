@@ -7,7 +7,8 @@ import {
 } from "recharts";
 import { useMemo } from "react";
 
-// when scores are changed, recalculate with usememo
+// npm install recharts to use this
+// when scores are changed, recalculate data with usememo and update the chart
 function ScoreBarChart({ scores }) {
     const chartData = useMemo(() => {
         // prevent crash by showing an empty graph when the input doesn't exsit
