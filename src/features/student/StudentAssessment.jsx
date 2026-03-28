@@ -75,7 +75,7 @@ const MOCK_RESPONSES = [
   "Thanks. Let's move to the next question.",
 ];
 
-export default function StudentAssessment() {
+export default function StudentCourse() {
   const { courseId, assessmentId } = useParams();
   const messagesEndRef = useRef(null);
   const { allCourses, getAssessmentsForCourse, getPublishedScoreForStudent } =

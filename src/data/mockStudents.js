@@ -1,6 +1,6 @@
 const mockStudents = [
   {
-    username: "Yi T",
+    studentName: "Yi T",
     course: ["COMPSCI 101", "COMPSCI 110", "COMPSCI 210"],
   },
 ];

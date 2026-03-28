@@ -1,99 +1,78 @@
-const mockAssessments = {
-  cs101: [
-    {
-      id: "a1",
-      name: "A1 - Python Basics",
-      deadline: "10 Apr 2026",
-      teacherNote: "Use clear variable names and simple control flow.",
-    },
-    {
-      id: "a2",
-      name: "A2 - Functions",
-      deadline: "24 Apr 2026",
-      teacherNote: "Keep each function focused and easy to test.",
-    },
-    {
-      id: "a3",
-      name: "A3 - Programming Project",
-      deadline: "8 May 2026",
-      teacherNote: "Build a small program that applies core course concepts.",
-    },
-  ],
+const mockAssessments = [
+  {
+    studentName: "Yi T",
+    courseId: "COMPSCI 110",
+    assessment: "A1 - Digital Logic",
+    status: "Completed",
+    summary:
+      "This assessment checks understanding of basic digital logic concepts such as logic gates, truth tables, and simple circuit design.",
+    duration: "30 minutes",
+    questionNumbers: 10,
+    grade: "10%",
+  },
+  {
+    studentName: "Yi T",
+    courseId: "COMPSCI 110",
+    assessment: "A2 - Problem Solving",
+    status: "upcoming",
+    deadline: "April 15, 11:59 PM",
+    summary:
+      "This assessment focuses on problem-solving skills, including breaking problems into steps, designing solutions, and applying logical thinking.",
+    duration: "40 minutes",
+    questionNumbers: 20,
+    grade: "10%",
+  },
 
-  cs110: [
-    {
-      id: "a1",
-      name: "A1 - Digital Logic",
-      deadline: "12 Apr 2026",
-      teacherNote: "Show your working clearly for binary and logic questions.",
-    },
-    {
-      id: "a2",
-      name: "A2 - Problem Solving",
-      deadline: "26 Apr 2026",
-      teacherNote: "Explain your approach before giving the final answer.",
-    },
-  ],
+  {
+    studentName: "Yi T",
+    courseId: "COMPSCI 110",
+    assessment: "A3 - Assembly Programming",
+    status: "upcoming",
+    deadline: "April 28, 11:59 PM",
+    summary:
+      "This assessment is about writing and understanding basic assembly programs, including registers, instructions, and simple control flow.",
+    duration: "50 minutes",
+    questionNumbers: 16,
+    grade: "10%",
+  },
+  {
+    studentName: "Yi T",
+    courseId: "COMPSCI 110",
+    assessment: "A4 - CPU and Cache",
+    status: "upcoming",
+    deadline: "May 10, 11:59 PM",
+    summary:
+      "This assessment evaluates knowledge of CPU execution, memory hierarchy, and how cache improves system performance.",
+    duration: "45 minutes",
+    questionNumbers: 14,
+    grade: "10%",
+  },
 
-  cs210: [
-    {
-      id: "a1",
-      name: "A1 - Assembly Programming",
-      deadline: "14 Apr 2026",
-      teacherNote: "Write neat code and comment each step clearly.",
-    },
-    {
-      id: "a2",
-      name: "A2 - CPU and Cache",
-      deadline: "28 Apr 2026",
-      teacherNote: "Focus on how memory access affects performance.",
-    },
-  ],
+  {
+    studentName: "Yi T",
+    courseId: "COMPSCI 101",
+    assessment: "A1 - Python Basics",
+    status: "upcoming",
+    deadline: "April 28, 11:59 PM",
+    summary:
+      "This assessment covers Python fundamentals such as variables, data types, input and output, and basic syntax.",
+    duration: "30 minutes",
+    questionNumbers: 12,
+    grade: "10%",
+  },
 
-  cs340: [
-    {
-      id: "a1",
-      name: "A1 - CPU Scheduling",
-      deadline: "15 Apr 2026",
-      teacherNote: "Compare the scheduling methods with clear examples.",
-    },
-    {
-      id: "a2",
-      name: "A2 - Memory Management",
-      deadline: "2 May 2026",
-      teacherNote: "Explain your paging or replacement logic clearly.",
-    },
-  ],
-
-  cs350: [
-    {
-      id: "a1",
-      name: "A1 - Proofs",
-      deadline: "11 Apr 2026",
-      teacherNote: "Write each proof step clearly and logically.",
-    },
-    {
-      id: "a2",
-      name: "A2 - Graphs",
-      deadline: "25 Apr 2026",
-      teacherNote: "Show the method you used, not just the final answer.",
-    },
-  ],
-
-  cs399: [
-    {
-      id: "a1",
-      name: "A1 - Project Proposal",
-      deadline: "18 Apr 2026",
-      teacherNote: "Clearly define the project scope and main goals.",
-    },
-    {
-      id: "a2",
-      name: "A2 - Sprint Review",
-      deadline: "9 May 2026",
-      teacherNote: "Present the progress made and key next steps.",
-    },
-  ],
-};
+  {
+    studentName: "Yi T",
+    courseId: "COMPSCI 101",
+    assessment: "A2 - Functions",
+    status: "upcoming",
+    deadline: "May 20, 11:59 PM",
+    summary:
+      "This assessment focuses on defining and using functions, passing parameters, and returning values in Python.",
+    duration: "35 minutes",
+    questionNumbers: 15,
+    grade: "10%",
+  },
+];
 
 export default mockAssessments;
