@@ -1,38 +1,31 @@
 """
 Shared FastAPI dependencies — injected via Depends() in route handlers.
 
+Auth scheme: HTTPBearer
+-----------------------
+All protected endpoints expect:
+    Authorization: Bearer <jwt>
+
+In Swagger UI (/docs):
+  1. Click the lock icon "Authorize" button (top right of the page).
+  2. In the "BearerJWT" section, paste your JWT in the "Value" field.
+  3. Click Authorize — every subsequent request carries the token.
+
+To get a token during development:
+  POST /api/v1/auth/dev-token  {"email": "you@domain.com", "role": "instructor"}
+  Copy the access_token and paste it into the Swagger Authorize dialog.
+
 Available dependencies
 ----------------------
 get_current_user      – Any authenticated user (student, instructor, or admin).
 require_instructor    – Authenticated user whose role is instructor OR admin.
 require_student       – Authenticated user whose role is student.
-require_enrollment    – Authenticated user who is actively enrolled in the
-                        course identified by the {course_id} path parameter.
-
-Usage example
--------------
-    from app.core.dependencies import get_current_user, require_instructor
-
-    @router.get("/courses/{course_id}")
-    def get_course(
-        course_id: UUID,
-        current_user: User = Depends(require_instructor),
-        db: Session = Depends(get_db),
-    ):
-        ...
-
-    @router.get("/courses/{course_id}/materials")
-    def list_materials(
-        course_id: UUID,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(require_enrollment),   # path param resolved automatically
-    ):
-        ...
+require_enrollment    – Authenticated user actively enrolled in {course_id}.
 """
 from uuid import UUID
 
 from fastapi import Depends, HTTPException, Path, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -42,15 +35,16 @@ from app.models.user import User
 
 # ---------------------------------------------------------------------------
 # Token extraction
+# HTTPBearer renders a clean "Value" input in Swagger (no username/password).
 # ---------------------------------------------------------------------------
 
-# tokenUrl is the endpoint the Swagger UI "Authorize" button uses to obtain a
-# token.  For Google OAuth it's not a classic username/password form, but the
-# URL still tells Swagger where the auth entry-point lives.
-# auto_error=False lets us return a proper 401 rather than FastAPI's default
-# 422 when the header is absent.
-_oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/api/v1/auth/google/login",
+_bearer_scheme = HTTPBearer(
+    scheme_name="BearerJWT",
+    description=(
+        "Paste the JWT returned by **POST /api/v1/auth/dev-token** (dev) "
+        "or the Google OAuth callback (production). "
+        "Do **not** prefix with 'Bearer' — just the raw token."
+    ),
     auto_error=False,
 )
 
@@ -66,20 +60,17 @@ _CREDENTIALS_EXCEPTION = HTTPException(
 # ---------------------------------------------------------------------------
 
 def get_current_user(
-    token: str | None = Depends(_oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
     db: Session = Depends(get_db),
 ) -> User:
     """
-    Extract and validate the Bearer JWT, then return the corresponding User
-    row from the database.
+    Extract and validate the Bearer JWT, then return the corresponding User.
 
-    Raises HTTP 401 if:
-      - No Authorization header is present
-      - The token is expired, malformed, or has an invalid signature
-      - The user_id in the token does not exist in the DB
-
-    Raises HTTP 403 if the account has been suspended.
+    Raises HTTP 401 when the token is absent, expired, malformed, or the
+    user_id does not exist in the database.
+    Raises HTTP 403 when the account is suspended.
     """
+    token = credentials.credentials if credentials else None
     if not token:
         raise _CREDENTIALS_EXCEPTION
 
@@ -111,10 +102,7 @@ def get_current_user(
 def require_instructor(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """
-    Allow only instructors and admins.
-    Raises HTTP 403 for students.
-    """
+    """Allow only instructors and admins. Raises HTTP 403 for students."""
     if current_user.role not in ("instructor", "admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -126,10 +114,7 @@ def require_instructor(
 def require_student(
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """
-    Allow only students.
-    Raises HTTP 403 for instructors and admins.
-    """
+    """Allow only students. Raises HTTP 403 for instructors and admins."""
     if current_user.role != "student":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -149,11 +134,8 @@ def require_enrollment(
 ) -> User:
     """
     Verify the current user is actively enrolled in the course given by
-    the {course_id} path parameter.
-
-    Admins bypass the enrollment check and are always granted access.
-
-    Raises HTTP 403 if the user has no active enrollment in the course.
+    the {course_id} path parameter. Admins bypass the check.
+    Raises HTTP 403 if not enrolled.
     """
     if current_user.role == "admin":
         return current_user
