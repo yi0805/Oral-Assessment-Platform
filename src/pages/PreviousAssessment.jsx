@@ -22,24 +22,6 @@ function PreviousAssessment() {
     ...PreviousAssessmentScore.map((row) => row.score),
     );
 
-    {/*create data for the chart*/ }
-    const gradeCounts = { A: 0, B: 0, C: 0, D: 0 };
-
-    PreviousAssessmentScore.forEach((item) => {
-        const score = item.score;
-
-        if (score >= 80) gradeCounts.A++;
-        else if (score >= 70) gradeCounts.B++;
-        else if (score >= 60) gradeCounts.C++;
-        else gradeCounts.D++;
-    });
-
-    const chartData = [
-        { name: "A", students: gradeCounts.A },
-        { name: "B", students: gradeCounts.B },
-        { name: "C", students: gradeCounts.C },
-        { name: "D", students: gradeCounts.D },
-    ];
 
     return (
     <Stack>
@@ -51,7 +33,7 @@ function PreviousAssessment() {
 
      <ContentCard>
            <Heading>Score Overview</Heading>
-           <ScoreBarChart data={chartData} />
+           <ScoreBarChart scores={PreviousAssessmentScore } />
      </ContentCard>
 
       <ContentCard>

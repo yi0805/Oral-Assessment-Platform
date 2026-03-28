@@ -30,7 +30,7 @@ const PreviousAssessmentScore = [
     date: "08 Mar 2026",
     score: 81,
     status: "Submitted",
-  },
+    },
 ];
 
 export default PreviousAssessmentScore;
