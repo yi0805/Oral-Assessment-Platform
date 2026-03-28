@@ -35,7 +35,11 @@ function ScoreBarChart({ scores }) {
     return (
         <ResponsiveContainer width="100%" height={200}>
             <BarChart data={chartData}>
-                <XAxis dataKey="name" />
+                <XAxis
+                    dataKey="name"
+                    label={{ value: "Grade", position: "insideBottom", offset: 10 }}
+                    height={50}
+                />
                 <Tooltip />
                 <Bar
                     dataKey="students"
