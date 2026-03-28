@@ -52,16 +52,16 @@ function LoginButton({ role }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Student
         </h2>
-        <ul className="mx-auto mb-8 max-w-xs text-left font-body text-sm leading-relaxed text-on-surface-variant list-none space-y-2">
-               <li>
-                   <span className="font-bold">Access</span> your assigned oral exams
-               </li>
-               <li>
-                  <span className="font-bold">Review</span> your session history
-               </li>
-               <li>
-                  <span className="font-bold">View</span> personalized feedback
-               </li>
+        <ul class="mx-auto mb-8 max-w-xs space-y-1 text-center font-body text-sm leading-relaxed text-on-surface-variant">
+          <li class="before:mr-2 before:content-['•']">
+            Access your assigned oral exams
+          </li>
+          <li class="before:mr-2 before:content-['•']">
+            Review your session history
+          </li>
+          <li class="before:mr-2 before:content-['•']">
+            View personalized feedback
+          </li>
         </ul>
         <div className="flex items-center justify-center gap-2 font-semibold text-primary transition-all duration-300 group-hover:gap-4">
           <span>Continue to Portal</span>
@@ -95,16 +95,16 @@ function LoginButton({ role }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Instructor
         </h2>
-        <ul className="mx-auto mb-8 max-w-xs text-left font-body text-sm leading-relaxed text-on-surface-variant list-none space-y-2">
-             <li>
-                  <span className="font-bold">Manage</span> course curriculums
-             </li>
-             <li>
-                  <span className="font-bold">Design</span> assessment rubrics
-             </li>
-             <li>
-                  <span className="font-bold">Grade</span> student oral performances
-             </li>
+        <ul class="mx-auto mb-8 max-w-xs space-y-1 text-center font-body text-sm leading-relaxed text-on-surface-variant">
+          <li class="before:mr-2 before:content-['•']">
+            Manage course curriculums
+          </li>
+          <li class="before:mr-2 before:content-['•']">
+            Design assessment rubrics
+          </li>
+          <li class="before:mr-2 before:content-['•']">
+            Grade student performances
+          </li>
         </ul>
         <div className="flex items-center justify-center gap-2 font-semibold text-secondary transition-all duration-300 group-hover:gap-4">
           <span>Curator Portal</span>
