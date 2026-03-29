@@ -1,5 +1,10 @@
 """Application configuration loaded from environment variables."""
+import logging
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+_INSECURE_DEFAULT_SECRET = "local-dev-secret-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -15,8 +20,20 @@ class Settings(BaseSettings):
     s3_bucket_name: str = "team8-project20-materials"
     s3_endpoint_url: str = ""
 
-    openai_api_key: str = ""
+    # ---------------------------------------------------------------------------
+    # AI API Keys
+    # ---------------------------------------------------------------------------
+    # Google AI Studio key — used for Gemini embedding (gemini-embedding-001).
+    # Get one at: https://aistudio.google.com/app/apikey
+    gemini_api_key: str = ""
 
+    # OpenRouter key — used for all chat/LLM completions (openrouter/free tier).
+    # Get one at: https://openrouter.ai/keys
+    openrouter_api_key: str = ""
+
+    # ---------------------------------------------------------------------------
+    # Google OAuth 2.0
+    # ---------------------------------------------------------------------------
     google_client_id: str = ""
     google_client_secret: str = ""
     # Full URL Google will redirect back to after the consent screen.
@@ -42,10 +59,23 @@ class Settings(BaseSettings):
     # Anyone else gets a 403.  Leave blank to allow any Google account.
     google_allowed_login_domains: str = ""
 
-    jwt_secret_key: str = "local-dev-secret-change-in-production"
+    # ---------------------------------------------------------------------------
+    # JWT
+    # ---------------------------------------------------------------------------
+    jwt_secret_key: str = _INSECURE_DEFAULT_SECRET
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
+    # ---------------------------------------------------------------------------
+    # Rate limiting (requests per minute, per IP)
+    # ---------------------------------------------------------------------------
+    rate_limit_auth: int = 10       # /auth endpoints
+    rate_limit_ai: int = 5          # AI generation endpoints (question gen, summaries)
+    rate_limit_default: int = 60    # all other endpoints
+
+    # ---------------------------------------------------------------------------
+    # Application
+    # ---------------------------------------------------------------------------
     # Where the SPA lives. After a successful OAuth callback the backend will
     # redirect to  {frontend_url}/auth/callback?token=<jwt>&role=<role>
     # Leave blank to return JSON instead of redirecting (useful for API testing).
@@ -67,3 +97,20 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# ---------------------------------------------------------------------------
+# Start-up security warnings
+# ---------------------------------------------------------------------------
+
+if settings.jwt_secret_key == _INSECURE_DEFAULT_SECRET and not settings.debug:
+    raise RuntimeError(
+        "JWT_SECRET_KEY is set to the insecure development default. "
+        "Set a strong random secret in your .env before running in production. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
+
+if settings.jwt_secret_key == _INSECURE_DEFAULT_SECRET:
+    logger.warning(
+        "JWT_SECRET_KEY is using the insecure development default. "
+        "Set JWT_SECRET_KEY in .env before deploying to production."
+    )
