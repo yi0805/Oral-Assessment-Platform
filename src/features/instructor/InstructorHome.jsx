@@ -3,8 +3,50 @@ import styled from "styled-components";
 
 import { useGradebook } from "../../hooks/useGradebook";
 import ContentCard from "../../ui/ContentCard";
+import Heading from "../../ui/Heading";
+import SearchBar from "../../ui/SearchBar";
+import Button from "../../ui/Button";
+import Input from "../../ui/Input";
 
 import InstructorCourseDashboard from "./InstructorCourseDashboard";
+
+const SearchWrap = styled.div`
+  flex: 1;
+  width: 350px;
+  max-width: 420px;
+  margin-left: auto;
+  float: right;
+`;
+
+const FormStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+  margin-top: var(--space-l);
+  max-width: 40ch;
+`;
+
+const FormActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-m);
+  margin-top: var(--space-m);
+`;
+
+const AddPanel = styled.div`
+  border: 1px solid var(--color-light-2);
+  border-radius: var(--radius-md);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
+  background: var(--color-primary-tint);
+`;
+
+const FieldLabel = styled.label`
+  display: block;
+  font-size: var(--font-size-s);
+  color: var(--color-dark-2);
+  margin-bottom: var(--space-xs);
+`;
 
 function InstructorHome() {
   const { allCourses, addCourse } = useGradebook();
@@ -27,6 +69,7 @@ function InstructorHome() {
     const value = search.trim().toLowerCase();
     
     if (!value) return allCourses;
+    console.log(course.code);
     
     return allCourses.filter(
       (course) =>
@@ -76,12 +119,12 @@ function InstructorHome() {
           <div>
             <span
               className="mb-2 block text-[11px] font-bold uppercase tracking-[0.2em] text-secondary"
-              >Dashboard</span
+              >Home</span
             >
             <h1
               className="font-headline text-4xl font-extrabold tracking-tight text-on-surface"
             >
-              My Courses
+              Courses
             </h1>
             <p
               className="mt-2 max-w-xl font-body leading-relaxed text-on-surface-variant"
@@ -92,19 +135,27 @@ function InstructorHome() {
           </div>
         </header>
         
-        <div class="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
+        <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
           <div
-            class="rounded-xl border border-outline-variant/5 bg-surface-container-lowest p-6 shadow-sm"
+            className="rounded-xl border border-outline-variant/5 bg-surface-container-lowest p-6 shadow-sm"
           >
             <p
-              class="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
+              className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
             >
               Pending Reviews
             </p>
-            <p class="font-headline text-3xl font-bold text-error">12</p>
+            <p className="font-headline text-3xl font-bold text-error">12</p>
           </div>
+          <SearchWrap>
+            <SearchBar
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by course code or name"
+            />
+          </SearchWrap>
         </div>
         
+        {/* The Course Cards */}
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
           {shownCourses.map((course, index) => (
           <button key={course.id} 
@@ -153,22 +204,79 @@ function InstructorHome() {
             </div>
           </button>
           ))}
-          <div
-            class="group flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-outline-variant/30 p-8 text-center transition-all duration-300 hover:border-primary/50 hover:bg-primary-container/10"
+          <button
+            className="group flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-outline-variant/30 p-8 text-center transition-all duration-300 hover:border-primary/50 hover:bg-primary-container/10"
+            onClick={() => setShowAddForm(true)}
           >
             <div
-              class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container transition-all group-hover:bg-primary group-hover:text-on-primary"
+              className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container transition-all group-hover:bg-primary group-hover:text-on-primary"
             >
-              <span class="material-symbols-outlined text-3xl">add</span>
+              <span className="material-symbols-outlined text-3xl">add</span>
             </div>
-            <h3 class="font-headline text-lg font-bold text-on-surface">
+            <h3 className="font-headline text-lg font-bold text-on-surface">
               Initialize New Course
             </h3>
-            <p class="mt-2 font-body text-sm text-on-surface-variant">
+            <p className="mt-2 font-body text-sm text-on-surface-variant">
               Create a new academic syllabus and invite teaching assistants.
             </p>
-          </div>
+          </button>
         </div>
+              {showAddForm && (
+        <AddPanel>
+          <h1>Add Course</h1>
+
+          <form onSubmit={handleAddCourse}>
+            <FormStack>
+              <div>
+                <FieldLabel htmlFor="new-course-code">Course code</FieldLabel>
+                <Input
+                  id="new-course-code"
+                  value={courseCode}
+                  onChange={(e) => setCourseCode(e.target.value)}
+                  placeholder="e.g. COMPSCI 101"
+                  required
+                />
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="new-course-name">Course name</FieldLabel>
+                <Input
+                  id="new-course-name"
+                  value={courseName}
+                  onChange={(e) => setCourseName(e.target.value)}
+                  placeholder="e.g. Intro to CS"
+                  required
+                />
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="new-course-desc">
+                  Description (optional)
+                </FieldLabel>
+                <Input
+                  id="new-course-desc"
+                  value={courseDesc}
+                  onChange={(e) => setCourseDesc(e.target.value)}
+                  placeholder="Short course description"
+                />
+              </div>
+            </FormStack>
+
+            <FormActions>
+              <Button type="submit" $variant="primary">
+                Add course
+              </Button>
+              <Button
+                type="button"
+                $variant="secondary"
+                onClick={() => setShowAddForm(false)}
+              >
+                Cancel
+              </Button>
+            </FormActions>
+          </form>
+        </AddPanel>
+      )}
       </div>
     </main>
     <div className="fixed bottom-8 right-8 z-50">

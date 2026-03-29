@@ -24,6 +24,8 @@ function LoginButton({ role }) {
         localStorage.setItem("role", pendingRole.current);
         localStorage.setItem("userName", userInfo.name);
         localStorage.setItem("userPicture", userInfo.picture);
+        console.log(localStorage.getItem("username"));
+        
         navigate("/home");
       } catch (err) {
         console.error("Fetch user info error:", err);

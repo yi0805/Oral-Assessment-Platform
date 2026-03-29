@@ -10,6 +10,7 @@ import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
 import StudentAssignments from "./features/student/StudentAssignments";
 import StudentAssessment from "./features/student/StudentAssessment";
+import UpdateMaterial from "./features/instructor/UploadMaterial";
 
 function App() {
   return (
@@ -37,6 +38,10 @@ function App() {
               <Route
                 path="courses/:courseId/assessments/:assessmentId"
                 element={<StudentAssessment />}
+              />
+              <Route
+                path="instructor/update-material"
+                element={<UpdateMaterial/>}
               />
             </Route>
 

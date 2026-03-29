@@ -2,6 +2,7 @@ import styled from "styled-components";
 import { NavLink } from "react-router";
 
 import useRequireAuth from "../hooks/useRequireAuth";
+import UpdateMaterial from "../features/instructor/UploadMaterial";
 
 const StyledSidebar = styled.div`
   background: var(--color-light);

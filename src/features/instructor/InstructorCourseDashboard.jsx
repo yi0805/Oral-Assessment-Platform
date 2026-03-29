@@ -204,11 +204,39 @@ export default function InstructorCourseDashboard({ course, onBack }) {
 
   return (
     <>
-      <TopRow>
+      <main className="min-h-screen bg-surface pl-64 pt-24">    
         <Button type="button" $variant="secondary" onClick={onBack}>
           Back to course page
         </Button>
+        <div className="mx-auto max-w-7xl px-10 pb-20">
+          <header
+            className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end"
+          >
+            <div>
+              <span
+                className="mb-2 block text-[11px] font-bold uppercase tracking-[0.2em] text-secondary"
+                >Dashboard</span
+              >
+              <h1
+                className="font-headline text-4xl font-extrabold tracking-tight text-on-surface"
+              >
+                {course.name}
+              </h1>
+              <p
+                className="mt-2 max-w-xl font-body leading-relaxed text-on-surface-variant"
+              >
+                Manage your academic syllabus, track curriculum progress, and
+                update course materials for the upcoming semester.
+              </p>
+          </div>
+          </header>
+        </div>
 
+
+      </main>
+
+      {/* <TopRow>
+        back to course page was here ##
         <div>
           <label
             htmlFor="assessment-select"
@@ -230,7 +258,7 @@ export default function InstructorCourseDashboard({ course, onBack }) {
             ))}
           </Selector>
         </div>
-      </TopRow>
+      </TopRow> */}
 
       <Heading $variant="page">{course.name}</Heading>
 
@@ -362,6 +390,7 @@ export default function InstructorCourseDashboard({ course, onBack }) {
           Publish all
         </Button>
       </ButtonRow>
+      
     </>
   );
 }
