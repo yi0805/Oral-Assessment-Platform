@@ -70,9 +70,8 @@ docker run --name project20-db \
   -p 5432:5432 \
   -d pgvector/pgvector:pg16
 
-psql -h localhost -U project20 -d project20_dev -f db/migrations/001_foundation_tables.sql
-psql -h localhost -U project20 -d project20_dev -f db/migrations/002_pgvector_patch.sql
-psql -h localhost -U project20 -d project20_dev -f db/migrations/003_assessment_runtime.sql
+psql -h localhost -U project20 -d project20_dev -f db/migrations/001_schema.sql
+
 psql -h localhost -U project20 -d project20_dev -f db/migrations/999_seed_dev_data.sql
 ```
 
@@ -83,7 +82,7 @@ FastAPI docs are available at `http://127.0.0.1:8000/docs`.
 - Python 3.11+
 - FastAPI
 - SQLAlchemy 2.0
-- PostgreSQL 16 with pgvector
+- AWS RDS database for PostgreSQL 16 with pgvector
 - AWS S3 for file storage
 - Google OAuth for authentication
 
