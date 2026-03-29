@@ -1,22 +1,13 @@
-import useRequireAuth from "../../hooks/useRequireAuth";
+import { useState } from "react";
 
-import Stack from "../../ui/Stack";
-import StatsContainer from "../../ui/StatsContainer";
-import Stats from "../../ui/Stats";
-import PreviousAssessmentScore from "../../data/previousAssessmentScore";
-import ContentCard from "../../ui/ContentCard";
-import Heading from "../../ui/Heading";
-import PreviousAssessmentTable from "../../ui/PreviousAssessmentTable";
-import FeedbackCard from "../../ui/FeedbackCard";
-import ScoreBarChart from "../../ui/BarChart";
 import getStudentByName from "../../utils/getStudentByname";
 import getCoursesByStudent from "../../utils/getCoursesByStudent";
 import CourseSelector from "../../ui/CourseSelector";
-import { useState } from "react";
 import getCompletedAssessmentByStudentandCourse from "../../utils/getCompletedAssessmentByStudentandCourse";
 import getStudentAssessmentResult from "../../utils/getStudentAssessmentGrade";
 import getStudentAvgAssessmentGrade from "../../utils/getStudentAvgAssessmentGrade";
 import getClassAvgGrade from "../../utils/getClassAvgGrade";
+import InstructorFeedback from "../../ui/InstructorFeedback";
 
 function StudentPreviousAssessment() {
   const userName = localStorage.getItem("userName");
@@ -44,6 +35,8 @@ function StudentPreviousAssessment() {
       </main>
     );
   }
+
+  console.log(studentAssessmentResults);
 
   const averageGrade = getStudentAvgAssessmentGrade(studentAssessmentResults);
 
@@ -152,50 +145,65 @@ function StudentPreviousAssessment() {
               </div>
             </div>
           </section>
+
+          <section className="mb-12">
+            <div className="mb-6 flex items-center justify-between">
+              <h3 className="text-xl font-bold text-on-surface">
+                Course Submissions
+              </h3>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
+              <div className="grid grid-cols-12 bg-surface-container-low px-6 py-4 text-xs font-bold uppercase tracking-wider text-outline">
+                <div className="col-span-5">Assessment Title</div>
+                <div className="col-span-2">Date Submitted</div>
+                <div className="col-span-2 text-center">Weight</div>
+                <div className="col-span-2 text-center">Score</div>
+              </div>
+
+              {studentAssessmentResults.map((assessment, index) => (
+                <div
+                  key={assessment.assessment}
+                  className={`group grid cursor-pointer grid-cols-12 items-center px-6 py-6 transition-colors hover:bg-surface-container-low ${
+                    index !== 0 ? "border-t border-surface-container" : ""
+                  }`}
+                >
+                  <div className="col-span-5">
+                    <p className="font-semibold text-on-surface">
+                      {assessment.assessment}
+                    </p>
+                  </div>
+
+                  <div className="col-span-2 text-sm text-on-surface-variant">
+                    {assessment.submittedDate}
+                  </div>
+
+                  <div className="col-span-2 text-center">
+                    <span className="rounded-full bg-surface-container px-2 py-1 text-xs text-on-surface-variant">
+                      {assessment.weight}
+                    </span>
+                  </div>
+
+                  <div className="col-span-2 text-center">
+                    <span
+                      className={`text-lg font-bold ${
+                        index === 0 ? "text-primary" : "text-on-surface-variant"
+                      }`}
+                    >
+                      {assessment.grade}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <InstructorFeedback
+            studentAssessmentResults={studentAssessmentResults}
+          />
         </div>
       </main>
     </div>
-
-    // useRequireAuth();
-
-    // const totalAssessments = PreviousAssessmentScore.length;
-    // const averageScore = Math.round(
-    //   PreviousAssessmentScore.reduce((sum, row) => sum + row.score, 0) /
-    //     PreviousAssessmentScore.length,
-    // );
-    // const bestScore = Math.max(
-    //   ...PreviousAssessmentScore.map((row) => row.score),
-    // );
-
-    // <Stack>
-    //   <StatsContainer>
-    //     <Stats title="Total Assessments" value={totalAssessments} />
-    //     <Stats title="Average Score" value={averageScore} />
-    //     <Stats title="Best Score" value={bestScore} />
-    //   </StatsContainer>
-
-    //   <ContentCard>
-    //     <Heading>Score Overview</Heading>
-    //     <ScoreBarChart scores={PreviousAssessmentScore} />
-    //   </ContentCard>
-
-    //   <ContentCard>
-    //     <Heading>Assessment history</Heading>
-
-    //     <PreviousAssessmentTable values={PreviousAssessmentScore} />
-    //   </ContentCard>
-
-    //   <ContentCard>
-    //     <Heading>Assessment feedback</Heading>
-
-    //     <FeedbackCard title="Operating Systems" text="Impressive!" />
-
-    //     <FeedbackCard
-    //       title="Computer Organisation"
-    //       text="Good job, but review linked lists."
-    //     />
-    //   </ContentCard>
-    // </Stack>
   );
 }
 

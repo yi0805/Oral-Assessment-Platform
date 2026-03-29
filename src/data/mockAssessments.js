@@ -21,6 +21,9 @@ const mockAssessments = [
       "Why are logic gates important in computing?",
       "What is the difference between AND and OR gates?",
     ],
+    weight: "10%",
+    instructorName: "Dr. Shyamli Sindhwani ",
+    department: "Computer Science",
   },
   {
     studentName: "Yi T",
@@ -55,6 +58,9 @@ const mockAssessments = [
       "What is decomposition?",
       "Why review your final answer?",
     ],
+    weight: "10%",
+    instructorName: "Dr. Shyamli Sindhwani ",
+    department: "Computer Science",
   },
 
   {
@@ -86,6 +92,9 @@ const mockAssessments = [
       "What is control flow?",
       "What does TRAP do?",
     ],
+    weight: "10%",
+    instructorName: "Dr. Shyamli Sindhwani ",
+    department: "Computer Science",
   },
   {
     studentName: "Yi T",
@@ -114,6 +123,9 @@ const mockAssessments = [
       "How does the CPU interact with memory?",
       "Why are multiple cache levels used?",
     ],
+    weight: "10%",
+    instructorName: "Dr. Shyamli Sindhwani ",
+    department: "Computer Science",
   },
 
   {
@@ -141,6 +153,9 @@ const mockAssessments = [
       "Why are data types important?",
       "What is basic Python syntax?",
     ],
+    weight: "10%",
+    instructorName: "Dr. Shyamli Sindhwani ",
+    department: "Computer Science",
   },
 
   {
@@ -171,6 +186,9 @@ const mockAssessments = [
       "What is scope in Python?",
       "How can functions reduce repeated code?",
     ],
+    weight: "10%",
+    instructorName: "Dr. Shyamli Sindhwani ",
+    department: "Computer Science",
   },
 ];
 

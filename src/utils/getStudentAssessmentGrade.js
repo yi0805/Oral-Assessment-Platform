@@ -13,6 +13,13 @@ function getStudentAssessmentResult(completedAssessments) {
       studentName: assessment.studentName,
       assessment: assessment.assessment,
       grade: matchedResult ? matchedResult.grade : "0",
+      submittedDate: matchedResult ? matchedResult.submittedDate : "N/A",
+      weight: assessment.weight,
+      feedback: matchedResult
+        ? matchedResult.feedback
+        : "No feedback available.",
+      instructorName: assessment.instructorName,
+      department: assessment.department,
     };
   });
 }
