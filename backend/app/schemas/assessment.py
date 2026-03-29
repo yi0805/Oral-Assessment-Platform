@@ -20,15 +20,15 @@ from app.schemas.enums import (
 
 class AssessmentConfigCreate(BaseModel):
     """POST /courses/:id/assessments — instructor creates a new assessment."""
-    question_pool_id: UUID
+    question_pool_id: UUID | None = None  # Required for generic mode; null for personalized
     title: str
     instructions: str | None = None
     assessment_mode: AssessmentMode = AssessmentMode.generic
     rubric_id: UUID | None = None
     total_time_minutes: int = 15
     per_question_time_limit_seconds: int | None = None
-    max_main_questions: int       # Required — instructor must set this
-    max_followups_per_main: int   # Required — instructor must set this
+    max_main_questions: int = 3   # How many main questions the student sees per session
+    max_followups_per_main: int = 2  # Max AI follow-ups per main question
     followup_enabled: bool = True
     open_at: datetime | None = None
     close_at: datetime | None = None
@@ -60,7 +60,7 @@ class AssessmentConfigOut(BaseModel):
 
     id: UUID
     course_id: UUID
-    question_pool_id: UUID
+    question_pool_id: UUID | None
     title: str
     instructions: str | None
     assessment_mode: AssessmentMode

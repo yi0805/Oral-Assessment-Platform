@@ -73,3 +73,20 @@ class StudentListItem(BaseModel):
     course_role: CourseRole
     is_active: bool
     enrolled_at: datetime
+
+
+class BulkEnrollResult(BaseModel):
+    """
+    Summary returned by POST /courses/:id/students/import-csv.
+
+    users_created:    New User records created (first time we've seen this email).
+    users_found:      Emails already in the users table.
+    enrolled:         Users newly enrolled in this course.
+    already_enrolled: Users who were already enrolled (skipped, no duplicate).
+    errors:           Rows that could not be processed, with a reason per row.
+    """
+    users_created: int
+    users_found: int
+    enrolled: int
+    already_enrolled: int
+    errors: list[dict]

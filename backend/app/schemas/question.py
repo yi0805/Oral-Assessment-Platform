@@ -55,11 +55,14 @@ class QuestionPoolCreate(BaseModel):
 
 
 class QuestionPoolGenerateRequest(BaseModel):
-    """POST /question-pools/:id/generate — trigger AI question generation."""
+    """POST /question-pools/:id/generate — trigger AI question generation.
+
+    Only main questions are generated here. Follow-up questions are generated
+    dynamically during the student's session based on their actual answers.
+    """
     material_ids: list[UUID]
     rubric_id: UUID | None = None
     num_main_questions: int = 3
-    num_followups_per_main: int = 2
 
 
 class QuestionPoolOut(BaseModel):
