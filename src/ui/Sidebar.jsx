@@ -132,7 +132,7 @@ function Sidebar() {
         )}
         <a
           className="flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium text-[#586064] transition-all hover:bg-white/50 hover:text-[#4f6073] dark:text-slate-400 dark:hover:bg-slate-700/50"
-          href="#"
+          href=""
         >
           <span
             className="material-symbols-outlined text-[20px]"

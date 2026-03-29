@@ -6,7 +6,6 @@ function Header() {
 
   const userPicture = localStorage.getItem("userPicture");
   const userName = localStorage.getItem("userName");
-  const role = localStorage.getItem("role");
 
   const handleLogout = () => {
     localStorage.removeItem("role");
@@ -44,7 +43,6 @@ function Header() {
             <p className="headline-font text-sm font-semibold text-on-surface">
               {userName}
             </p>
-            <p className="text-xs text-on-surface-variant">{role}</p>
           </div>
           <img
             alt="User profile avatar"

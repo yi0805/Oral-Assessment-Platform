@@ -5,13 +5,13 @@ import GlobalStyle from "./styles/GlobalStyles";
 import AppLayout from "./ui/AppLayout";
 import Home from "./pages/Home";
 import InstructorUpdateAssessment from "./pages/InstructorUpdateAssessment";
-import PreviousAssessment from "./pages/PreviousAssessment";
+import StudentPreviousAssessment from "./features/student/StudentPreviousAssessment";
 import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
-import StudentAssignments from "./features/student/StudentAssignments";
+import StudentCourse from "./features/student/StudentCourse";
 import StudentAssessment from "./features/student/StudentAssessment";
-import UpdateMaterial from "./features/instructor/UploadMaterial";
-
+import InstructorDashboard from "./features/instructor/InstructorDashboard";
+import InstructorPendingGrades from "./features/instructor/InstructorPendingGrades";
 function App() {
   return (
     <GradebookProvider>
@@ -23,21 +23,24 @@ function App() {
 
             <Route element={<AppLayout />}>
               <Route path="home" element={<Home />} />
+
+              <Route path="student/:courseId" element={<StudentCourse />} />
               <Route
                 path="student/previous-assessments"
-                element={<PreviousAssessment />}
+                element={<StudentPreviousAssessment />}
+              />
+
+              <Route
+                path="instructor/:courseId"
+                element={<InstructorDashboard />}
+              />
+              <Route
+                path="instructor/pendingGrades"
+                element={<InstructorPendingGrades />}
               />
               <Route
                 path="instructor/update-assessment"
                 element={<InstructorUpdateAssessment />}
-              />
-              <Route
-                path="courses/:courseId/assignments"
-                element={<StudentAssignments />}
-              />
-              <Route
-                path="courses/:courseId/assessments/:assessmentId"
-                element={<StudentAssessment />}
               />
               <Route
                 path="instructor/update-material"
@@ -46,8 +49,12 @@ function App() {
             </Route>
 
             <Route path="login" element={<Login />} />
-
             <Route path="*" element={<PageNotFound />} />
+
+            <Route
+              path="student/:courseId/:assessmentId"
+              element={<StudentAssessment />}
+            />
           </Routes>
         </BrowserRouter>
       </>

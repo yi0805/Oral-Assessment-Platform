@@ -57,15 +57,18 @@ export default function StudentPracticeModal({
       <ContentCard $variant="modal" onClick={(e) => e.stopPropagation()}>
         <Heading>{title}</Heading>
         <BodyText>Course Number: {courseNumber}</BodyText>
-        <BodyText>{question}</BodyText>
-
-        <Input
-          type="text"
-          $variant="modal"
-          value={answer}
-          onChange={(e) => setCurrentAnswer(e.target.value)}
-          placeholder="Type your answer..."
-        />
+              <BodyText onCopy={(e) => e.preventDefault()}>
+                  {question}
+              </BodyText>
+              <Input
+                  type="text"
+                  $variant="modal"
+                  value={answer}
+                  onChange={(e) => setCurrentAnswer(e.target.value)}
+                  onPaste={(e) => e.preventDefault()}
+                  onCopy={(e) => e.preventDefault()}
+                  placeholder="Type your answer..."
+              />
 
         <ActionsContainer $variant="end">
           <Button $variant="secondary" onClick={back} disabled={!canGoBack}>

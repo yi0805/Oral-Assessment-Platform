@@ -6,6 +6,12 @@ body {
   font-family: "Inter", sans-serif;
 }
 
+h1,
+h2,
+h3 {
+  font-family: "Manrope", sans-serif;
+}
+
 .headline-font {
   font-family: "Manrope", sans-serif;
 }
@@ -25,4 +31,30 @@ body {
 
 .text-glow {
   text-shadow: 0 0 20px rgba(79, 96, 115, 0.1);
+}
+
+.mic-active {
+  box-shadow: 0 0 0 0 rgba(79, 96, 115, 0.4);
+  animation: pulse 2s infinite;
+}
+
+.academic-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(79, 96, 115, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 15px rgba(79, 96, 115, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(79, 96, 115, 0);
+  }
 }
