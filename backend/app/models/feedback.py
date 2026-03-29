@@ -33,6 +33,10 @@ class AISummary(Base):
         server_default="true",
         comment="Always true because the AI summary is advisory only.",
     )
+    suggested_grade: Mapped[str | None] = mapped_column(
+        String, nullable=True,
+        comment="Advisory grade suggested by the AI (e.g. A, B+, Pass). Never auto-assigned.",
+    )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="success", comment="success | failed")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

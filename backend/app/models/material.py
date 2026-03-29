@@ -110,8 +110,9 @@ class MaterialChunk(Base):
     )
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # gemini-embedding-001 with outputDimensionality=768 (pgvector HNSW index limit is 2000)
     embedding = mapped_column(
-        Vector(1536), nullable=True, comment="OpenAI ada-002 embedding, HNSW indexed"
+        Vector(768), nullable=True, comment="Gemini gemini-embedding-001 768-dim vector (outputDimensionality=768), HNSW indexed"
     )
     source_page_start: Mapped[int | None] = mapped_column(Integer, nullable=True)
     source_page_end: Mapped[int | None] = mapped_column(Integer, nullable=True)

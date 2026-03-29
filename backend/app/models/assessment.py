@@ -67,6 +67,11 @@ class AssessmentConfig(Base):
         nullable=True,
         comment="Null means the overall session timer is the only enforced limit.",
     )
+    max_main_questions: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+        comment="Maximum number of main questions shown to a student per session. Must be set before publishing.",
+    )
     max_followups_per_main: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="3"
     )
