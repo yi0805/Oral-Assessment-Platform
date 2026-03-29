@@ -12,6 +12,18 @@ export default function StudentCourse() {
   const { studentName, courseId } = useLocation().state || {};
 
   const assessments = getAssessmentByCourseAndStudent(courseId, studentName);
+
+  // improve here later
+  if (assessments.length === 0) {
+    return (
+      <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
+        <p className="text-lg font-semibold text-red-700">
+          No assessments found for this course.
+        </p>
+      </main>
+    );
+  }
+
   const earliestDeadline = getEarliestAssessment(assessments);
 
   const sortedAssessments = [...assessments].sort(

@@ -120,7 +120,7 @@ const mockAssessments = [
     studentName: "Yi T",
     courseId: "COMPSCI 101",
     assessment: "A1 - Python Basics",
-    status: "upcoming",
+    status: "Completed",
     deadline: "April 28, 11:59 PM",
     summary:
       "This assessment covers Python fundamentals such as variables, data types, input and output, and basic syntax.",
@@ -147,7 +147,7 @@ const mockAssessments = [
     studentName: "Yi T",
     courseId: "COMPSCI 101",
     assessment: "A2 - Functions",
-    status: "upcoming",
+    status: "Completed",
     deadline: "May 20, 11:59 PM",
     summary:
       "This assessment focuses on defining and using functions, passing parameters, and returning values in Python.",

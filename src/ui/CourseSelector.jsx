@@ -1,5 +1,4 @@
 function CourseSelector({ courses, selectedCourse, onChange }) {
-  console.log(courses);
   return (
     <div className="relative flex max-w-xs items-center">
       <select

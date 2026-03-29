@@ -13,6 +13,10 @@ import getStudentByName from "../../utils/getStudentByname";
 import getCoursesByStudent from "../../utils/getCoursesByStudent";
 import CourseSelector from "../../ui/CourseSelector";
 import { useState } from "react";
+import getCompletedAssessmentByStudentandCourse from "../../utils/getCompletedAssessmentByStudentandCourse";
+import getStudentAssessmentResult from "../../utils/getStudentAssessmentGrade";
+import getStudentAvgAssessmentGrade from "../../utils/getStudentAvgAssessmentGrade";
+import getClassAvgGrade from "../../utils/getClassAvgGrade";
 
 function StudentPreviousAssessment() {
   const userName = localStorage.getItem("userName");
@@ -21,6 +25,45 @@ function StudentPreviousAssessment() {
   const courses = student ? getCoursesByStudent(student) : [];
 
   const [selectedCourse, setSelectedCourse] = useState(courses[0]?.id || "");
+
+  const completedAssessments = getCompletedAssessmentByStudentandCourse(
+    student.studentName,
+    selectedCourse,
+  );
+
+  const studentAssessmentResults =
+    getStudentAssessmentResult(completedAssessments);
+
+  // improve here later
+  if (studentAssessmentResults.length === 0) {
+    return (
+      <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
+        <p className="text-lg font-semibold text-red-700">
+          No assessments found for this course.
+        </p>
+      </main>
+    );
+  }
+
+  const averageGrade = getStudentAvgAssessmentGrade(studentAssessmentResults);
+
+  const classAverageGrade = getClassAvgGrade(selectedCourse);
+  const difference = averageGrade - classAverageGrade;
+  const classAverageGradeText = `${difference >= 0 ? "+" : "-"}${difference.toFixed(1)}`;
+
+  const bestAssessmentGrade = Math.max(
+    ...studentAssessmentResults.map((assessment) => assessment.grade),
+  );
+  const lowestAssessmentGrade = Math.min(
+    ...studentAssessmentResults.map((assessment) => assessment.grade),
+  );
+
+  const bestAssessmentName = studentAssessmentResults.find(
+    (assessment) => parseInt(assessment.grade) === bestAssessmentGrade,
+  ).assessment;
+  const lowestAssessmentName = studentAssessmentResults.find(
+    (assessment) => parseInt(assessment.grade) === lowestAssessmentGrade,
+  ).assessment;
 
   return (
     <div className="min-h-screen">
@@ -46,6 +89,69 @@ function StudentPreviousAssessment() {
               />
             </div>
           </div>
+
+          <section className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
+              <div>
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary-container">
+                  <span className="material-symbols-outlined text-on-primary-container">
+                    analytics
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-on-surface-variant">
+                  Course Average
+                </p>
+              </div>
+              <div className="mt-4">
+                <span className="text-4xl font-bold text-primary">
+                  {averageGrade.toFixed(1)} / 10
+                </span>
+                <span className="ml-2 text-xs font-medium text-secondary">
+                  {classAverageGradeText} vs. Class Avg
+                </span>
+              </div>
+            </div>
+            <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
+              <div>
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-tertiary-container">
+                  <span className="material-symbols-outlined text-on-tertiary-container">
+                    emoji_events
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-on-surface-variant">
+                  Highest Score
+                </p>
+              </div>
+              <div className="mt-4">
+                <span className="text-4xl font-bold text-on-surface">
+                  {bestAssessmentGrade}
+                </span>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {bestAssessmentName}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
+              <div>
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-highest">
+                  <span className="material-symbols-outlined text-on-surface-variant">
+                    trending_down
+                  </span>
+                </div>
+                <p className="text-sm font-medium text-on-surface-variant">
+                  Lowest Score
+                </p>
+              </div>
+              <div className="mt-4">
+                <span className="text-4xl font-bold text-on-surface">
+                  {lowestAssessmentGrade}
+                </span>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  {lowestAssessmentName}
+                </p>
+              </div>
+            </div>
+          </section>
         </div>
       </main>
     </div>
