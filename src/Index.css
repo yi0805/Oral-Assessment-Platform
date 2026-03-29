@@ -38,6 +38,12 @@ h3 {
   animation: pulse 2s infinite;
 }
 
+.academic-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
 @keyframes pulse {
   0% {
     transform: scale(0.95);

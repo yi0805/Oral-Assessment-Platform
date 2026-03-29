@@ -10,6 +10,8 @@ import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
 import StudentCourse from "./features/student/StudentCourse";
 import StudentAssessment from "./features/student/StudentAssessment";
+import InstructorDashboard from "./features/instructor/InstructorDashboard";
+import InstructorPendingGrades from "./features/instructor/InstructorPendingGrades";
 function App() {
   return (
     <GradebookProvider>
@@ -26,6 +28,15 @@ function App() {
               <Route
                 path="student/previous-assessments"
                 element={<StudentPreviousAssessment />}
+              />
+
+              <Route
+                path="instructor/:courseId"
+                element={<InstructorDashboard />}
+              />
+              <Route
+                path="instructor/pendingGrades"
+                element={<InstructorPendingGrades />}
               />
               <Route
                 path="instructor/update-assessment"
