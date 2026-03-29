@@ -40,9 +40,8 @@ docker run --name project20-db \
   -d pgvector/pgvector:pg16
 
 # 5. Run migrations from the project root
-psql -h localhost -U project20 -d project20_dev -f db/migrations/001_foundation_tables.sql
-psql -h localhost -U project20 -d project20_dev -f db/migrations/002_pgvector_patch.sql
-psql -h localhost -U project20 -d project20_dev -f db/migrations/003_assessment_runtime.sql
+psql -h localhost -U project20 -d project20_dev -f db/migrations/001_schema.sql
+
 psql -h localhost -U project20 -d project20_dev -f db/migrations/999_seed_dev_data.sql
 
 # 6. Start the API server
