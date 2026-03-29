@@ -10,7 +10,8 @@ GET    /materials/{material_id}/status          Lightweight processing-status po
 DELETE /materials/{material_id}                 Delete material + storage object
 
 Processing pipeline (triggered asynchronously after upload):
-  uploaded → extracting → chunking → embedding → ready  (or failed)
+  uploaded → extracting → chunking → embedding → ready
+  (embedding failures fall back to zero vectors and still reach 'ready')
 """
 import logging
 from uuid import UUID, uuid4
@@ -22,6 +23,7 @@ from fastapi import (
     File,
     Form,
     HTTPException,
+    Query,
     UploadFile,
     status,
 )
@@ -39,7 +41,8 @@ from app.schemas.material import (
     MaterialStatusOut,
     MaterialUploadResponse,
 )
-from app.services import s3_client
+from app.schemas.pagination import Page
+from app.services import material_pipeline, s3_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -96,6 +99,29 @@ async def upload_material(
 
     filename = file.filename or "unknown"
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    # Guard against accidental double-uploads of the same file.
+    # If a material with the same original_filename already exists in this course
+    # (regardless of processing status), return 409 with its ID so the caller
+    # can manage the existing record instead of creating a duplicate.
+    existing_material = (
+        db.query(Material)
+        .filter(
+            Material.course_id == course_id,
+            Material.original_filename == filename,
+        )
+        .first()
+    )
+    if existing_material:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"A material named '{filename}' already exists in this course "
+                f"(id: {existing_material.id}, status: {existing_material.processing_status}). "
+                "Delete the existing material first if you want to re-upload."
+            ),
+        )
+
     if extension not in ALLOWED_FILE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -159,20 +185,23 @@ async def upload_material(
             detail="Material metadata could not be saved.",
         ) from exc
 
-    # Trigger background processing pipeline when ready.
-    # background_tasks.add_task(material_pipeline.run_pipeline, material.id)
+    # Trigger the 4-stage processing pipeline as a background task:
+    # extracting → chunking → embedding (Gemini gemini-embedding-001) → ready
+    background_tasks.add_task(material_pipeline.run_pipeline, material.id)
 
     return material
 
 
 @router.get(
     "/courses/{course_id}/materials",
-    response_model=list[MaterialListItem],
+    response_model=Page[MaterialListItem],
     summary="List course materials",
-    description="Returns all materials for a course ordered by upload date (newest first).",
+    description="Returns materials for a course ordered by upload date, newest first (paginated).",
 )
 def list_materials(
     course_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -180,13 +209,14 @@ def list_materials(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    materials = (
+    q = (
         db.query(Material)
         .filter(Material.course_id == course_id)
         .order_by(Material.uploaded_at.desc())
-        .all()
     )
-    return materials
+    total = q.count()
+    items = q.offset((page - 1) * page_size).limit(page_size).all()
+    return Page.create(items, total, page, page_size)
 
 
 @router.get(

@@ -42,6 +42,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.security import create_access_token, is_login_domain_allowed, resolve_role_for_new_user
@@ -79,7 +80,9 @@ class _DevTokenResponse(BaseModel):
         "This endpoint is automatically disabled when DEBUG=false."
     ),
 )
+@limiter.limit(f"{settings.rate_limit_auth}/minute")
 def dev_token(
+    request: Request,
     payload: _DevTokenRequest,
     db: Session = Depends(get_db),
 ):

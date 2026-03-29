@@ -3,26 +3,32 @@ Question pool & question CRUD routes.
 
 Endpoints
 ---------
-POST   /courses/{course_id}/question-pools          Create an empty question pool
-GET    /courses/{course_id}/question-pools          List all pools for a course
-POST   /question-pools/{pool_id}/generate           Trigger AI question generation
-GET    /question-pools/{pool_id}                    Get pool with all questions
-PUT    /question-pools/{pool_id}/approve            Mark pool as approved
-POST   /question-pools/{pool_id}/questions          Add a custom question
-PUT    /questions/{question_id}                     Edit a question
-DELETE /questions/{question_id}                     Remove a question
+POST   /courses/{course_id}/question-pools                  Create an empty question pool
+GET    /courses/{course_id}/question-pools                  List all pools for a course
+POST   /question-pools/{pool_id}/generate                   Trigger AI question generation
+GET    /question-pools/{pool_id}                            Get pool with all questions
+PUT    /question-pools/{pool_id}/approve                    Mark pool as approved
+POST   /question-pools/{pool_id}/publish-as-assessment      One-step: approve + create + publish assessment
+POST   /question-pools/{pool_id}/questions                  Add a custom question
+PUT    /questions/{question_id}                             Edit a question
+DELETE /questions/{question_id}                             Remove a question
 """
 from uuid import UUID
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
+from app.models.assessment import AssessmentConfig
 from app.models.course import Course
 from app.models.question import Question, QuestionPool
 from app.models.user import User
+from app.core.limiter import limiter
+from app.core.config import settings
+from app.schemas.assessment import AssessmentConfigOut
+from app.schemas.pagination import Page
 from app.schemas.question import (
     QuestionCreate,
     QuestionOut,
@@ -53,6 +59,21 @@ def create_question_pool(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
+    existing_pool = (
+        db.query(QuestionPool)
+        .filter(QuestionPool.course_id == course_id, QuestionPool.title == payload.title)
+        .first()
+    )
+    if existing_pool:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"A question pool titled '{payload.title}' already exists in this course "
+                f"(id: {existing_pool.id}, status: {existing_pool.status}). "
+                "Use the existing pool or choose a different title."
+            ),
+        )
+
     pool = QuestionPool(
         course_id=course_id,
         title=payload.title,
@@ -68,12 +89,14 @@ def create_question_pool(
 
 @router.get(
     "/courses/{course_id}/question-pools",
-    response_model=list[QuestionPoolBrief],
+    response_model=Page[QuestionPoolBrief],
     summary="List question pools",
-    description="Returns all question pools for a course (brief view, no questions list).",
+    description="Returns all question pools for a course (brief view, no questions list) (paginated).",
 )
 def list_question_pools(
     course_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -81,13 +104,14 @@ def list_question_pools(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    pools = (
+    q = (
         db.query(QuestionPool)
         .filter(QuestionPool.course_id == course_id)
         .order_by(QuestionPool.created_at.desc())
-        .all()
     )
-    return pools
+    total = q.count()
+    items = q.offset((page - 1) * page_size).limit(page_size).all()
+    return Page.create(items, total, page, page_size)
 
 
 @router.post(
@@ -95,12 +119,16 @@ def list_question_pools(
     response_model=QuestionPoolOut,
     summary="Trigger AI question generation",
     description=(
-        "Instructor-only. Marks the pool for AI generation from the selected "
-        "materials and rubric. The actual generation is handled by the AI service "
-        "(question_generator.py integration point)."
+        "Instructor-only. Uses the AI Gateway (OpenRouter free + RAG search) to "
+        "generate grounded main questions from the selected materials and rubric. "
+        "Only main questions are generated; follow-up questions are dynamically "
+        "produced during the student's session based on their answers. "
+        "Replaces any previously generated questions in the pool."
     ),
 )
-def generate_questions(
+@limiter.limit(f"{settings.rate_limit_ai}/minute")
+async def generate_questions(
+    request: Request,
     pool_id: UUID,
     payload: QuestionPoolGenerateRequest,
     db: Session = Depends(get_db),
@@ -115,11 +143,38 @@ def generate_questions(
             detail="AI generation can only be triggered for pools in 'draft' status.",
         )
 
-    # Integration point: call question_generator.generate_pool(pool_id, payload.material_ids, payload.rubric_id)
-    pool.generated_from_materials = [str(mid) for mid in payload.material_ids]
-    pool.generation_method = "ai_generated"
-    db.commit()
-    db.refresh(pool)
+    from app.services.question_generator import generate_pool
+
+    try:
+        pool = await generate_pool(
+            db=db,
+            pool_id=pool_id,
+            material_ids=payload.material_ids,
+            rubric_id=payload.rubric_id,
+            num_main_questions=payload.num_main_questions or 3,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"AI generation service error: {exc}",
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        # Catch unexpected DB errors (e.g. vector dimension mismatch if migration 004
+        # not applied) and return a readable 500 instead of plain-text "Internal Server Error".
+        import logging as _logging
+        _logging.getLogger(__name__).exception(
+            "Unexpected error in generate_questions for pool %s", pool_id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Question generation failed: {type(exc).__name__}: {exc}",
+        ) from exc
+
     return pool
 
 
@@ -172,6 +227,116 @@ def approve_question_pool(
     return pool
 
 
+# ---------------------------------------------------------------------------
+# Publish pool as assessment (one-step shortcut)
+# ---------------------------------------------------------------------------
+
+class _PublishAsAssessmentRequest(QuestionPoolCreate.__class__):
+    """
+    Inline payload — we define it directly here to avoid a circular import
+    with schemas/assessment.py.  Only the fields needed to create + publish
+    an assessment are exposed; everything else uses sensible defaults.
+    """
+    pass
+
+
+from pydantic import BaseModel as _BaseModel  # noqa: E402
+
+class PublishAsAssessmentRequest(_BaseModel):
+    """POST /question-pools/{pool_id}/publish-as-assessment"""
+    title: str
+    instructions: str | None = None
+    total_time_minutes: int = 15
+    max_main_questions: int = 3
+    max_followups_per_main: int = 2
+    followup_enabled: bool = True
+    rubric_id: UUID | None = None
+    open_at: datetime | None = None
+    close_at: datetime | None = None
+
+
+@router.post(
+    "/question-pools/{pool_id}/publish-as-assessment",
+    response_model=AssessmentConfigOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="One-step: approve pool → create assessment → publish",
+    description=(
+        "Instructor-only. Convenience endpoint that combines three steps into one: "
+        "(1) marks the pool as approved if it is not already, "
+        "(2) creates an AssessmentConfig linked to the pool and its course, "
+        "(3) immediately publishes that config. "
+        "Equivalent to PUT /approve + POST /assessments + PUT /publish."
+    ),
+)
+def publish_pool_as_assessment(
+    pool_id: UUID,
+    payload: PublishAsAssessmentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    pool = db.query(QuestionPool).filter(QuestionPool.id == pool_id).first()
+    if not pool:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question pool not found")
+    if pool.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot publish an archived question pool as an assessment.",
+        )
+
+    # Guard: prevent creating a second assessment from the same pool.
+    existing_assessment = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.question_pool_id == pool_id)
+        .first()
+    )
+    if existing_assessment:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"An assessment already exists for this question pool "
+                f"(assessment id: {existing_assessment.id}, "
+                f"title: '{existing_assessment.title}', "
+                f"status: {existing_assessment.status}). "
+                "Manage the existing assessment instead of creating a duplicate."
+            ),
+        )
+
+    # Step 1: Auto-approve the pool if it is still in draft
+    if pool.status == "draft":
+        pool.status = "approved"
+        pool.approved_at = datetime.now(timezone.utc)
+        pool.approved_by = current_user.id
+        db.flush()
+
+    # Step 2: Create the AssessmentConfig
+    config = AssessmentConfig(
+        course_id=pool.course_id,
+        question_pool_id=pool.id,
+        title=payload.title,
+        instructions=payload.instructions,
+        assessment_mode="generic",
+        rubric_id=payload.rubric_id,
+        total_time_minutes=payload.total_time_minutes,
+        max_main_questions=payload.max_main_questions,
+        max_followups_per_main=payload.max_followups_per_main,
+        followup_enabled=payload.followup_enabled,
+        open_at=payload.open_at,
+        close_at=payload.close_at,
+    )
+    db.add(config)
+    db.flush()
+
+    # Step 3: Publish immediately
+    now = datetime.now(timezone.utc)
+    config.status = "published"
+    config.published_at = now
+    config.published_by = current_user.id
+
+    db.commit()
+    db.refresh(config)
+    return config
+
+
 @router.post(
     "/question-pools/{pool_id}/questions",
     response_model=QuestionOut,
@@ -210,7 +375,11 @@ def add_question(
     "/questions/{question_id}",
     response_model=QuestionOut,
     summary="Edit a question",
-    description="Instructor-only. Updates the text or metadata of an existing question.",
+    description=(
+        "Instructor-only. Updates the text or metadata of an existing question. "
+        "Allowed on pools in 'draft', 'approved', or 'published' status — "
+        "blocked only when the pool is 'archived'."
+    ),
 )
 def update_question(
     question_id: UUID,
@@ -221,6 +390,13 @@ def update_question(
     question = db.query(Question).filter(Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
+    if pool and pool.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify questions in an archived question pool.",
+        )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(question, field, value)
@@ -234,7 +410,10 @@ def update_question(
     "/questions/{question_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a question",
-    description="Instructor-only. Permanently removes a question from its pool.",
+    description=(
+        "Instructor-only. Permanently removes a question from its pool. "
+        "Blocked only when the pool is 'archived'."
+    ),
 )
 def delete_question(
     question_id: UUID,
@@ -244,6 +423,13 @@ def delete_question(
     question = db.query(Question).filter(Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
+    if pool and pool.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot delete questions from an archived question pool.",
+        )
 
     db.delete(question)
     db.commit()

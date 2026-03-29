@@ -11,7 +11,7 @@ DELETE /rubrics/{rubric_id}           Delete a rubric (instructor only)
 """
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -19,6 +19,7 @@ from app.core.dependencies import get_current_user, require_instructor
 from app.models.course import Course
 from app.models.rubric import Rubric
 from app.models.user import User
+from app.schemas.pagination import Page
 from app.schemas.rubric import RubricBrief, RubricCreate, RubricOut, RubricUpdate
 
 router = APIRouter()
@@ -44,6 +45,20 @@ def create_rubric(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
+    existing_rubric = (
+        db.query(Rubric)
+        .filter(Rubric.course_id == course_id, Rubric.title == payload.title)
+        .first()
+    )
+    if existing_rubric:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"A rubric titled '{payload.title}' already exists in this course "
+                f"(id: {existing_rubric.id}). Use PUT /rubrics/{{id}} to update it."
+            ),
+        )
+
     rubric = Rubric(
         course_id=course_id,
         title=payload.title,
@@ -60,12 +75,14 @@ def create_rubric(
 
 @router.get(
     "/courses/{course_id}/rubrics",
-    response_model=list[RubricBrief],
+    response_model=Page[RubricBrief],
     summary="List course rubrics",
-    description="Returns all rubrics for a course (title + metadata, no rubric_text).",
+    description="Returns rubrics for a course (title + metadata, no rubric_text) (paginated).",
 )
 def list_rubrics(
     course_id: UUID,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -73,13 +90,10 @@ def list_rubrics(
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
-    rubrics = (
-        db.query(Rubric)
-        .filter(Rubric.course_id == course_id)
-        .order_by(Rubric.created_at.desc())
-        .all()
-    )
-    return rubrics
+    q = db.query(Rubric).filter(Rubric.course_id == course_id).order_by(Rubric.created_at.desc())
+    total = q.count()
+    items = q.offset((page - 1) * page_size).limit(page_size).all()
+    return Page.create(items, total, page, page_size)
 
 
 @router.get(
