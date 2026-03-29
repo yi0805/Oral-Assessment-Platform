@@ -1,5 +1,4 @@
-import { useMemo, useState } from "react";
-import styled from "styled-components";
+import { useNavigate } from "react-router";
 
 import { useGradebook } from "../../hooks/useGradebook";
 import ContentCard from "../../ui/ContentCard";
@@ -9,6 +8,10 @@ import Button from "../../ui/Button";
 import Input from "../../ui/Input";
 
 import InstructorCourseDashboard from "./InstructorCourseDashboard";
+import getInstructorByName from "../../utils/getInstructorByname";
+import getUngradedAssessmentsByInstructor from "../../utils/getUngradedAssessmentsByInstructor";
+import InstructorCourseCard from "../../ui/InstructorCourseCard";
+import getCourseInfoByInstructor from "../../utils/getCourseInfoByInstructor";
 
 const SearchWrap = styled.div`
   flex: 1;
@@ -90,208 +93,82 @@ function InstructorHome() {
       name: courseName,
       description: courseDesc,
     });
+  const navigate = useNavigate();
 
-    setCourseCode("");
-    setCourseName("");
-    setCourseDesc("");
-    setShowAddForm(false);
-  }
+  const Username = localStorage.getItem("userName");
+  const instructor = getInstructorByName(Username);
+  const courses = getCourseInfoByInstructor(instructor);
 
-  if (selectedCourse) {
-    return (
-      <ContentCard>
-        <InstructorCourseDashboard
-          key={selectedCourse.id}
-          course={selectedCourse}
-          onBack={() => setSelectedCourse(null)}
-        />
-      </ContentCard>
-    );
-  }
+  const unGradedAssessments = getUngradedAssessmentsByInstructor(instructor);
 
   return (
-    <>    
-    <main className="min-h-screen bg-surface pl-64 pt-24">    
-      <div className="mx-auto max-w-7xl px-10 pb-20">
-        <header
-          className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end"
-        >
-          <div>
-            <span
-              className="mb-2 block text-[11px] font-bold uppercase tracking-[0.2em] text-secondary"
-              >Home</span
-            >
-            <h1
-              className="font-headline text-4xl font-extrabold tracking-tight text-on-surface"
-            >
-              Courses
-            </h1>
-            <p
-              className="mt-2 max-w-xl font-body leading-relaxed text-on-surface-variant"
-            >
-              Manage your academic syllabus, track curriculum progress, and
-              update course materials for the upcoming semester.
-            </p>
-          </div>
-        </header>
-        
-        <div className="mb-16 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div
-            className="rounded-xl border border-outline-variant/5 bg-surface-container-lowest p-6 shadow-sm"
-          >
-            <p
-              className="mb-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant"
-            >
-              Pending Reviews
-            </p>
-            <p className="font-headline text-3xl font-bold text-error">12</p>
-          </div>
-          <SearchWrap>
-            <SearchBar
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by course code or name"
-            />
-          </SearchWrap>
-        </div>
-        
-        {/* The Course Cards */}
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-          {shownCourses.map((course, index) => (
-          <button key={course.id} 
-            className="group flex flex-col overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary/5"
-            onClick={() => setSelectedCourse(course)}
-          >
-            <div className="relative h-48 overflow-hidden bg-gradient-to-tl}">
-              <img
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                data-alt="abstract artistic visualization of quantum computing particles and glowing neural networks in shades of deep blue and silver"
-                src={images[index % images.length]}
-              />
-              <div
-                className="absolute right-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary backdrop-blur-md"
-              >
-                Active
-              </div>
+    <>
+      <main className="min-h-screen bg-surface pl-64 pt-24">
+        <div className="mx-auto max-w-7xl px-10 pb-20">
+          <header className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
+            <div>
+              <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
+                My Courses
+              </h1>
             </div>
-            <div className="flex flex-grow flex-col p-6">
-              <span className="mb-1 font-body text-xs font-bold text-secondary-dim"
-                >{course.code}</span
-              >
-              <h3
-                className="mb-3 font-headline text-xl font-bold text-on-surface transition-colors group-hover:text-primary"
-              >
-                {course.name}
-              </h3>
-              <p
-                className="mb-6 flex-grow font-body text-sm leading-relaxed text-on-surface-variant"
-              >
-                {course.description}
-              </p>
-              {/* <div
-                className="flex items-center justify-between border-t border-outline-variant/10 pt-6"
-              >                
+          </header>
+
+          <div className="mb-10">
+            <div className="flex flex-col items-center justify-between gap-6 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-5 shadow-sm md:flex-row md:p-6">
+              <div className="flex items-center gap-6">
+                <div className="flex flex-col">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-lg text-error">
+                      assignment_late
+                    </span>
+                    <span className="font-headline text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant">
+                      Pending Reviews
+                    </span>
+                  </div>
+                  <h2 className="text-center font-headline text-4xl font-extrabold leading-none tracking-tight text-primary">
+                    {unGradedAssessments.length}
+                  </h2>
+                </div>
+                <div className="hidden h-10 w-[1px] bg-outline-variant/20 md:block"></div>
+                <p className="max-w-sm font-body text-sm text-on-surface-variant">
+                  Student submissions are currently awaiting your feedback and
+                  grading.
+                </p>
+              </div>
+              <div className="flex w-full flex-row gap-3 md:w-auto">
                 <button
-                  className="group/btn flex items-center gap-1 text-sm font-bold text-primary hover:underline"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 font-headline text-xs font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
+                  onClick={() => {
+                    navigate("/instructor/pendingGrades", {
+                      state: {
+                        unGradedAssessments,
+                      },
+                    });
+                  }}
                 >
-                  Manage Course
-                  <span
-                    className="material-symbols-outlined text-sm transition-transform group-hover/btn:translate-x-1"
-                    >arrow_forward</span
-                  >
+                  Review Submissions
+                  <span className="material-symbols-outlined text-xs">
+                    arrow_forward
+                  </span>
                 </button>
-              </div> */}
+              </div>
             </div>
-          </button>
-          ))}
-          <button
-            className="group flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl border-2 border-dashed border-outline-variant/30 p-8 text-center transition-all duration-300 hover:border-primary/50 hover:bg-primary-container/10"
-            onClick={() => setShowAddForm(true)}
-          >
-            <div
-              className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-surface-container transition-all group-hover:bg-primary group-hover:text-on-primary"
-            >
-              <span className="material-symbols-outlined text-3xl">add</span>
-            </div>
-            <h3 className="font-headline text-lg font-bold text-on-surface">
-              Initialize New Course
-            </h3>
-            <p className="mt-2 font-body text-sm text-on-surface-variant">
-              Create a new academic syllabus and invite teaching assistants.
-            </p>
-          </button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <InstructorCourseCard courses={courses} />
+          </div>
         </div>
-              {showAddForm && (
-        <AddPanel>
-          <h1>Add Course</h1>
-
-          <form onSubmit={handleAddCourse}>
-            <FormStack>
-              <div>
-                <FieldLabel htmlFor="new-course-code">Course code</FieldLabel>
-                <Input
-                  id="new-course-code"
-                  value={courseCode}
-                  onChange={(e) => setCourseCode(e.target.value)}
-                  placeholder="e.g. COMPSCI 101"
-                  required
-                />
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="new-course-name">Course name</FieldLabel>
-                <Input
-                  id="new-course-name"
-                  value={courseName}
-                  onChange={(e) => setCourseName(e.target.value)}
-                  placeholder="e.g. Intro to CS"
-                  required
-                />
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="new-course-desc">
-                  Description (optional)
-                </FieldLabel>
-                <Input
-                  id="new-course-desc"
-                  value={courseDesc}
-                  onChange={(e) => setCourseDesc(e.target.value)}
-                  placeholder="Short course description"
-                />
-              </div>
-            </FormStack>
-
-            <FormActions>
-              <Button type="submit" $variant="primary">
-                Add course
-              </Button>
-              <Button
-                type="button"
-                $variant="secondary"
-                onClick={() => setShowAddForm(false)}
-              >
-                Cancel
-              </Button>
-            </FormActions>
-          </form>
-        </AddPanel>
-      )}
+      </main>
+      <div className="fixed bottom-8 right-8 z-50">
+        <button className="group flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-2xl transition-all hover:bg-primary-dim active:scale-90">
+          <span className="material-symbols-outlined text-3xl transition-transform duration-300 group-hover:rotate-90">
+            add
+          </span>
+        </button>
       </div>
-    </main>
-    <div className="fixed bottom-8 right-8 z-50">
-      <button
-        className="group flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-2xl transition-all hover:bg-primary-dim active:scale-90"
-      >
-        <span
-          className="material-symbols-outlined text-3xl transition-transform duration-300 group-hover:rotate-90"
-          >add</span
-        >
-      </button>
-    </div>
     </>
   );
 }
-
+}
 export default InstructorHome;
-
