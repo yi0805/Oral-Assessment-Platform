@@ -124,6 +124,38 @@ const mockAssessmentResults = [
       "Excellent work on the assignment! Your implementation of the functions was efficient and well-documented. Keep up the great work!",
     status: "ungraded",
   },
+  {
+    studentName: "Henry Song",
+    courseId: "COMPSCI 101",
+    assessment: "A1 - Python Basics",
+    grade: "8",
+    submittedDate: "Feb 20, 2026",
+    feedback:
+      "Great job on the assignment! Your code is clean and well-structured. Keep up the good work!",
+    status: "graded",
+  },
+
+  {
+    studentName: "Henry Song",
+    courseId: "COMPSCI 101",
+    assessment: "A2 - Functions",
+    grade: "10",
+    submittedDate: "May 10, 2026",
+    feedback:
+      "Excellent work on the assignment! Your implementation of the functions was efficient and well-documented. Keep up the great work!",
+    status: "ungraded",
+  },
+
+  {
+    studentName: "Henry Song",
+    courseId: "COMPSCI 110",
+    assessment: "A1 - Digital Logic",
+    grade: "8",
+    submittedDate: "Feb 22, 2026",
+    feedback:
+      "Excellent work on the assignment! Your implementation of the functions was efficient and well-documented. Keep up the great work!",
+    status: "ungraded",
+  },
 ];
 
 export default mockAssessmentResults;

@@ -12,6 +12,9 @@ import StudentCourse from "./features/student/StudentCourse";
 import StudentAssessment from "./features/student/StudentAssessment";
 import InstructorDashboard from "./features/instructor/InstructorDashboard";
 import InstructorPendingGrades from "./features/instructor/InstructorPendingGrades";
+import UpdateMaterial from "./features/instructor/UploadMaterial";
+import Transcript from "./features/instructor/Transcript";
+
 function App() {
   return (
     <GradebookProvider>
@@ -55,6 +58,11 @@ function App() {
               path="student/:courseId/:assessmentId"
               element={<StudentAssessment />}
             />
+            <Route
+              path="instructor/transcript"
+              element={<Transcript/>}
+            />
+
           </Routes>
         </BrowserRouter>
       </>

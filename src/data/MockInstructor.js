@@ -1,6 +1,6 @@
 const mockInstructor = [
   {
-    instructorName: "Dr. Shyamli Sindhwani ",
+    name: "Dr. Shyamli Sindhwani ",
     department: "Computer Science",
     teachingCourses: [
       "COMPSCI 101",
@@ -11,7 +11,7 @@ const mockInstructor = [
   },
 
   {
-    instructorName: "Yi T",
+    name: "Yi T",
     department: "Computer Science",
     teachingCourses: [
       "COMPSCI 101",
@@ -22,7 +22,7 @@ const mockInstructor = [
   },
 
   {
-    instructorName: "Whilin Zhao",
+    name: "Whilin Zhao",
     department: "Computer Science",
     teachingCourses: [
       "COMPSCI 101",
@@ -31,6 +31,17 @@ const mockInstructor = [
       "COMPSCI 340",
     ],
   },
+
+  {
+    name: "Henry Song",
+    department: "Computer Science",
+    teachingCourses: [
+      "COMPSCI 101",
+      "COMPSCI 110",
+      "COMPSCI 210",
+      "COMPSCI 340",
+    ]
+  }
 ];
 
 export default mockInstructor;

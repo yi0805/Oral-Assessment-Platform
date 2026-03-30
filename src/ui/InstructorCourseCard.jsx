@@ -7,7 +7,7 @@ function InstructorCourseCard({ courses }) {
   ];
 
   return courses.map((course, index) => (
-    <div
+    <button
       key={course.id}
       className="group flex flex-col overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary/5"
     >
@@ -34,17 +34,8 @@ function InstructorCourseCard({ courses }) {
         <p className="mb-6 flex-grow font-body text-sm leading-relaxed text-on-surface-variant">
           {course.description}
         </p>
-
-        <div className="flex items-center justify-between border-t border-outline-variant/10 pt-6">
-          <button className="group/btn flex items-center gap-1 text-sm font-bold text-primary hover:underline">
-            Manage Course
-            <span className="material-symbols-outlined text-sm transition-transform group-hover/btn:translate-x-1">
-              arrow_forward
-            </span>
-          </button>
-        </div>
       </div>
-    </div>
+    </button>
   ));
 }
 
