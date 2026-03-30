@@ -129,7 +129,7 @@ const mockAssessments = [
   },
 
   {
-    studentName: "Whilin Zhao",
+    studentName: "Yi T",
     courseId: "COMPSCI 101",
     assessment: "A1 - Python Basics",
     status: "Completed",
@@ -159,7 +159,7 @@ const mockAssessments = [
   },
 
   {
-    studentName: "Whilin Zhao",
+    studentName: "Yi T",
     courseId: "COMPSCI 101",
     assessment: "A2 - Functions",
     status: "Completed",
