@@ -1,5 +1,5 @@
 
-function Transcipt() {
+function AddCourse() {
 
   return (
     <>
@@ -312,4 +312,4 @@ function Transcipt() {
   );
 }
 
-export default Transcipt;
+export default AddCourse;

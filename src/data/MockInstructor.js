@@ -1,6 +1,6 @@
 const mockInstructor = [
   {
-    id:0,
+    // id:0,
     name: "Dr. Shyamli Sindhwani ",
     department: "Computer Science",
     courses: [
@@ -12,7 +12,7 @@ const mockInstructor = [
   },
 
   {
-    id:1,
+    // id:1,
     name: "Yi T",
     department: "Computer Science",
     courses: [
@@ -24,7 +24,7 @@ const mockInstructor = [
   },
 
   {
-    id:2,
+    // id:2,
     name: "Whilin Zhao",
     department: "Computer Science",
     courses: [
@@ -36,7 +36,7 @@ const mockInstructor = [
   },
 
   {
-    id:3,
+    // id:3,
     name: "Henry Song",
     department: "Computer Science",
     courses: [

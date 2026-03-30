@@ -14,6 +14,8 @@ import InstructorDashboard from "./features/instructor/InstructorDashboard";
 import InstructorPendingGrades from "./features/instructor/InstructorPendingGrades";
 import UpdateMaterial from "./features/instructor/UploadMaterial";
 import Transcript from "./features/instructor/Transcript";
+import AddCourse from "./features/instructor/AddCourse";
+import InstructorCourseDashboard from "./features/instructor/InstructorCourseDashboard";
 
 function App() {
   return (
@@ -49,6 +51,18 @@ function App() {
                 path="instructor/update-material"
                 element={<UpdateMaterial/>}
               />
+              <Route
+                path="instructor/transcript"
+                element={<Transcript/>}
+              />
+              <Route
+                path="instructor/AddCourse"
+                element={<AddCourse/>}
+              />
+              <Route
+                path="instructor/course-dashboard"
+                element={<InstructorCourseDashboard/>}
+              />
             </Route>
 
             <Route path="login" element={<Login />} />
@@ -57,10 +71,6 @@ function App() {
             <Route
               path="student/:courseId/:assessmentId"
               element={<StudentAssessment />}
-            />
-            <Route
-              path="instructor/transcript"
-              element={<Transcript/>}
             />
 
           </Routes>

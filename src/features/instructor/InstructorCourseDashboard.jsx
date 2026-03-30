@@ -100,7 +100,7 @@ function getShownScore(student) {
   return student.aiScore;
 }
 
-export default function InstructorCourseDashboard({ course, onBack }) {
+export default function InstructorCourseDashboard({ course }) {
   const {
     ensureGradebook,
     getAssessmentsForCourse,
@@ -176,11 +176,11 @@ export default function InstructorCourseDashboard({ course, onBack }) {
   if (assessments.length === 0) {
     return (
       <>
-        <TopRow>
+        {/* <TopRow>
           <Button type="button" $variant="secondary" onClick={onBack}>
             Back to courses
           </Button>
-        </TopRow>
+        </TopRow> */}
 
         <Heading $variant="page">{course.name}</Heading>
         <BodyText>No assessments yet for this course.</BodyText>
@@ -191,11 +191,11 @@ export default function InstructorCourseDashboard({ course, onBack }) {
   if (!students) {
     return (
       <>
-        <TopRow>
+        {/* <TopRow>
           <Button type="button" $variant="secondary" onClick={onBack}>
             Back to courses
           </Button>
-        </TopRow>
+        </TopRow> */}
 
         <InfoText>Loading gradebook...</InfoText>
       </>
@@ -205,9 +205,9 @@ export default function InstructorCourseDashboard({ course, onBack }) {
   return (
     <>
       <main className="min-h-screen bg-surface pl-64 pt-24">    
-        <Button type="button" $variant="secondary" onClick={onBack}>
+        {/* <Button type="button" $variant="secondary" onClick={onBack}>
           Back to course page
-        </Button>
+        </Button> */}
         <div className="mx-auto max-w-7xl px-10 pb-20">
           <header
             className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end"
