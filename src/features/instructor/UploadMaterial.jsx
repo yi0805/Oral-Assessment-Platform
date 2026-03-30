@@ -1,15 +1,15 @@
+import { useLocation } from "react-router";
 import getInstructorByName from "../../utils/getInstructorByname";
 import mockCourses from "../../data/mockCourses";
 import mockInstructor from "../../data/mockInstructor";
 import getCourseInfoByInstructor from "../../utils/getCourseInfoByInstructor";
-
+import getCoursesByInstructor from "../../utils/getCoursesByInstructor";
 
 function UpdateMaterial(){
-    const Username = localStorage.getItem("username");
-    const instructor = getInstructorByName(Username);
-    console.log(instructor.name);
-    const courses = getCourseInfoByInstructor(instructor);
-    console.log(courses);
+    // const Username = localStorage.getItem("username");
+    // const instructor = getInstructorByName(Username);
+    // const courses = getCoursesByInstructor(instructor);
+    // console.log("Instructor: ", Username);
     
 return (
     <>
@@ -42,10 +42,10 @@ return (
                             <select
                             className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
                             >
-                            <option>{courses[0]}</option>
-                            <option>{courses[1]}</option>
+                            <option>COMPSCI 101</option>
+                            {/* <option>{courses[1]}</option>
                             <option>{courses[2]}</option>
-                            <option>{courses[3]}</option>
+                            <option>{courses[3]}</option> */}
                             
                             </select>
                             <span
@@ -62,36 +62,10 @@ return (
                         >
                         <input
                             className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                            placeholder="e.g., Mid-Term Syllabus Update 2024"
+                            placeholder="e.g., Intro to Python"
                             type="text"
                         />
-                        </div>
-                        <div className="space-y-2">
-                        <label
-                            className="ml-1 block text-sm font-semibold text-on-surface-variant"
-                            >Target Difficulty</label
-                        >
-                        <div className="grid grid-cols-3 gap-4">
-                            <button
-                            className="rounded-xl border-2 border-primary-container bg-primary-container/30 px-4 py-3 text-sm font-semibold text-primary transition-all hover:bg-primary-container/50"
-                            type="button"
-                            >
-                            Foundational
-                            </button>
-                            <button
-                            className="rounded-xl border-2 border-transparent bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface-variant transition-all hover:bg-surface-container-high"
-                            type="button"
-                            >
-                            Intermediate
-                            </button>
-                            <button
-                            className="rounded-xl border-2 border-transparent bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface-variant transition-all hover:bg-surface-container-high"
-                            type="button"
-                            >
-                            Advanced
-                            </button>
-                        </div>
-                        </div>
+                        </div>                        
                         <div className="space-y-2">
                         <label
                             className="ml-1 block text-sm font-semibold text-on-surface-variant"
@@ -212,7 +186,7 @@ return (
                 src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVCGVyyQqfO-19vp2pmD6AID9Ui4jZyVdFBJC4Dd9xIwyi_Wq3zmfIrzALaNCanKTKzb69Zw80EoWXyNplx9aPxwuzrUKam9awbyqcrNcNnR607gF_8jVGD_WYOsOIV3Ykxl4NHG7Tk3vrvrnqBcQZ7wnwI3tZRmk2UYvJtFtsfSxcI5ynho1SQgebXGpy91RN9qpxIAh6BVWjZf3s_99wKYtTr9KAPOWeND0i8Rn0e2imsnCp5pNpUGQw_mXdGzzUlxtInB2-xVVj"
             />
             <div className="flex-1">
-                <h4 className="text-sm font-bold text-on-surface">Curator's Tip</h4>
+                <h4 className="text-sm font-bold text-on-surface">Next Level's Tip</h4>
                 <p className="text-sm leading-relaxed text-on-surface-variant">
                 For better AI generation results, ensure the PDF contains clear
                 headings and structured learning objectives. The engine performs

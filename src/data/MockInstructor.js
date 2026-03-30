@@ -1,8 +1,9 @@
 const mockInstructor = [
   {
+    id:0,
     name: "Dr. Shyamli Sindhwani ",
     department: "Computer Science",
-    teachingCourses: [
+    courses: [
       "COMPSCI 101",
       "COMPSCI 110",
       "COMPSCI 210",
@@ -11,9 +12,10 @@ const mockInstructor = [
   },
 
   {
+    id:1,
     name: "Yi T",
     department: "Computer Science",
-    teachingCourses: [
+    courses: [
       "COMPSCI 101",
       "COMPSCI 110",
       "COMPSCI 210",
@@ -22,9 +24,10 @@ const mockInstructor = [
   },
 
   {
+    id:2,
     name: "Whilin Zhao",
     department: "Computer Science",
-    teachingCourses: [
+    courses: [
       "COMPSCI 101",
       "COMPSCI 110",
       "COMPSCI 210",
@@ -33,9 +36,10 @@ const mockInstructor = [
   },
 
   {
+    id:3,
     name: "Henry Song",
     department: "Computer Science",
-    teachingCourses: [
+    courses: [
       "COMPSCI 101",
       "COMPSCI 110",
       "COMPSCI 210",
