@@ -131,6 +131,7 @@ function PendingStudentTable({ rows = [] }) {
             >
               <span
                 className="material-symbols-outlined text-sm"
+                style={{ verticalAlign: "middle" }}
                 data-icon="chevron_left"
               >
                 chevron_left
@@ -158,6 +159,7 @@ function PendingStudentTable({ rows = [] }) {
             >
               <span
                 className="material-symbols-outlined text-sm"
+                style={{ verticalAlign: "middle" }}
                 data-icon="chevron_right"
               >
                 chevron_right

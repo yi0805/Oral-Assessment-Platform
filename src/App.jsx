@@ -31,7 +31,7 @@ function App() {
 
               <Route path="student/:courseId" element={<StudentCourse />} />
               <Route
-                path="student/previous-assessments"
+                path="student/previousAssessments"
                 element={<StudentPreviousAssessment />}
               />
 
@@ -43,25 +43,16 @@ function App() {
                 path="instructor/pendingGrades"
                 element={<InstructorPendingGrades />}
               />
+
               <Route
-                path="instructor/update-assessment"
-                element={<InstructorUpdateAssessment />}
+                path="instructor/updateMaterial"
+                element={<UpdateMaterial />}
               />
+              <Route path="instructor/transcript" element={<Transcript />} />
+              <Route path="instructor/AddCourse" element={<AddCourse />} />
               <Route
-                path="instructor/update-material"
-                element={<UpdateMaterial/>}
-              />
-              <Route
-                path="instructor/transcript"
-                element={<Transcript/>}
-              />
-              <Route
-                path="instructor/AddCourse"
-                element={<AddCourse/>}
-              />
-              <Route
-                path="instructor/course-dashboard"
-                element={<InstructorCourseDashboard/>}
+                path="instructor/courseDashboard"
+                element={<InstructorCourseDashboard />}
               />
             </Route>
 
@@ -72,7 +63,6 @@ function App() {
               path="student/:courseId/:assessmentId"
               element={<StudentAssessment />}
             />
-
           </Routes>
         </BrowserRouter>
       </>

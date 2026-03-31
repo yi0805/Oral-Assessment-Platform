@@ -74,10 +74,12 @@ function InstructorHome() {
         </div>
       </main>
       <div className="fixed bottom-8 right-8 z-50">
-        <button className="group flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-2xl transition-all hover:bg-primary-dim active:scale-90"
-          onClick={() => {
-            navigate("/instructor/AddCourse")
-          }}>
+        <button
+          className="group flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-2xl transition-all hover:bg-primary-dim active:scale-90"
+          // onClick={() => {
+          //   navigate("/instructor/AddCourse")
+          // }}
+        >
           <span className="material-symbols-outlined text-3xl transition-transform duration-300 group-hover:rotate-90">
             add
           </span>
