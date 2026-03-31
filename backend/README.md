@@ -1,23 +1,29 @@
-# Project 20 — AI-Supported Oral Assessment API
+# Project 20 Backend
 
-Backend service for Project 20. Instructors upload course materials, AI generates oral assessment questions, students complete timed chat-based sessions, and instructors review AI-generated summaries before releasing grades.
+AI-supported oral assessment API for Project 20. Instructors upload course materials, AI generates oral assessment questions, students complete timed chat-based sessions, and instructors review AI-generated summaries before releasing grades.
 
-## System overview
+## System Overview
 
+```text
+Instructor uploads PDF/PPTX/DOCX
+  -> S3 or local storage
+  -> PostgreSQL metadata + processing state
+  -> Gemini embedding -> pgvector for RAG search
+
+Student completes assessment session
+  -> PostgreSQL transcript, answers, timing
+
+AI summary generated
+  -> OpenRouter LLM
+  -> PostgreSQL ai_summaries table
+
+Instructor releases grade
+  -> PostgreSQL instructor_feedback table
+Student views released results
+  -> read-only API access
 ```
-Instructor uploads PDF/PPTX  →  S3 (file storage)
-                             →  RDS PostgreSQL (metadata + processing state)
-                             →  Gemini embedding → pgvector (RAG search)
 
-Student completes session    →  RDS (transcript, answers, timing)
-
-AI summary generated         →  OpenRouter LLM → RDS (ai_summaries table)
-
-Instructor releases grade    →  RDS (instructor_feedback table)
-Student views results        →  RDS (read-only)
-```
-
-## Tech stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -27,69 +33,102 @@ Student views results        →  RDS (read-only)
 | File storage | AWS S3 |
 | Embeddings | Google Gemini `gemini-embedding-001` (768-dim) |
 | LLM | OpenRouter free tier |
-| Auth | Google OAuth 2.0 + JWT (python-jose) |
-| Rate limiting | slowapi |
+| Auth | Google OAuth 2.0 + JWT (`python-jose`) |
+| Rate limiting | `slowapi` |
 
-## Project structure
+## Project Structure
 
-```
+```text
 backend/
 ├── app/
 │   ├── api/
-│   │   ├── routes/          # One file per resource group
-│   │   │   ├── auth.py      # Google OAuth + dev-token
-│   │   │   ├── courses.py   # Course CRUD + enrollment + CSV import
-│   │   │   ├── materials.py # Upload, list, status, delete
-│   │   │   ├── rubrics.py   # Rubric CRUD
-│   │   │   ├── questions.py # Question pools + AI generation
-│   │   │   ├── assessments.py # Assessment config + publish
-│   │   │   ├── sessions.py  # Start, respond, complete, transcript
-│   │   │   └── feedback.py  # AI summary + instructor feedback + release
-│   │   └── router.py        # Mounts all routers under /api/v1
+│   │   ├── routes/
+│   │   │   ├── auth.py
+│   │   │   ├── courses.py
+│   │   │   ├── materials.py
+│   │   │   ├── rubrics.py
+│   │   │   ├── questions.py
+│   │   │   ├── assessments.py
+│   │   │   ├── sessions.py
+│   │   │   └── feedback.py
+│   │   └── router.py
 │   ├── core/
-│   │   ├── config.py        # All settings from .env (pydantic-settings)
-│   │   ├── database.py      # SQLAlchemy engine + get_db dependency
-│   │   ├── dependencies.py  # get_current_user, require_instructor, require_enrollment
-│   │   ├── limiter.py       # slowapi rate limiter instance
-│   │   └── security.py      # JWT create/verify + role resolution
-│   ├── models/              # SQLAlchemy ORM models (one per table group)
-│   ├── schemas/             # Pydantic request/response schemas
-│   │   └── pagination.py    # Generic Page[T] paginated response
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── dependencies.py
+│   │   ├── limiter.py
+│   │   └── security.py
+│   ├── models/
+│   ├── schemas/
 │   ├── services/
-│   │   ├── embedding_service.py   # Gemini embedding calls
-│   │   ├── material_pipeline.py   # PDF/PPTX/DOCX extraction → chunk → embed
-│   │   ├── question_generator.py  # OpenRouter question generation
-│   │   ├── ai_summary_service.py  # OpenRouter post-session summary
-│   │   ├── rag_search.py          # pgvector cosine similarity search
-│   │   └── s3_client.py           # S3/local file upload/download/delete
-│   └── main.py              # App factory, CORS, rate limiting, health endpoints
+│   │   ├── embedding_service.py
+│   │   ├── material_pipeline.py
+│   │   ├── question_generator.py
+│   │   ├── ai_summary_service.py
+│   │   ├── rag_search.py
+│   │   └── s3_client.py
+│   └── main.py
 ├── db/
 │   └── migrations/
-│       ├── 001_schema.sql         # Complete schema (all 14 tables) — run on fresh DB
-│       └── 999_seed_dev_data.sql  # Dev seed data — local/test only, NOT production
+│       ├── 001_schema.sql
+│       └── 999_seed_dev_data.sql
 ├── tests/
-│   ├── conftest.py          # DB fixtures, TestClient, auth helpers, AI mocks
-│   ├── api/
-│   │   ├── test_health.py
-│   │   ├── test_auth.py
-│   │   ├── test_courses.py
-│   │   ├── test_materials.py
-│   │   └── test_materials_s3_upload.py
-│   └── services/
-│       └── test_material_pipeline.py
 ├── Dockerfile
 ├── requirements.txt
 └── .env.example
 ```
 
-## Local development setup
+## Quick Start
+
+These setup steps support both macOS and Windows. Commands are labeled when they differ by platform.
+
+## Choose Your Setup First
+
+Before starting, decide which environment you are using. Docker and AWS are not the same thing in this project.
+
+| Option | What it uses | When to use it | What you need |
+|---|---|---|---|
+| Local development with Docker | Local PostgreSQL container on your own machine | Best for day-to-day backend development, debugging, and running tests safely | Docker Desktop, local `.env`, local DB schema |
+| Local backend + AWS services | Backend runs on your machine, but uses shared AWS RDS and/or S3 | Use when you need shared team data or shared uploaded files | AWS access, RDS certificate, SSO login, AWS-related `.env` values |
+| Full Docker Compose stack | Local PostgreSQL plus local backend container | Good when you want the backend and database both containerized locally | Docker Desktop and `docker compose up` |
+
+### Important distinction
+
+- Docker means services run locally on your computer
+- AWS means services run remotely in the team or production cloud environment
+- You do not need AWS just to run the backend locally
+- You do not need Docker in order to connect your local backend to AWS RDS or AWS S3
+- The most common beginner setup is: backend runs locally, database runs locally in Docker, storage stays local
+
+### Recommended default for most team members
+
+Use local development first:
+
+- Local PostgreSQL in Docker
+- Backend started from your terminal with `uvicorn`
+- `STORAGE_BACKEND=local`
+
+Only switch to AWS RDS or AWS S3 when you specifically need:
+
+- the shared team database
+- the shared S3 bucket
+- production-like integration testing
 
 ### Prerequisites
-- Python 3.11+
-- PostgreSQL 15+ with pgvector **or** Docker
-- `psql` CLI
 
-### 1. Create virtual environment
+- Python 3.11+
+- PostgreSQL 15+ with pgvector, or Docker
+- `psql`
+
+### Terminal conventions
+
+- macOS commands below assume `zsh` or `bash`
+- Windows commands below assume PowerShell
+- Docker commands are the same on both platforms unless noted otherwise
+
+### 1. Create a virtual environment
+
+#### macOS
 
 ```bash
 cd backend
@@ -98,14 +137,32 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2. Configure environment
+#### Windows PowerShell
+
+```powershell
+cd backend
+py -3 -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+### 2. Configure environment variables
+
+#### macOS
 
 ```bash
 cp .env.example .env
-# Edit .env and fill in your API keys (see section below)
 ```
 
-### 3. Start a local PostgreSQL with pgvector (Docker)
+#### Windows PowerShell
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `.env` and fill in the required keys from the [Environment Variables](#environment-variables) section.
+
+### 3. Start a local PostgreSQL with pgvector
 
 ```bash
 docker run --name project20-db \
@@ -116,86 +173,158 @@ docker run --name project20-db \
   -d pgvector/pgvector:pg16
 ```
 
-### 4. Run the schema migration
+### 4. Run database schema setup
+
+#### macOS
 
 ```bash
 psql -h localhost -U project20 -d project20_dev -f db/migrations/001_schema.sql
 ```
 
-Optionally seed test data (1 instructor, 2 students, 1 course, 4 questions):
+Optional dev seed data:
 
 ```bash
 psql -h localhost -U project20 -d project20_dev -f db/migrations/999_seed_dev_data.sql
 ```
 
+#### Windows PowerShell
+
+```powershell
+psql -h localhost -U project20 -d project20_dev -f db/migrations/001_schema.sql
+```
+
+Optional dev seed data:
+
+```powershell
+psql -h localhost -U project20 -d project20_dev -f db/migrations/999_seed_dev_data.sql
+```
+
 ### 5. Start the API
+
+#### macOS
 
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-API docs: http://127.0.0.1:8000/docs
-Health check: http://127.0.0.1:8000/health/db
+#### Windows PowerShell
 
-### How to set up the sso aws s3 connection to backend code:
+```powershell
+uvicorn app.main:app --reload --port 8000
+```
 
-1. Install AWS CLI on Mac (M1): `brew install awscli`
+- Swagger UI: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- DB health check: [http://127.0.0.1:8000/health/db](http://127.0.0.1:8000/health/db)
 
-   1. verify by: `brew install awscli` --> expected: `aws-cli/2.x.x`
-2. After install, run: `aws configure sso`
+## Environment Variables
 
-   1. Fill things according to the aws account configaration:
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string |
+| `GEMINI_API_KEY` | Yes | Google AI Studio key for embeddings |
+| `OPENROUTER_API_KEY` | Yes | OpenRouter key for LLM completions |
+| `JWT_SECRET_KEY` | Yes | Secret for signing JWTs |
+| `GOOGLE_CLIENT_ID` | OAuth | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | OAuth | Google OAuth client secret |
+| `STORAGE_BACKEND` | No | `local` (default) or `s3` |
+| `S3_BUCKET_NAME` | S3 | S3 bucket name for file uploads |
+| `AWS_REGION` | S3 | AWS region, default `ap-southeast-2` |
+| `AWS_PROFILE_NAME` | S3 | AWS profile name for SSO-based local access |
+| `AWS_ACCESS_KEY_ID` | S3 | AWS credentials, if not using SSO/profile |
+| `AWS_SECRET_ACCESS_KEY` | S3 | AWS credentials |
+| `CORS_ORIGINS` | No | JSON array of allowed origins |
+| `DEBUG` | No | `true` enables dev-token endpoint and relaxed CORS |
+| `FRONTEND_URL` | No | SPA URL for OAuth redirect |
 
-      1. SSO start URL: https://uoa-sso.awsapps.com/start/#
-      2. SSO region: ap-southeast-2
-      3. give profile name → e.g. `uoa-sso`
-3. Then login, `aws sso login --profile uoa-sso`(everytime before start backend)
-4. if `aws s3 ls --profile uoa-sso` list the bucket `team8-project20-materials` == SUCCESS
-5. Then connect to backend, by add code in `.env`:
+Generate a JWT secret:
 
-   ```python
-   STORAGE_BACKEND=s3
-   AWS_PROFILE_NAME=uoa-sso
-   AWS_REGION=ap-southeast-2
-   S3_BUCKET_NAME=team8-project20-materials
-   ```
-
-6. Start the backend: ...
-
-## AWS RDS setup (production / team shared DB)
-
-### Connect to RDS
+#### macOS
 
 ```bash
-# Download SSL certificate (one-time)
-curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+python -c "import secrets; print(secrets.token_hex(32))"
+```
 
+#### Windows PowerShell
+
+```powershell
+py -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### Example local `.env`
+
+```bash
+DATABASE_URL=postgresql://project20:localdev123@localhost:5432/project20_dev
+GEMINI_API_KEY=REMOVED_SECRET
+OPENROUTER_API_KEY=REMOVED_SECRET
+JWT_SECRET_KEY=replace-me
+STORAGE_BACKEND=local
+DEBUG=true
+```
+
+## AWS RDS Setup
+
+Use this only if your backend should connect to the shared remote PostgreSQL database on AWS.
+
+This section does not start your backend for you. It only changes where your backend stores and reads database data from.
+
+### 1. Download the RDS SSL certificate
+
+#### macOS
+
+```bash
+curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+```
+
+#### Windows PowerShell
+
+```powershell
+Invoke-WebRequest -Uri "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" -OutFile "global-bundle.pem"
+```
+
+### 2. Test the RDS connection
+
+#### macOS
+
+```bash
 export RDSHOST="project20-db-pg16.cntu207sfdan.ap-southeast-2.rds.amazonaws.com"
 
-# Test connection
 psql "host=$RDSHOST port=5432 dbname=postgres user=project20 \
   sslmode=verify-full sslrootcert=./global-bundle.pem"
 ```
 
-### Run migrations on RDS
+#### Windows PowerShell
+
+```powershell
+$env:RDSHOST = "project20-db-pg16.cntu207sfdan.ap-southeast-2.rds.amazonaws.com"
+
+psql "host=$env:RDSHOST port=5432 dbname=postgres user=project20 sslmode=verify-full sslrootcert=./global-bundle.pem"
+```
+
+### 3. Run schema migration on RDS
+
+#### macOS
 
 ```bash
-# Schema only (production)
 psql "host=$RDSHOST port=5432 dbname=postgres user=project20 \
   sslmode=verify-full sslrootcert=./global-bundle.pem" \
   -f db/migrations/001_schema.sql
 
-# Verify all 14 tables exist
 psql "host=$RDSHOST port=5432 dbname=postgres user=project20 \
   sslmode=verify-full sslrootcert=./global-bundle.pem" \
   -c "\dt"
 ```
 
-Do **not** run `999_seed_dev_data.sql` on production.
+#### Windows PowerShell
 
-### Point the backend at RDS
+```powershell
+psql "host=$env:RDSHOST port=5432 dbname=postgres user=project20 sslmode=verify-full sslrootcert=./global-bundle.pem" -f db/migrations/001_schema.sql
 
-In `backend/.env`:
+psql "host=$env:RDSHOST port=5432 dbname=postgres user=project20 sslmode=verify-full sslrootcert=./global-bundle.pem" -c "\dt"
+```
+
+Do not run `999_seed_dev_data.sql` on production.
+
+### 4. Point the backend at RDS
 
 ```bash
 DATABASE_URL=postgresql://project20:PASSWORD@project20-db-pg16.cntu207sfdan.ap-southeast-2.rds.amazonaws.com:5432/postgres?sslmode=verify-full&sslrootcert=./global-bundle.pem
@@ -204,31 +333,65 @@ S3_BUCKET_NAME=team8-project20-materials
 AWS_REGION=ap-southeast-2
 ```
 
-## Environment variables
+## AWS S3 Setup with AWS SSO
 
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_URL` | ✅ | PostgreSQL connection string |
-| `GEMINI_API_KEY` | ✅ | Google AI Studio key for embeddings |
-| `OPENROUTER_API_KEY` | ✅ | OpenRouter key for LLM completions |
-| `JWT_SECRET_KEY` | ✅ | Random secret for signing JWTs |
-| `GOOGLE_CLIENT_ID` | OAuth | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | OAuth | Google OAuth client secret |
-| `STORAGE_BACKEND` | | `local` (default) or `s3` |
-| `S3_BUCKET_NAME` | S3 | S3 bucket name for file uploads |
-| `AWS_REGION` | S3 | AWS region (default: `ap-southeast-2`) |
-| `AWS_ACCESS_KEY_ID` | S3 | AWS credentials (or use profile/instance role) |
-| `AWS_SECRET_ACCESS_KEY` | S3 | AWS credentials |
-| `CORS_ORIGINS` | | JSON array of allowed origins |
-| `DEBUG` | | `true` enables dev-token endpoint and relaxed CORS |
-| `FRONTEND_URL` | | SPA URL for OAuth redirect |
+Use this only if your backend should upload and read files from the shared AWS S3 bucket.
 
-Generate a secure JWT secret:
+This section is independent from Docker. You can:
+
+- run the backend locally and use local storage
+- run the backend locally and use AWS S3
+- run the backend in Docker and still use AWS S3
+
+If you do not need the shared bucket, keep `STORAGE_BACKEND=local`.
+
+### 1. Install AWS CLI
+
+#### macOS
+
 ```bash
-python -c "import secrets; print(secrets.token_hex(32))"
+brew install awscli
+aws --version
 ```
 
-## API endpoints (49 total)
+#### Windows PowerShell
+
+```powershell
+winget install Amazon.AWSCLI
+aws --version
+```
+
+### 2. Configure AWS SSO
+
+```text
+aws configure sso
+```
+
+Use:
+
+- SSO start URL: `https://uoa-sso.awsapps.com/start/#`
+- SSO region: `ap-southeast-2`
+- Profile name: for example `uoa-sso`
+
+### 3. Log in before starting the backend
+
+```text
+aws sso login --profile uoa-sso
+aws s3 ls --profile uoa-sso
+```
+
+If the bucket `team8-project20-materials` appears, the connection is working.
+
+### 4. Add S3 settings to `.env`
+
+```bash
+STORAGE_BACKEND=s3
+AWS_PROFILE_NAME=uoa-sso
+AWS_REGION=ap-southeast-2
+S3_BUCKET_NAME=team8-project20-materials
+```
+
+## API Overview
 
 | Group | Prefix | Key endpoints |
 |---|---|---|
@@ -242,74 +405,156 @@ python -c "import secrets; print(secrets.token_hex(32))"
 | Sessions | `/api/v1` | Start, respond, complete, transcript, `/sessions/mine` |
 | Feedback | `/api/v1` | AI summary, instructor feedback, release to student |
 
-Full interactive docs at `/docs` (Swagger UI).
+Interactive docs are available at `/docs`.
 
-### Authentication in Swagger 
+### Swagger authentication
 
-1. `POST /api/v1/auth/dev-token` → `{"email": "you@test.com", "role": "instructor"}`
-2. Copy the `access_token`
-3. Click **🔒 Authorize** (top-right) → paste token → Authorize
+1. Call `POST /api/v1/auth/dev-token` with `{"email": "you@test.com", "role": "instructor"}`
+2. Copy the returned `access_token`
+3. Click `Authorize` in Swagger UI and paste the token
 
-## Running tests
+## Running Tests
 
-Tests require a separate PostgreSQL database with pgvector:
+Tests require a separate PostgreSQL database with pgvector.
+
+### Create a test database
+
+#### macOS
 
 ```bash
-# Create test database
 createdb project20_test
-
-# Run all tests
-TEST_DATABASE_URL="postgresql://project20:localdev123@localhost:5432/project20_test" \
-  pytest tests/ -v
-
-# Run a specific file
-TEST_DATABASE_URL="..." pytest tests/api/test_auth.py -v
 ```
 
-Tests skip automatically if `TEST_DATABASE_URL` is not set. AI calls (Gemini, OpenRouter) are always mocked in tests.
+#### Windows PowerShell
 
-## What is stored where
+```powershell
+createdb project20_test
+```
+
+### Run tests
+
+#### macOS
+
+```bash
+TEST_DATABASE_URL="postgresql://project20:localdev123@localhost:5432/project20_test" \
+  pytest tests/ -v
+```
+
+#### Windows PowerShell
+
+```powershell
+$env:TEST_DATABASE_URL = "postgresql://project20:localdev123@localhost:5432/project20_test"
+pytest tests/ -v
+```
+
+### Run a single test file
+
+#### macOS
+
+```bash
+TEST_DATABASE_URL="postgresql://project20:localdev123@localhost:5432/project20_test" \
+  pytest tests/api/test_auth.py -v
+```
+
+#### Windows PowerShell
+
+```powershell
+$env:TEST_DATABASE_URL = "postgresql://project20:localdev123@localhost:5432/project20_test"
+pytest tests/api/test_auth.py -v
+```
+
+Notes:
+
+- Tests skip automatically if `TEST_DATABASE_URL` is not set
+- AI calls to Gemini and OpenRouter are mocked in tests
+
+## Data Storage Map
 
 | Data | Storage |
 |---|---|
-| Uploaded files (PDF, PPTX, DOCX) | S3 (`local_uploads/` in dev) |
-| Users, courses, enrollments | RDS `users`, `courses`, `course_enrollments` |
-| Material metadata + processing state | RDS `materials` |
-| Text chunks + 768-dim vectors | RDS `material_chunks` (pgvector) |
-| Rubrics, question pools, questions | RDS `rubrics`, `question_pools`, `questions` |
-| Assessment config | RDS `assessment_configs` |
-| Session state + transcript | RDS `assessment_sessions`, `transcript_messages` |
-| AI summary | RDS `ai_summaries` |
-| Instructor grade + feedback | RDS `instructor_feedback` |
+| Uploaded files (PDF, PPTX, DOCX) | S3, or `local_uploads/` in dev |
+| Users, courses, enrollments | `users`, `courses`, `course_enrollments` |
+| Material metadata and processing state | `materials` |
+| Text chunks and 768-dim vectors | `material_chunks` with pgvector |
+| Rubrics, question pools, questions | `rubrics`, `question_pools`, `questions` |
+| Assessment config | `assessment_configs` |
+| Session state and transcript | `assessment_sessions`, `transcript_messages` |
+| AI summary | `ai_summaries` |
+| Instructor grade and feedback | `instructor_feedback` |
 
-## Inspect RDS data via psql
+## Inspect Data with `psql`
+
+#### macOS
 
 ```bash
-# Row counts across all tables
 psql "$DB_URL" -c "
 SELECT 'users' AS t, COUNT(*) FROM users UNION ALL
-SELECT 'courses',    COUNT(*) FROM courses UNION ALL
-SELECT 'materials',  COUNT(*) FROM materials UNION ALL
+SELECT 'courses', COUNT(*) FROM courses UNION ALL
+SELECT 'materials', COUNT(*) FROM materials UNION ALL
 SELECT 'material_chunks', COUNT(*) FROM material_chunks UNION ALL
 SELECT 'assessment_sessions', COUNT(*) FROM assessment_sessions UNION ALL
 SELECT 'transcript_messages', COUNT(*) FROM transcript_messages UNION ALL
 SELECT 'ai_summaries', COUNT(*) FROM ai_summaries;
 "
+```
 
-# Material processing status
+```bash
 psql "$DB_URL" -c "
+SELECT title, processing_status, total_chunks FROM materials;
+"
+```
+
+#### Windows PowerShell
+
+```powershell
+psql "$env:DB_URL" -c "
+SELECT 'users' AS t, COUNT(*) FROM users UNION ALL
+SELECT 'courses', COUNT(*) FROM courses UNION ALL
+SELECT 'materials', COUNT(*) FROM materials UNION ALL
+SELECT 'material_chunks', COUNT(*) FROM material_chunks UNION ALL
+SELECT 'assessment_sessions', COUNT(*) FROM assessment_sessions UNION ALL
+SELECT 'transcript_messages', COUNT(*) FROM transcript_messages UNION ALL
+SELECT 'ai_summaries', COUNT(*) FROM ai_summaries;
+"
+```
+
+```powershell
+psql "$env:DB_URL" -c "
 SELECT title, processing_status, total_chunks FROM materials;
 "
 ```
 
 ## Docker
 
-```bash
-# Build image
-docker build -t project20-api .
+Docker commands below are the same on macOS and Windows.
 
-# Run with docker-compose (starts PostgreSQL + API together)
+Docker is for local development infrastructure. In this project it is mainly used to run:
+
+- a local PostgreSQL database container
+- optionally the backend container as well
+
+Docker does not mean you are using AWS. It is a separate local workflow.
+
+### Build the backend image
+
+```bash
+docker build -t project20-api .
+```
+
+### Run with Docker Compose
+
+```bash
 docker compose up
 ```
 
-The `docker-compose.yml` at the project root starts a local `pgvector/pgvector:pg15` database and the API with hot-reload.
+The project root `docker-compose.yml` starts:
+
+- a local `pgvector/pgvector:pg15` database container
+- the backend API container with hot reload
+
+Use Docker Compose when you want both services local and containerized.
+
+Do not use Docker Compose if your goal is specifically:
+
+- connecting your local backend directly to AWS RDS
+- running against the shared AWS S3 bucket without containerizing the backend
