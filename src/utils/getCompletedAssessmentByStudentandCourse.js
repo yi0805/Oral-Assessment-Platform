@@ -10,6 +10,7 @@ function getCompletedAssessmentByStudentandCourse(studentName, selectedCourse) {
   const completedAssessments = selectedCourseAssessments.filter(
     (assessment) => assessment.status === "Completed",
   );
+
   return completedAssessments;
 }
 

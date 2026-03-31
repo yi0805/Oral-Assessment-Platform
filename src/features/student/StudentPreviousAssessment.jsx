@@ -36,8 +36,6 @@ function StudentPreviousAssessment() {
     );
   }
 
-  console.log(studentAssessmentResults);
-
   const averageGrade = getStudentAvgAssessmentGrade(studentAssessmentResults);
 
   const classAverageGrade = getClassAvgGrade(selectedCourse);

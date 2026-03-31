@@ -1,0 +1,173 @@
+import { useState } from "react";
+
+function PendingStudentTable({ rows = [] }) {
+  const rowsPerPage = 6;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalPages = Math.ceil(rows.length / rowsPerPage);
+
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const currentRows = rows.slice(startIndex, endIndex);
+
+  function goToPage(page) {
+    setCurrentPage(page);
+  }
+
+  function goToPrevPage() {
+    if (currentPage > 1) setCurrentPage(currentPage - 1);
+  }
+
+  function goToNextPage() {
+    if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  }
+  return (
+    <>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="border-b border-outline-variant/10 bg-surface-container-low/50">
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Publish
+              </th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Student
+              </th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Course
+              </th>
+              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Assessment Name
+              </th>
+              <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                AI Score
+              </th>
+              <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Final Score
+              </th>
+              <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Action
+              </th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-outline-variant/5">
+            {rows.length === 0 ? (
+              <tr>
+                <td
+                  colSpan="7"
+                  className="px-6 py-8 text-center text-sm text-on-surface-variant"
+                >
+                  No pending assessments to found.
+                </td>
+              </tr>
+            ) : (
+              currentRows.map((assessment, index) => (
+                <tr
+                  className="group transition-colors hover:bg-surface-container-low/30"
+                  key={index}
+                >
+                  <td className="px-6 py-5">
+                    <label className="relative inline-flex cursor-pointer items-center">
+                      <input className="peer sr-only" type="checkbox" />
+                      <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                    </label>
+                  </td>
+                  <td className="px-6 py-5">
+                    <div className="flex items-center gap-3">
+                      <img
+                        className="h-10 w-10 rounded-full object-cover ring-2 ring-white"
+                        data-alt="Close up of Elena Mitsotakis, a smiling female student with long brown hair in a bright outdoor campus setting"
+                        src="https://i.pravatar.cc/300?img=12"
+                      />
+                      <div>
+                        <div className="headline-font text-sm font-bold text-on-surface">
+                          {assessment.studentName}
+                        </div>
+                        <div className="text-xs text-on-surface-variant">
+                          email
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-5">
+                    <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
+                      {assessment.courseId}
+                    </span>
+                  </td>
+                  <td className="px-6 py-5 text-sm font-medium text-on-surface-variant">
+                    {assessment.assessment}
+                  </td>
+                  <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
+                    {assessment.grade || 0}/10
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    <input
+                      className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+                      type="text"
+                    />
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <button className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white">
+                      Review
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > 0 && (
+        <div className="flex items-center justify-between border-t border-outline-variant/10 bg-surface-container-low/20 px-6 py-4">
+          <span className="text-xs font-medium text-on-surface-variant">
+            Page {currentPage} of {totalPages}
+          </span>
+          <nav className="flex items-center gap-1">
+            <button
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high"
+              onClick={goToPrevPage}
+              disabled={currentPage === 1}
+            >
+              <span
+                className="material-symbols-outlined text-sm"
+                data-icon="chevron_left"
+              >
+                chevron_left
+              </span>
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                className={`flex h-8 w-8 items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                  currentPage === page
+                    ? "bg-primary font-bold text-on-primary shadow-sm"
+                    : "text-on-surface-variant hover:bg-surface-container-high"
+                }`}
+                key={page}
+                onClick={() => goToPage(page)}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high"
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+            >
+              <span
+                className="material-symbols-outlined text-sm"
+                data-icon="chevron_right"
+              >
+                chevron_right
+              </span>
+            </button>
+          </nav>
+        </div>
+      )}
+    </>
+  );
+}
+
+export default PendingStudentTable;
