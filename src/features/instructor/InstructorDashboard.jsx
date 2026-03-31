@@ -9,7 +9,6 @@ export default function InstructorDashboard() {
   const course = state?.course || [];
 
   const assessments = getAssessmentsByCourse(course.id);
-  console.log(assessments);
 
   const assessmentOptions = [
     ...new Set(assessments.map((item) => item.assessment)),
@@ -27,8 +26,6 @@ export default function InstructorDashboard() {
       (sum, item) => sum + parseFloat(item.grade),
       0,
     ) / selectedAssessmentResults.length;
-
-  console.log(selectedAssessmentResults);
 
   return (
     <div className="min-h-screen">

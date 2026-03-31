@@ -1,18 +1,22 @@
 import { useEffect } from "react";
 import { NavLink } from "react-router";
 
+import { useMoveBack } from "../../hooks/useMoveBack";
+
 function Transcipt() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
+  const moveback = useMoveBack();
+
   return (
     <div className="font-body">
       <main className="min-h-screen pl-64 pt-16">
         <div className="mx-auto max-w-6xl px-12 py-16">
-          <NavLink
+          <button
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
-            to="/home"
+            onClick={moveback}
           >
             <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
               arrow_back
@@ -20,7 +24,7 @@ function Transcipt() {
             <span className="font-body uppercase tracking-widest">
               Back to Dashboard
             </span>
-          </NavLink>
+          </button>
           <div className="mb-12">
             <div className="flex items-end justify-between">
               <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">

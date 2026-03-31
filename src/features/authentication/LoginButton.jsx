@@ -24,7 +24,6 @@ function LoginButton({ role }) {
         localStorage.setItem("role", pendingRole.current);
         localStorage.setItem("userName", userInfo.name);
         localStorage.setItem("userPicture", userInfo.picture);
-        console.log(localStorage.getItem("userName"));
 
         navigate("/home");
       } catch (err) {

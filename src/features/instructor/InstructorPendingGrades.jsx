@@ -16,8 +16,6 @@ function InstructorPendingGrades() {
     return studentName.includes(keyword) || courseId.includes(keyword);
   });
 
-  console.log(filteredAssessments);
-
   return (
     <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
       <div className="mb-8">

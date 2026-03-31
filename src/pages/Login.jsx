@@ -61,9 +61,3 @@ function Login() {
 }
 
 export default Login;
-
-//  <StandaloneLayout>
-//       <BaseCard $variant="login">
-//         <LoginChooser />
-//       </BaseCard>
-//     </StandaloneLayout>
