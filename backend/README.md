@@ -244,7 +244,7 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 Full interactive docs at `/docs` (Swagger UI).
 
-### Authentication in Swagger
+### Authentication in Swagger 
 
 1. `POST /api/v1/auth/dev-token` → `{"email": "you@test.com", "role": "instructor"}`
 2. Copy the `access_token`
