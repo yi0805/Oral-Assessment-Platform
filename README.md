@@ -2,6 +2,20 @@
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
+# COMPSCI 399 Team 8 Capstone Project
+
+jwil598
+
+## Project Overview
+
+A simple end-to-end conversational assessment that can be piloted in a real course.
+
+- Upload course materials and generate a small pool of questions (editable by instructor)
+- Short text-based chat assessment with adaptive follow-up questions
+- Secure recording and storage of full conversation transcripts
+- Instructor dashboard to review sessions and add manual judgement and feedback comments
+- Automatic summary of each student’s demonstrated understanding (advisory only)
+
 Currently, two official plugins are available:
 
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
