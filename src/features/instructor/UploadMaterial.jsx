@@ -6,10 +6,11 @@ import getCourseInfoByInstructor from "../../utils/getCourseInfoByInstructor";
 import getCoursesByInstructor from "../../utils/getCoursesByInstructor";
 
 function UpdateMaterial(){
-    // const Username = localStorage.getItem("username");
-    // const instructor = getInstructorByName(Username);
-    // const courses = getCoursesByInstructor(instructor);
-    // console.log("Instructor: ", Username);
+    const Username = localStorage.getItem("userName");
+    const instructor = getInstructorByName(Username);
+    const courses = getCoursesByInstructor(instructor);
+    console.log("Instructor: ", Username);
+    console.log("Course: ", courses);
     
 return (
     <>
