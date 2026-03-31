@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
 function DashboardTable({ selectedAssessmentResults }) {
-  console.log(selectedAssessmentResults);
+  const navigate = useNavigate();
 
   const rowsPerPage = 6;
   const [currentPage, setCurrentPage] = useState(1);
@@ -124,7 +125,12 @@ function DashboardTable({ selectedAssessmentResults }) {
                     </span>
                   </td>
                   <td className="px-8 py-5 text-right">
-                    <button className="whitespace-now-content flex items-center gap-1.5 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container">
+                    <button
+                      className="whitespace-now-content flex items-center gap-1.5 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
+                      onClick={() => {
+                        navigate("/instructor/transcript");
+                      }}
+                    >
                       <span className="material-symbols-outlined text-sm">
                         visibility
                       </span>
@@ -147,24 +153,24 @@ function DashboardTable({ selectedAssessmentResults }) {
         </table>
       </div>
       {selectedAssessmentResults.length > 0 && (
-        <div class="flex items-center justify-between border-t border-surface-container bg-surface-container-low px-8 py-4">
-          <span class="text-xs font-medium text-on-surface-variant">
+        <div className="flex items-center justify-between border-t border-surface-container bg-surface-container-low px-8 py-4">
+          <span className="text-xs font-medium text-on-surface-variant">
             Showing {currentRows.length} of xxx submissions
           </span>
-          <div class="flex gap-2">
+          <div className="flex gap-2">
             <button
-              class="rounded p-2 text-outline transition-colors hover:bg-surface-container"
+              className="rounded p-2 text-outline transition-colors hover:bg-surface-container"
               onClick={goToPrevPage}
               disabled={currentPage === 1}
             >
-              <span class="material-symbols-outlined text-sm">
+              <span className="material-symbols-outlined text-sm">
                 chevron_left
               </span>
             </button>
 
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <button
-                class={`rounded p-2 px-4 text-sm font-bold transition-colors hover:bg-surface-container ${currentPage === page ? "text-on-surface" : "text-outline"}`}
+                className={`rounded p-2 px-4 text-sm font-bold transition-colors hover:bg-surface-container ${currentPage === page ? "text-on-surface" : "text-outline"}`}
                 key={page}
                 onClick={() => goToPage(page)}
               >
@@ -173,11 +179,11 @@ function DashboardTable({ selectedAssessmentResults }) {
             ))}
 
             <button
-              class="rounded p-2 text-outline transition-colors hover:bg-surface-container"
+              className="rounded p-2 text-outline transition-colors hover:bg-surface-container"
               onClick={goToNextPage}
               disabled={currentPage === totalPages}
             >
-              <span class="material-symbols-outlined text-sm">
+              <span className="material-symbols-outlined text-sm">
                 chevron_right
               </span>
             </button>

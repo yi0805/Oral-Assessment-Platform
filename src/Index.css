@@ -44,6 +44,20 @@ h3 {
   -webkit-backdrop-filter: blur(12px);
 }
 
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @keyframes pulse {
   0% {
     transform: scale(0.95);

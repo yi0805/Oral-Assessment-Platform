@@ -1,6 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 
 function PendingStudentTable({ rows = [] }) {
+  const navigate = useNavigate();
+
   const rowsPerPage = 6;
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -108,7 +111,12 @@ function PendingStudentTable({ rows = [] }) {
                     />
                   </td>
                   <td className="px-6 py-5 text-right">
-                    <button className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white">
+                    <button
+                      className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
+                      onClick={() => {
+                        navigate("/instructor/transcript");
+                      }}
+                    >
                       Review
                     </button>
                   </td>

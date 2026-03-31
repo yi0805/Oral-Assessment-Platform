@@ -47,8 +47,8 @@ function App() {
                 path="instructor/updateMaterial"
                 element={<UpdateMaterial />}
               />
-
               <Route path="instructor/transcript" element={<Transcript />} />
+
               <Route path="instructor/AddCourse" element={<AddCourse />} />
             </Route>
 
