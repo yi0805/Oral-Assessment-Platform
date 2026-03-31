@@ -5,6 +5,7 @@ Endpoints
 ---------
 POST  /sessions/{session_id}/ai-summary/generate   Trigger AI summary generation
 GET   /sessions/{session_id}/ai-summary            Get the AI summary
+POST  /sessions/{session_id}/ai-summary/accept     Accept AI grade + release in one step (NEW)
 POST  /sessions/{session_id}/feedback              Instructor submits grade + comments
 PUT   /sessions/{session_id}/feedback              Instructor revises feedback
 PUT   /sessions/{session_id}/release               Release results to student
@@ -38,7 +39,7 @@ from app.models.session_runtime import TranscriptMessage
 from app.models.user import User
 from app.schemas.assessment import TranscriptMessageOut
 from app.schemas.feedback import (
-    AISummaryOut,
+    AISummaryOut,  # still used by generate_ai_summary and get_ai_summary endpoints
     FeedbackCreate,
     FeedbackOut,
     FeedbackUpdate,
@@ -222,6 +223,100 @@ def update_feedback(
 
 
 # ---------------------------------------------------------------------------
+# Accept AI suggestion and release in one step
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/sessions/{session_id}/ai-summary/accept",
+    response_model=FeedbackOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Accept AI grade and release to student in one step",
+    description=(
+        "Instructor-only. Convenience endpoint: if the instructor is satisfied with the "
+        "AI-generated advisory grade and summary, they can accept it in a single call. "
+        "This will: (1) create an InstructorFeedback record using the AI suggested_grade "
+        "as final_grade, (2) optionally attach a custom visible comment, and (3) "
+        "immediately release the results to the student. "
+        "Requires an AI summary to have been generated first "
+        "(POST /sessions/{id}/ai-summary/generate). "
+        "Equivalent to POST /feedback + PUT /release in one request."
+    ),
+)
+def accept_ai_and_release(
+    session_id: UUID,
+    payload: FeedbackCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    sess = _get_session_or_404(db, session_id)
+
+    if sess.status not in ("under_review", "submitted", "time_expired"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot accept AI grade for session with status '{sess.status}'. "
+                "Session must be in 'under_review', 'submitted', or 'time_expired' state."
+            ),
+        )
+
+    # Require an AI summary to exist
+    ai_summary = db.query(AISummary).filter(AISummary.session_id == session_id).first()
+    if not ai_summary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=(
+                "No AI summary found for this session. "
+                "Call POST /sessions/{id}/ai-summary/generate first."
+            ),
+        )
+    if ai_summary.status != "success" or not ai_summary.suggested_grade:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "AI summary did not produce a valid suggested grade. "
+                "Please review the transcript manually and use POST /feedback instead."
+            ),
+        )
+
+    existing = db.query(InstructorFeedback).filter(
+        InstructorFeedback.session_id == session_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Feedback already exists for this session. Use PUT /feedback to update.",
+        )
+
+    # Use AI suggested grade as the final grade; allow instructor to override with payload
+    final_grade = payload.final_grade or ai_summary.suggested_grade
+    student_visible_comments = (
+        payload.student_visible_comments
+        or f"Your assessment has been reviewed. Grade: {final_grade}."
+    )
+
+    now = datetime.now(timezone.utc)
+    feedback = InstructorFeedback(
+        session_id=session_id,
+        instructor_id=current_user.id,
+        comments=payload.comments or f"[AI grade accepted by {current_user.full_name or current_user.email}]",
+        grading_rationale=payload.grading_rationale or (ai_summary.summary_text[:500] if ai_summary else None),
+        provisional_grade=ai_summary.suggested_grade,
+        final_grade=final_grade,
+        student_visible_comments=student_visible_comments,
+        released_to_student=True,
+        released_at=now,
+    )
+    db.add(feedback)
+
+    sess.status = "released"
+    sess.released_at = now
+
+    db.commit()
+    db.refresh(feedback)
+    return feedback
+
+
+# ---------------------------------------------------------------------------
 # Release workflow
 # ---------------------------------------------------------------------------
 
@@ -313,7 +408,9 @@ def get_student_results(
             detail="Your results have not been released yet. Please check back later.",
         )
 
-    ai_summary = db.query(AISummary).filter(AISummary.session_id == session_id).first()
+    # NOTE: AI summary is intentionally NOT fetched or returned here.
+    # Per user flow Phase 6, students only see: final grade, instructor feedback,
+    # and the full transcript. The AI summary is an instructor-only advisory tool.
 
     transcript = (
         db.query(TranscriptMessage)
@@ -327,6 +424,5 @@ def get_student_results(
         final_grade=feedback.final_grade,
         student_visible_comments=feedback.student_visible_comments,
         released_at=feedback.released_at,
-        ai_summary=AISummaryOut.model_validate(ai_summary) if ai_summary else None,
         transcript_messages=[TranscriptMessageOut.model_validate(m) for m in transcript],
     )

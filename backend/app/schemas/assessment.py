@@ -148,6 +148,28 @@ class SessionBrief(BaseModel):
     started_at: datetime | None
     ended_at: datetime | None
     total_messages: int | None
+    # Enriched fields for the instructor grading dashboard (populated by the list endpoint)
+    student_name: str | None = None
+    student_email: str | None = None
+    ai_suggested_grade: str | None = None   # advisory grade from AISummary
+    final_grade: str | None = None          # instructor-assigned final grade (if already graded)
+
+
+class AssessmentStatsOut(BaseModel):
+    """
+    GET /assessments/{id}/sessions/stats
+    Class-level grade statistics calculated from instructor-assigned final grades.
+    Only graded (released) sessions with a numeric final_grade are included.
+    Matches the statistics panel shown on the instructor grading dashboard
+    (median, average, highest, lowest).
+    """
+    assessment_id: UUID
+    total_sessions: int           # all sessions for the assessment
+    graded_count: int             # sessions with a numeric final_grade
+    average_grade: float | None   # arithmetic mean
+    median_grade: float | None    # median
+    highest_grade: float | None   # maximum
+    lowest_grade: float | None    # minimum
 
 
 # ---- Runtime items ----

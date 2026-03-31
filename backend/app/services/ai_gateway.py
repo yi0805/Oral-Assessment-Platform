@@ -249,14 +249,19 @@ async def chat_complete(
                 OPENROUTER_CHAT_URL,
                 headers={
                     "Authorization": f"Bearer {settings.openrouter_api_key}",
-                    "Content-Type": "application/json",
+                    # Explicitly request UTF-8 to prevent decode errors with
+                    # answers that contain math/Unicode symbols (∑, ∫, ≤, etc.)
+                    "Content-Type": "application/json; charset=utf-8",
+                    "Accept": "application/json",
                     "HTTP-Referer": "https://project20.localhost",
                     "X-Title": "Project 20 AI Oral Assessment",
                 },
-                json=payload,
+                content=__import__("json").dumps(payload, ensure_ascii=False).encode("utf-8"),
             )
             response.raise_for_status()
-            data = response.json()
+            # Explicitly decode as UTF-8 to avoid charset-detection failures when
+            # response bodies contain Unicode math symbols or non-ASCII characters.
+            data = __import__("json").loads(response.content.decode("utf-8"))
             content: str = data["choices"][0]["message"]["content"]
             logger.info(
                 "[AI Gateway] OpenRouter chat: %d input tokens, reply=%d chars",

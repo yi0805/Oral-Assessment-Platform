@@ -76,14 +76,19 @@ class StudentResultsOut(BaseModel):
     GET /sessions/:id/results — what the student sees after the instructor releases.
     Per the user flow (Phase 6), the student can view:
     - Their final confirmed grade/mark
-    - The instructor's manual feedback
+    - The instructor's manual feedback (student_visible_comments)
     - The full transcript
+
+    NOTE: The AI summary is NOT included here — it is an instructor-only advisory
+    tool (Phase 5) and must not be shown to students. Exposing it (especially when
+    it shows a 'failed to generate summary' message) degrades the student experience
+    and reveals internal system errors they should not see.
     """
     session_id: UUID
     final_grade: str | None
     student_visible_comments: str | None
     released_at: datetime | None
-    ai_summary: AISummaryOut | None
+    # ai_summary intentionally excluded — instructor-only per user flow Phase 5/6
     transcript_messages: list["TranscriptMessageOut"]
 
 

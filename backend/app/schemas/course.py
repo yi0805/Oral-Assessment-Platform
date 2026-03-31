@@ -1,7 +1,7 @@
 """Pydantic schemas for course management API."""
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.enums import CourseRole
 from app.schemas.user import UserBrief
 
@@ -48,8 +48,15 @@ class CourseBrief(BaseModel):
 
 class EnrollmentCreate(BaseModel):
     """POST /courses/:id/enroll — enroll a user in a course."""
-    user_id: UUID
+    user_id: UUID = Field(..., description="UUID of the user to enroll. Required.")
     course_role: CourseRole
+
+    @field_validator("user_id", mode="before")
+    @classmethod
+    def user_id_required(cls, v):
+        if v is None or v == "":
+            raise ValueError("user_id is required.")
+        return v
 
 
 class EnrollmentOut(BaseModel):
