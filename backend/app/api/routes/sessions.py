@@ -41,10 +41,12 @@ from app.core.dependencies import get_current_user, require_instructor, require_
 from app.schemas.pagination import Page
 from app.models.assessment import AssessmentConfig, AssessmentSession
 from app.models.course import CourseEnrollment
+from app.models.feedback import AISummary, InstructorFeedback
 from app.models.question import Question
 from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
 from app.models.user import User
 from app.schemas.assessment import (
+    AssessmentStatsOut,
     FullTranscriptOut,
     SessionBrief,
     SessionOut,
@@ -454,6 +456,36 @@ def complete_session(
 
 
 # ---------------------------------------------------------------------------
+# List my sessions (student) — MUST be defined before /sessions/{session_id}
+# so FastAPI matches the literal path "mine" before the UUID path parameter.
+# ---------------------------------------------------------------------------
+
+@router.get(
+    "/sessions/mine",
+    response_model=Page[SessionBrief],
+    summary="List my sessions",
+    description=(
+        "Student-only. Returns all sessions belonging to the authenticated student, "
+        "ordered most recent first (paginated)."
+    ),
+)
+def list_my_sessions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    q = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.student_id == current_user.id)
+        .order_by(AssessmentSession.created_at.desc())
+    )
+    total = q.count()
+    items = q.offset((page - 1) * page_size).limit(page_size).all()
+    return Page.create(items, total, page, page_size)
+
+
+# ---------------------------------------------------------------------------
 # Transcript view (instructor)
 # ---------------------------------------------------------------------------
 
@@ -503,7 +535,11 @@ def get_session_transcript(
     "/assessments/{assessment_id}/sessions",
     response_model=Page[SessionBrief],
     summary="List student sessions for an assessment",
-    description="Instructor-only. Returns brief summaries of all student sessions (paginated).",
+    description=(
+        "Instructor-only. Returns brief summaries of all student sessions (paginated). "
+        "Each item is enriched with student name, email, AI-suggested grade, and final grade "
+        "for the instructor grading dashboard transcript list view."
+    ),
 )
 def list_sessions(
     assessment_id: UUID,
@@ -522,33 +558,133 @@ def list_sessions(
         .order_by(AssessmentSession.created_at.desc())
     )
     total = q.count()
-    items = q.offset((page - 1) * page_size).limit(page_size).all()
-    return Page.create(items, total, page, page_size)
+    sessions = q.offset((page - 1) * page_size).limit(page_size).all()
+
+    # Enrich each session brief with student info, AI suggested grade, and final grade
+    enriched: list[SessionBrief] = []
+    for sess in sessions:
+        brief = SessionBrief.model_validate(sess)
+
+        # Attach student name and email
+        student = db.query(User).filter(User.id == sess.student_id).first()
+        if student:
+            brief.student_name = student.full_name
+            brief.student_email = student.email
+
+        # Attach AI suggested grade (advisory)
+        ai_summary = db.query(AISummary).filter(
+            AISummary.session_id == sess.id,
+            AISummary.status == "success",
+        ).first()
+        if ai_summary:
+            brief.ai_suggested_grade = ai_summary.suggested_grade
+
+        # Attach instructor final grade if already graded
+        feedback = db.query(InstructorFeedback).filter(
+            InstructorFeedback.session_id == sess.id
+        ).first()
+        if feedback:
+            brief.final_grade = feedback.final_grade
+
+        enriched.append(brief)
+
+    return Page.create(enriched, total, page, page_size)
 
 
 @router.get(
-    "/sessions/mine",
-    response_model=Page[SessionBrief],
-    summary="List my sessions",
+    "/assessments/{assessment_id}/sessions/stats",
+    response_model=AssessmentStatsOut,
+    summary="Get class grade statistics",
     description=(
-        "Student-only. Returns all sessions belonging to the authenticated student, "
-        "ordered most recent first (paginated)."
+        "Instructor-only. Returns median, average, highest, and lowest final grades "
+        "across all instructor-graded sessions for this assessment. "
+        "Only sessions with a numeric final_grade are included in calculations. "
+        "Matches the statistics panel shown on the instructor grading dashboard."
     ),
 )
-def list_my_sessions(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+def get_assessment_stats(
+    assessment_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_student),
+    current_user: User = Depends(require_instructor),
 ):
-    q = (
+    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+
+    total_sessions = (
         db.query(AssessmentSession)
-        .filter(AssessmentSession.student_id == current_user.id)
-        .order_by(AssessmentSession.created_at.desc())
+        .filter(AssessmentSession.assessment_config_id == assessment_id)
+        .count()
     )
-    total = q.count()
-    items = q.offset((page - 1) * page_size).limit(page_size).all()
-    return Page.create(items, total, page, page_size)
+
+    # Collect all numeric final grades for this assessment
+    feedbacks = (
+        db.query(InstructorFeedback)
+        .join(AssessmentSession, InstructorFeedback.session_id == AssessmentSession.id)
+        .filter(
+            AssessmentSession.assessment_config_id == assessment_id,
+            InstructorFeedback.final_grade.isnot(None),
+        )
+        .all()
+    )
+
+    # Parse final_grade values to floats (supports "85", "85/100", "85%", "A" mapped to 4.0 etc.)
+    numeric_grades: list[float] = []
+    for fb in feedbacks:
+        grade_str = (fb.final_grade or "").strip()
+        # Try raw float first (e.g. "85", "92.5")
+        try:
+            numeric_grades.append(float(grade_str))
+            continue
+        except (ValueError, TypeError):
+            pass
+        # Try "85/100" style
+        if "/" in grade_str:
+            try:
+                num, denom = grade_str.split("/", 1)
+                numeric_grades.append(float(num.strip()) / float(denom.strip()) * 100)
+                continue
+            except (ValueError, ZeroDivisionError):
+                pass
+        # Try "85%" style
+        if grade_str.endswith("%"):
+            try:
+                numeric_grades.append(float(grade_str[:-1].strip()))
+                continue
+            except ValueError:
+                pass
+        # Skip letter grades or unparseable values
+
+    graded_count = len(numeric_grades)
+
+    if graded_count == 0:
+        return AssessmentStatsOut(
+            assessment_id=assessment_id,
+            total_sessions=total_sessions,
+            graded_count=0,
+            average_grade=None,
+            median_grade=None,
+            highest_grade=None,
+            lowest_grade=None,
+        )
+
+    numeric_grades.sort()
+    average = sum(numeric_grades) / graded_count
+    n = graded_count
+    if n % 2 == 1:
+        median = numeric_grades[n // 2]
+    else:
+        median = (numeric_grades[n // 2 - 1] + numeric_grades[n // 2]) / 2.0
+
+    return AssessmentStatsOut(
+        assessment_id=assessment_id,
+        total_sessions=total_sessions,
+        graded_count=graded_count,
+        average_grade=round(average, 2),
+        median_grade=round(median, 2),
+        highest_grade=max(numeric_grades),
+        lowest_grade=min(numeric_grades),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -587,19 +723,38 @@ async def _generate_ai_followup(
     """
     Generate a context-aware follow-up question using the AI Gateway.
 
-    Builds a compact conversation history from recent transcript messages
-    and asks the LLM to generate the next follow-up.
+    Builds a compact conversation history from recent transcript messages,
+    explicitly anchoring to the current main question so follow-ups stay
+    on-topic (fixes: follow-up not relevant to the main question).
 
     Falls back to a generic probing question on any AI error.
     """
     from app.services.ai_gateway import chat_complete
 
-    # Build recent conversation context (last 6 turns for brevity)
+    # Identify the current main question from session_question_items so the
+    # follow-up is explicitly grounded in that question (not just recent chat).
+    main_question_text: str | None = None
+    current_main = session.current_main_index or 1
+    main_item = (
+        db.query(SessionQuestionItem)
+        .filter(
+            SessionQuestionItem.session_id == session.id,
+            SessionQuestionItem.question_kind == "main",
+            SessionQuestionItem.main_group_no == current_main,
+        )
+        .first()
+    )
+    if main_item:
+        main_question_text = main_item.asked_text
+
+    # Build recent conversation context (last 8 turns for breadth).
+    # Limit to the current main question block by filtering on main_group_no
+    # so follow-ups don't bleed context from previous main questions.
     recent_msgs = (
         db.query(TranscriptMessage)
         .filter(TranscriptMessage.session_id == session.id)
         .order_by(TranscriptMessage.sequence_no.desc())
-        .limit(6)
+        .limit(8)
         .all()
     )
     recent_msgs.reverse()
@@ -610,23 +765,32 @@ async def _generate_ai_followup(
         history_lines.append(f"{prefix}: {m.content}")
     history = "\n".join(history_lines)
 
+    main_context = (
+        f"\n\nThe main question being assessed is:\n\"{main_question_text}\"\n"
+        if main_question_text else ""
+    )
+
     system_prompt = (
         "You are an academic assessor conducting an oral assessment. "
-        "Generate a single, concise follow-up question that probes the student's "
-        "understanding more deeply. The follow-up must be directly related to what "
-        "the student just said. Output ONLY the question text — no preamble."
+        "Your follow-up questions must be DIRECTLY related to the MAIN QUESTION "
+        "that was asked and the student's most recent answer. "
+        "Do not drift to unrelated topics. "
+        "Generate a single, concise probing follow-up that tests deeper understanding "
+        "of the same concept. Output ONLY the question text — no preamble, no quotes."
     )
     user_prompt = (
+        f"{main_context}"
         f"Conversation so far:\n{history}\n\n"
         f"This is follow-up #{current_followup + 1}. "
-        "Generate the next follow-up question:"
+        "Generate a follow-up question that is directly related to the main question above "
+        "and probes what the student just said more deeply:"
     )
 
     try:
         result = await chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
             system_prompt=system_prompt,
-            temperature=0.7,
+            temperature=0.6,  # Slightly lower temperature for more focused, on-topic questions
             max_tokens=150,
         )
         # Clean any accidental quotation wrapping

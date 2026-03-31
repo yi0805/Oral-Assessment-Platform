@@ -1,7 +1,7 @@
 """Pydantic schemas for question pool and individual question API."""
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.enums import QuestionKind, AnswerStyle, Difficulty, PoolStatus
 
 
@@ -10,10 +10,24 @@ class QuestionCreate(BaseModel):
     question_text: str
     question_kind: QuestionKind
     answer_style: AnswerStyle
-    difficulty: Difficulty | None = None
+    # NOTE: difficulty is not used in assessments — leave as None.
+    difficulty: Difficulty | None = Field(
+        default=None,
+        description="Difficulty level — optional, not used in current assessments. Leave null.",
+        examples=[None],
+    )
     learning_objective: str | None = None
     display_order: int | None = None
-    parent_question_id: UUID | None = None
+    # NOTE: parent_question_id MUST be null for main questions.
+    # Only set this when adding a pre-defined follow-up question (rare).
+    parent_question_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Leave null for main questions. "
+            "Only set when explicitly linking a pre-defined follow-up to its parent."
+        ),
+        examples=[None],
+    )
 
 
 class QuestionUpdate(BaseModel):
