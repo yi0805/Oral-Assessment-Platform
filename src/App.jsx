@@ -43,17 +43,13 @@ function App() {
                 path="instructor/pendingGrades"
                 element={<InstructorPendingGrades />}
               />
-
               <Route
                 path="instructor/updateMaterial"
                 element={<UpdateMaterial />}
               />
+
               <Route path="instructor/transcript" element={<Transcript />} />
               <Route path="instructor/AddCourse" element={<AddCourse />} />
-              <Route
-                path="instructor/courseDashboard"
-                element={<InstructorCourseDashboard />}
-              />
             </Route>
 
             <Route path="login" element={<Login />} />

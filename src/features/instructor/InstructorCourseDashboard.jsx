@@ -101,92 +101,92 @@ function getShownScore(student) {
 }
 
 export default function InstructorCourseDashboard({ course }) {
-  const {
-    ensureGradebook,
-    getAssessmentsForCourse,
-    getStudents,
-    setInstructorScore,
-    setSelectedPublished,
-    publishAll,
-  } = useGradebook();
+  // const {
+  //   ensureGradebook,
+  //   getAssessmentsForCourse,
+  //   getStudents,
+  //   setInstructorScore,
+  //   setSelectedPublished,
+  //   publishAll,
+  // } = useGradebook();
 
-  const assessments = getAssessmentsForCourse(course.id);
-  const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
+  // const assessments = getAssessmentsForCourse(course.id);
+  // const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
 
-  const assessmentId =
-    assessments.length === 0
-      ? ""
-      : selectedAssessmentId &&
-          assessments.some(
-            (assessment) => assessment.id === selectedAssessmentId,
-          )
-        ? selectedAssessmentId
-        : (assessments[0]?.id ?? "");
+  // const assessmentId =
+  //   assessments.length === 0
+  //     ? ""
+  //     : selectedAssessmentId &&
+  //         assessments.some(
+  //           (assessment) => assessment.id === selectedAssessmentId,
+  //         )
+  //       ? selectedAssessmentId
+  //       : (assessments[0]?.id ?? "");
 
-  useLayoutEffect(() => {
-    if (course.id && assessmentId) {
-      ensureGradebook(course.id, assessmentId);
-    }
-  }, [course.id, assessmentId, ensureGradebook]);
+  // useLayoutEffect(() => {
+  //   if (course.id && assessmentId) {
+  //     ensureGradebook(course.id, assessmentId);
+  //   }
+  // }, [course.id, assessmentId, ensureGradebook]);
 
-  const students = getStudents(course.id, assessmentId);
-  const [draftScores, setDraftScores] = useState({});
-  const [selectedStudentIds, setSelectedStudentIds] = useState(() => new Set());
+  // const students = getStudents(course.id, assessmentId);
+  // const [draftScores, setDraftScores] = useState({});
+  // const [selectedStudentIds, setSelectedStudentIds] = useState(() => new Set());
 
-  function getDraftKey(studentId) {
-    return `${course.id}|${assessmentId}|${studentId}`;
-  }
+  // function getDraftKey(studentId) {
+  //   return `${course.id}|${assessmentId}|${studentId}`;
+  // }
 
-  function handleAssessmentChange(e) {
-    setSelectedAssessmentId(e.target.value);
-    setDraftScores({});
-    setSelectedStudentIds(new Set());
-  }
+  // function handleAssessmentChange(e) {
+  //   setSelectedAssessmentId(e.target.value);
+  //   setDraftScores({});
+  //   setSelectedStudentIds(new Set());
+  // }
 
-  function toggleStudent(id) {
-    setSelectedStudentIds((prev) => {
-      const next = new Set(prev);
+  // function toggleStudent(id) {
+  //   setSelectedStudentIds((prev) => {
+  //     const next = new Set(prev);
 
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  //     if (next.has(id)) next.delete(id);
+  //     else next.add(id);
 
-      return next;
-    });
-  }
+  //     return next;
+  //   });
+  // }
 
-  function handlePublishSelected() {
-    if (!course.id || !assessmentId || selectedStudentIds.size === 0) return;
+  // function handlePublishSelected() {
+  //   if (!course.id || !assessmentId || selectedStudentIds.size === 0) return;
 
-    setSelectedPublished(
-      course.id,
-      assessmentId,
-      [...selectedStudentIds],
-      true,
-    );
-    setSelectedStudentIds(new Set());
-  }
+  //   setSelectedPublished(
+  //     course.id,
+  //     assessmentId,
+  //     [...selectedStudentIds],
+  //     true,
+  //   );
+  //   setSelectedStudentIds(new Set());
+  // }
 
-  function handlePublishAll() {
-    if (!course.id || !assessmentId) return;
-    publishAll(course.id, assessmentId);
-  }
+  // function handlePublishAll() {
+  //   if (!course.id || !assessmentId) return;
+  //   publishAll(course.id, assessmentId);
+  // }
 
-  const stats = students ? getStats(students, getShownScore) : null;
+  // const stats = students ? getStats(students, getShownScore) : null;
 
-  if (assessments.length === 0) {
-    return (
-      <>
-        {/* <TopRow>
-          <Button type="button" $variant="secondary" onClick={onBack}>
-            Back to courses
-          </Button>
-        </TopRow> */}
+  // if (assessments.length === 0) {
+  //   return (
+  //     <>
+  //       {/* <TopRow>
+  //         <Button type="button" $variant="secondary" onClick={onBack}>
+  //           Back to courses
+  //         </Button>
+  //       </TopRow> */}
 
-        <Heading $variant="page">{course.name}</Heading>
-        <BodyText>No assessments yet for this course.</BodyText>
-      </>
-    );
-  }
+  //       <Heading $variant="page">{course.name}</Heading>
+  //       <BodyText>No assessments yet for this course.</BodyText>
+  //     </>
+  //   );
+  // }
 
   if (!students) {
     return (
@@ -204,35 +204,26 @@ export default function InstructorCourseDashboard({ course }) {
 
   return (
     <>
-      <main className="min-h-screen bg-surface pl-64 pt-24">    
+      <main className="min-h-screen bg-surface pl-64 pt-24">
         {/* <Button type="button" $variant="secondary" onClick={onBack}>
           Back to course page
         </Button> */}
         <div className="mx-auto max-w-7xl px-10 pb-20">
-          <header
-            className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end"
-          >
+          <header className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>
-              <span
-                className="mb-2 block text-[11px] font-bold uppercase tracking-[0.2em] text-secondary"
-                >Dashboard</span
-              >
-              <h1
-                className="font-headline text-4xl font-extrabold tracking-tight text-on-surface"
-              >
+              <span className="mb-2 block text-[11px] font-bold uppercase tracking-[0.2em] text-secondary">
+                Dashboard
+              </span>
+              <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
                 {course.name}
               </h1>
-              <p
-                className="mt-2 max-w-xl font-body leading-relaxed text-on-surface-variant"
-              >
+              <p className="mt-2 max-w-xl font-body leading-relaxed text-on-surface-variant">
                 Manage your academic syllabus, track curriculum progress, and
                 update course materials for the upcoming semester.
               </p>
-          </div>
+            </div>
           </header>
         </div>
-
-
       </main>
 
       {/* <TopRow>
@@ -390,7 +381,6 @@ export default function InstructorCourseDashboard({ course }) {
           Publish all
         </Button>
       </ButtonRow>
-      
     </>
   );
 }
