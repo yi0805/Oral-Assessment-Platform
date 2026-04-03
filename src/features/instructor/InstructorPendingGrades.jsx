@@ -1,19 +1,33 @@
-import { NavLink, useLocation } from "react-router";
+import { NavLink } from "react-router";
 import PendingStudentTable from "../../ui/PendingStudentTable";
 import { useState } from "react";
+import { usePendingReviews } from "./usePendingReviews";
+import Spinner from "../../ui/Spinner";
 
 function InstructorPendingGrades() {
-  const { state } = useLocation();
-  const unGradedAssessments = state?.unGradedAssessments || [];
-
   const [searchValue, setSearchValue] = useState("");
-  const filteredAssessments = unGradedAssessments.filter((item) => {
+  const { pendingReviews, isLoading } = usePendingReviews();
+
+  if (isLoading) return <Spinner />;
+
+  const extractedReviews = pendingReviews.map((review) => {
+    const email = review.user.email;
+    const fullName = review.user.full_name;
+    const image = review.user.image;
+    const courseCode = review.course.course_code;
+    const title = review.assessment_config.title;
+    const suggestedGrade = review.aisummary?.suggested_grade;
+
+    return { email, fullName, image, courseCode, title, suggestedGrade };
+  });
+
+  const filteredReviews = extractedReviews.filter((item) => {
     const keyword = searchValue.toLowerCase().trim();
 
-    const studentName = item.studentName?.toLowerCase() || "";
-    const courseId = item.courseId?.toLowerCase() || "";
+    const studentName = item.fullName?.toLowerCase() || "";
+    const courseCode = item.courseCode?.toLowerCase() || "";
 
-    return studentName.includes(keyword) || courseId.includes(keyword);
+    return studentName.includes(keyword) || courseCode.includes(keyword);
   });
 
   return (
@@ -55,9 +69,7 @@ function InstructorPendingGrades() {
             </button>
             <div className="text-sm font-medium text-on-surface-variant">
               Showing{" "}
-              <span className="text-on-surface">
-                {filteredAssessments.length}
-              </span>{" "}
+              <span className="text-on-surface">{filteredReviews.length}</span>{" "}
               submissions
             </div>
           </div>
@@ -79,9 +91,7 @@ function InstructorPendingGrades() {
           </div>
         </div>
 
-        <PendingStudentTable rows={filteredAssessments} />
-
-        {/* next */}
+        <PendingStudentTable filteredReviews={filteredReviews} />
       </div>
     </main>
   );

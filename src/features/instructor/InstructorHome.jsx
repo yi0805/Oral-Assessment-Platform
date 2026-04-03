@@ -57,13 +57,9 @@ function InstructorHome() {
               <div className="flex w-full flex-row gap-3 md:w-auto">
                 <button
                   className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 font-headline text-xs font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
-                  // onClick={() => {
-                  //   navigate("/instructor/pendingGrades", {
-                  //     state: {
-                  //       unGradedAssessments,
-                  //     },
-                  //   });
-                  // }}
+                  onClick={() => {
+                    navigate("/instructor/pendingGrades");
+                  }}
                 >
                   Review Submissions
                   <span className="material-symbols-outlined text-xs">

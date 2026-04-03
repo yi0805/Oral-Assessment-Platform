@@ -1,17 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-function PendingStudentTable({ rows = [] }) {
+function PendingStudentTable({ filteredReviews = [] }) {
   const navigate = useNavigate();
 
   const rowsPerPage = 6;
   const [currentPage, setCurrentPage] = useState(1);
 
-  const totalPages = Math.ceil(rows.length / rowsPerPage);
+  const totalPages = Math.ceil(filteredReviews.length / rowsPerPage);
 
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
-  const currentRows = rows.slice(startIndex, endIndex);
+  const currentRows = filteredReviews.slice(startIndex, endIndex);
 
   function goToPage(page) {
     setCurrentPage(page);
@@ -55,17 +55,25 @@ function PendingStudentTable({ rows = [] }) {
           </thead>
 
           <tbody className="divide-y divide-outline-variant/5">
-            {rows.length === 0 ? (
+            {filteredReviews.length === 0 ? (
               <tr>
-                <td
-                  colSpan="7"
-                  className="px-6 py-8 text-center text-sm text-on-surface-variant"
-                >
-                  No pending assessments to found.
+                <td colSpan="7" className="px-6 py-10 text-center">
+                  <div className="flex flex-col items-center justify-center gap-2 text-on-surface-variant">
+                    <span className="material-symbols-outlined text-3xl opacity-60">
+                      fact_check
+                    </span>
+                    <p className="text-sm font-medium">
+                      Nothing to review right now
+                    </p>
+                    <p className="text-xs">
+                      New submissions will appear here when they are ready for
+                      grading.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
-              currentRows.map((assessment, index) => (
+              currentRows.map((review, index) => (
                 <tr
                   className="group transition-colors hover:bg-surface-container-low/30"
                   key={index}
@@ -81,28 +89,28 @@ function PendingStudentTable({ rows = [] }) {
                       <img
                         className="h-10 w-10 rounded-full object-cover ring-2 ring-white"
                         data-alt="Close up of Elena Mitsotakis, a smiling female student with long brown hair in a bright outdoor campus setting"
-                        src="https://i.pravatar.cc/300?img=12"
+                        src={review.image || "/WhereRU.png"}
                       />
                       <div>
                         <div className="headline-font text-sm font-bold text-on-surface">
-                          {assessment.studentName}
+                          {review.fullName || "Unknown Student"}
                         </div>
                         <div className="text-xs text-on-surface-variant">
-                          email
+                          {review.email || "No email provided"}
                         </div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-5">
                     <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
-                      {assessment.courseId}
+                      {review.courseCode || "Unknown Course"}
                     </span>
                   </td>
                   <td className="px-6 py-5 text-sm font-medium text-on-surface-variant">
-                    {assessment.assessment}
+                    {review.title || "Unknown Assessment"}
                   </td>
                   <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
-                    {assessment.grade || 0}/10
+                    {review.suggestedGrade || 0}/10
                   </td>
                   <td className="px-6 py-5 text-center">
                     <input
@@ -126,7 +134,7 @@ function PendingStudentTable({ rows = [] }) {
           </tbody>
         </table>
       </div>
-      {rows.length > 0 && (
+      {filteredReviews.length > 0 && (
         <div className="flex items-center justify-between border-t border-outline-variant/10 bg-surface-container-low/20 px-6 py-4">
           <span className="text-xs font-medium text-on-surface-variant">
             Page {currentPage} of {totalPages}
