@@ -33,6 +33,7 @@ class UserUpdate(BaseModel):
 class UserOut(BaseModel):
     """Returned by GET /auth/me and embedded in other responses."""
     model_config = ConfigDict(from_attributes=True)
+    id: UUID
     email: str
     full_name: str
     role: UserRole

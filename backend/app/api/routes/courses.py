@@ -94,38 +94,38 @@ def create_course(
     return course
 
 
-@router.get(
-    "",
-    response_model=Page[CourseBrief],
-    summary="List my courses",
-    description="Returns all courses the authenticated user is actively enrolled in (paginated).",
-)
-def list_courses(
-    page: int = Query(1, ge=1, description="Page number (1-based)"),
-    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    # Admins see every course; everyone else sees only their enrollments.
-    if current_user.role == "admin":
-        q = db.query(Course).order_by(Course.created_at.desc())
-    else:
-        enrollments = (
-            db.query(CourseEnrollment)
-            .filter(
-                CourseEnrollment.user_id == current_user.id,
-                CourseEnrollment.is_active.is_(True),
-            )
-            .all()
-        )
-        course_ids = [e.course_id for e in enrollments]
-        if not course_ids:
-            return Page.create([], 0, page, page_size)
-        q = db.query(Course).filter(Course.id.in_(course_ids)).order_by(Course.created_at.desc())
+# @router.get(
+#     "",
+#     response_model=Page[CourseBrief],
+#     summary="List my courses",
+#     description="Returns all courses the authenticated user is actively enrolled in (paginated).",
+# )
+# def list_courses(
+#     page: int = Query(1, ge=1, description="Page number (1-based)"),
+#     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user),
+# ):
+#     # Admins see every course; everyone else sees only their enrollments.
+#     if current_user.role == "admin":
+#         q = db.query(Course).order_by(Course.created_at.desc())
+#     else:
+#         enrollments = (
+#             db.query(CourseEnrollment)
+#             .filter(
+#                 CourseEnrollment.user_id == current_user.id,
+#                 CourseEnrollment.is_active.is_(True),
+#             )
+#             .all()
+#         )
+#         course_ids = [e.course_id for e in enrollments]
+#         if not course_ids:
+#             return Page.create([], 0, page, page_size)
+#         q = db.query(Course).filter(Course.id.in_(course_ids)).order_by(Course.created_at.desc())
 
-    total = q.count()
-    items = q.offset((page - 1) * page_size).limit(page_size).all()
-    return Page.create(items, total, page, page_size)
+#     total = q.count()
+#     items = q.offset((page - 1) * page_size).limit(page_size).all()
+#     return Page.create(items, total, page, page_size)
 
 
 @router.get(
@@ -385,3 +385,28 @@ def import_students_csv(
         already_enrolled=already_enrolled,
         errors=errors,
     )
+
+
+
+# Integration
+
+@router.get(
+    "",
+    response_model=list[CourseOut],
+    summary="Integration",
+)
+def list_courses(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    courses = (
+        db.query(Course)
+        .join(CourseEnrollment, CourseEnrollment.course_id == Course.id)
+        .filter(CourseEnrollment.user_id == current_user.id)
+        .filter(CourseEnrollment.is_active == True)
+        .order_by(Course.course_code)
+        .all()
+    )
+    return courses
+
+

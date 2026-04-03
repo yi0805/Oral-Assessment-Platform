@@ -1,22 +1,17 @@
 import { useNavigate } from "react-router";
 
-import getInstructorByName from "../../utils/getInstructorByname";
-import getUngradedAssessmentsByInstructor from "../../utils/getUngradedAssessmentsByInstructor";
 import InstructorCourseCard from "../../ui/InstructorCourseCard";
-import getCourseInfoByInstructor from "../../utils/getCourseInfoByInstructor";
+import { useCourses } from "../../hooks/useCourses";
+import Spinner from "../../ui/Spinner";
 
 function InstructorHome() {
   const navigate = useNavigate();
 
-  // const Username = localStorage.getItem("userName") || "";
-  // const instructor = getInstructorByName(Username) || [];
-  // const courses = getCourseInfoByInstructor(instructor) || [];
+  const { courses, isLoading } = useCourses();
 
-  // const Username = localStorage.getItem("userName") || "";
-  // const instructor = getInstructorByName(Username) || [];
-  // const courses = getCourseInfoByInstructor(instructor) || [];
+  console.log(courses);
 
-  // const unGradedAssessments = getUngradedAssessmentsByInstructor(instructor);
+  if (isLoading) return <Spinner />;
 
   return (
     <>
@@ -73,7 +68,7 @@ function InstructorHome() {
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {/* <InstructorCourseCard courses={courses} /> */}
+            <InstructorCourseCard courses={courses} />
           </div>
         </div>
       </main>

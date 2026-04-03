@@ -14,15 +14,15 @@ function InstructorCourseCard({ courses }) {
     <button
       key={course.id}
       className="group flex flex-col overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest text-left shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary/5"
-      onClick={() => {
-        navigate(`/instructor/${course.id}`, {
-          state: { course },
-        });
-      }}
+      // onClick={() => {
+      //   navigate(`/instructor/${course.id}`, {
+      //     state: { course },
+      //   });
+      // }}
     >
       <div className="relative h-48 overflow-hidden">
         <img
-          alt={course.name}
+          alt={course.course_code}
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           src={images[index % images.length]}
         />
@@ -33,11 +33,11 @@ function InstructorCourseCard({ courses }) {
 
       <div className="flex flex-grow flex-col p-6">
         <span className="mb-1 font-body text-xs font-bold text-secondary-dim">
-          {course.id}
+          {course.course_code}
         </span>
 
         <h3 className="mb-3 font-headline text-xl font-bold text-on-surface transition-colors group-hover:text-primary">
-          {course.name}
+          {course.course_name}
         </h3>
 
         <p className="mb-6 flex-grow font-body text-sm leading-relaxed text-on-surface-variant">

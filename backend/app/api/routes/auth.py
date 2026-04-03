@@ -218,7 +218,7 @@ def _fetch_google_userinfo(access_token: str) -> dict:
     return resp.json()
 
 
-def _upsert_user(db: Session, google_sub: str, email: str, full_name: str, image: str) -> User:
+def _upsert_user(db: Session, google_sub: str, email: str, full_name: str, image: str | None) -> User:
     """
     Find an existing user by google_sub (preferred) or email, or create a
     new one.
@@ -533,10 +533,14 @@ def login_with_google(
     token = Authorization[len("Bearer "):]
 
     userinfo = _fetch_google_userinfo(token)
-    google_sub: str | None = userinfo.get("sub")
-    email: str | None = userinfo.get("email")
-    full_name: str = userinfo.get("name")
-    image : str | None = userinfo.get("picture")
+
+    google_sub = userinfo.get("sub")
+    email = userinfo.get("email")
+    full_name = userinfo.get("name")
+    image = userinfo.get("picture")
+
+    if not google_sub or not email or not full_name:
+        raise HTTPException(status_code=400, detail="Missing required Google user info")
 
     if not is_login_domain_allowed(email):
         raise HTTPException(
@@ -573,6 +577,7 @@ def login_with_google(
 
     return {
         "user": {
+            "id": user.id,
             "email": user.email,
             "full_name": user.full_name,
             "role": user.role,

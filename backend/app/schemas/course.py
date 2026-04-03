@@ -28,12 +28,12 @@ class CourseOut(BaseModel):
 
     id: UUID
     course_code: str | None
-    course_name: str
+    course_name: str | None
     term: str | None
     description: str | None
     created_by: UUID | None
-    created_at: datetime
-    updated_at: datetime
+    created_at: datetime | None
+    updated_at: datetime | None
 
 
 class CourseBrief(BaseModel):

@@ -1,45 +1,22 @@
+import api from "./api";
+
 export async function loginWithGoogle({ accessToken }) {
-  const response = await fetch(
-    "http://localhost:8000/api/v1/auth/google/login",
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      credentials: "include",
+  const response = await api.get("/auth/google/login", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
     },
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to get JWT token");
-  }
-
-  return response.json();
+  });
+  return response.data;
 }
 
 export async function logoutWithGoogle() {
-  const response = await fetch(
-    "http://localhost:8000/api/v1/auth/google/logout",
-    {
-      method: "POST",
-      credentials: "include",
-    },
-  );
+  const response = await api.post("/auth/google/logout");
 
-  if (!response.ok) {
-    throw new Error("Failed to logout");
-  }
-
-  return response.json();
+  return response.data;
 }
 
 export async function getCurrentUser() {
-  const response = await fetch("http://localhost:8000/api/v1/auth/google/me", {
-    credentials: "include",
-  });
+  const response = await api.get("/auth/google/me");
 
-  if (!response.ok) {
-    throw new Error("Failed to get user info");
-  }
-
-  return response.json();
+  return response.data;
 }

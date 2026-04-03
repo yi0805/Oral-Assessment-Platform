@@ -1,12 +1,9 @@
 import { useLogout } from "../features/authentication/useLogout";
 import { useUser } from "../features/authentication/useUser";
-import Loading from "../ui/Loading";
 
 function Header() {
   const { user } = useUser();
-  const { logout, isPending } = useLogout();
-
-  if (isPending) return <Loading />;
+  const { logout } = useLogout();
 
   return (
     <header className="fixed top-0 z-40 flex h-16 w-full items-center justify-between bg-[#f8f9fa] px-8 dark:bg-slate-900">

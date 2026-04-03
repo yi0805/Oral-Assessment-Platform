@@ -67,3 +67,7 @@ local_uploads/
 
 # AWS cert
 global-bundle.pem
+
+backend/alembic/
+
+backend/alembic.ini

@@ -62,6 +62,10 @@ h3 {
   animation: subtle-pulse 3s ease-in-out infinite;
 }
 
+.animate-spin-slow {
+  animation: spin-slow 2s linear infinite;
+}
+
 @keyframes pulse {
   0% {
     transform: scale(0.95);
@@ -96,7 +100,4 @@ h3 {
   to {
     transform: rotate(360deg);
   }
-}
-.animate-spin-slow {
-  animation: spin-slow 2s linear infinite;
 }
