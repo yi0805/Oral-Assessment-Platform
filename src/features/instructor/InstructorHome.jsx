@@ -3,15 +3,16 @@ import { useNavigate } from "react-router";
 import InstructorCourseCard from "../../ui/InstructorCourseCard";
 import { useCourses } from "../../hooks/useCourses";
 import Spinner from "../../ui/Spinner";
+import { usePendingReviews } from "./usePendingReviews";
 
 function InstructorHome() {
   const navigate = useNavigate();
 
   const { courses, isLoading } = useCourses();
+  const { pendingReviews, isLoading: isPendingReviewsLoading } =
+    usePendingReviews();
 
-  console.log(courses);
-
-  if (isLoading) return <Spinner />;
+  if (isLoading || isPendingReviewsLoading) return <Spinner />;
 
   return (
     <>
@@ -38,14 +39,20 @@ function InstructorHome() {
                     </span>
                   </div>
                   <h2 className="text-center font-headline text-4xl font-extrabold leading-none tracking-tight text-primary">
-                    {/* {unGradedAssessments.length} */}
+                    {pendingReviews.length}
                   </h2>
                 </div>
                 <div className="hidden h-10 w-[1px] bg-outline-variant/20 md:block"></div>
-                <p className="max-w-sm font-body text-sm text-on-surface-variant">
-                  Student submissions are currently awaiting your feedback and
-                  grading.
-                </p>
+                {pendingReviews.length > 0 ? (
+                  <p className="max-w-sm font-body text-sm text-on-surface-variant">
+                    Student submissions are currently awaiting your feedback and
+                    grading.
+                  </p>
+                ) : (
+                  <p className="max-w-sm font-body text-sm text-on-surface-variant">
+                    No pending reviews at the moment.
+                  </p>
+                )}
               </div>
               <div className="flex w-full flex-row gap-3 md:w-auto">
                 <button

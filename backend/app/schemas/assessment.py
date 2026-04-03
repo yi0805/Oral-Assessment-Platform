@@ -66,7 +66,7 @@ class AssessmentConfigOut(BaseModel):
     assessment_mode: AssessmentMode
     rubric_id: UUID | None
     total_time_minutes: int
-    per_question_time_limit_seconds: int | None
+    per_question_time_limit_minutes: int | None
     max_main_questions: int | None
     max_followups_per_main: int | None
     followup_enabled: bool

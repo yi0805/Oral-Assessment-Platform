@@ -23,7 +23,7 @@ class AISummaryOut(BaseModel):
     strengths: str | None
     gaps: str | None
     evidence_refs: list | None
-    suggested_grade: str | None
+    suggested_grade: int | None
     model_name: str
     advisory_only: bool
     status: str

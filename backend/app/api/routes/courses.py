@@ -405,6 +405,7 @@ def list_courses(
         .filter(CourseEnrollment.user_id == current_user.id)
         .filter(CourseEnrollment.is_active == True)
         .order_by(Course.course_code)
+        .distinct()
         .all()
     )
     return courses

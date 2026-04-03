@@ -40,7 +40,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor, require_student
 from app.schemas.pagination import Page
 from app.models.assessment import AssessmentConfig, AssessmentSession
-from app.models.course import CourseEnrollment
+from app.models.course import CourseEnrollment, Course
 from app.models.feedback import AISummary, InstructorFeedback
 from app.models.question import Question
 from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
@@ -55,7 +55,13 @@ from app.schemas.assessment import (
     StudentResponseRequest,
     StudentResponseResponse,
     TranscriptMessageOut,
+    AssessmentConfigOut
 )
+
+from pydantic import BaseModel
+from app.schemas.feedback import AISummaryOut
+from app.schemas.user import UserOut
+from app.schemas.course import CourseOut
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -803,3 +809,68 @@ async def _generate_ai_followup(
             "How would this apply in a real-world scenario?",
         ]
         return fallback_probes[current_followup % len(fallback_probes)]
+
+
+
+
+
+
+# integration
+
+class PendingReviewOut(BaseModel):
+    session: SessionOut 
+    assessment_config: AssessmentConfigOut
+    user:  UserOut
+    course: CourseOut 
+    aisummary: AISummaryOut | None
+
+@router.get(
+    "/pendingReviews",
+    response_model=list[PendingReviewOut],
+    summary="Integration",
+)
+def pending_Reviews(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    pendingReviews = (
+        db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary)
+        .join(
+            CourseEnrollment,
+            CourseEnrollment.course_id == AssessmentSession.course_id,
+        )
+        .join(
+            User,
+            User.id == AssessmentSession.student_id,
+        )
+        .join(
+            Course,
+            Course.id == AssessmentSession.course_id,
+        )
+        .join(
+            AssessmentConfig,
+            AssessmentConfig.id == AssessmentSession.assessment_config_id,
+        )
+        .outerjoin(
+            AISummary,
+            AISummary.session_id == AssessmentSession.id,
+        )
+        .filter(CourseEnrollment.user_id == current_user.id)
+        .filter(CourseEnrollment.course_role == "instructor")
+        .filter(CourseEnrollment.is_active == True)
+        .filter(AssessmentSession.status == "under_review")
+        .distinct()
+        .all()
+    )
+
+    return [
+        {
+            "session": session,
+            "assessment_config": assessment_config,
+            "user": user,
+            "course": course,
+            "aisummary": ai_summary,
+
+        }
+        for session, assessment_config, user, course, ai_summary in pendingReviews
+    ]
