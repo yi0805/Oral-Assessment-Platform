@@ -1,20 +1,12 @@
-import { useNavigate } from "react-router";
-import { googleLogout } from "@react-oauth/google";
+import { useLogout } from "../features/authentication/useLogout";
+import { useUser } from "../features/authentication/useUser";
+import Loading from "../ui/Loading";
 
 function Header() {
-  const navigate = useNavigate();
+  const { user } = useUser();
+  const { logout, isPending } = useLogout();
 
-  const userPicture = localStorage.getItem("userPicture");
-  const userName = localStorage.getItem("userName");
-  const role = localStorage.getItem("role");
-
-  const handleLogout = () => {
-    localStorage.removeItem("role");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userPicture");
-    googleLogout();
-    navigate("/login");
-  };
+  if (isPending) return <Loading />;
 
   return (
     <header className="fixed top-0 z-40 flex h-16 w-full items-center justify-between bg-[#f8f9fa] px-8 dark:bg-slate-900">
@@ -42,20 +34,22 @@ function Header() {
         <div className="flex items-center gap-3 border-l border-outline-variant/20 pl-4">
           <div className="hidden text-right sm:block">
             <p className="headline-font text-sm font-semibold text-on-surface">
-              {userName}
+              {user.full_name || "User"}
             </p>
-            <p className="text-xs text-on-surface-variant">{role}</p>
+            <p className="text-xs text-on-surface-variant">
+              {user.role || "Role"}
+            </p>
           </div>
           <img
             alt="User profile avatar"
             className="h-10 w-10 rounded-full object-cover"
             data-alt="portrait of a young man with short brown hair and a friendly smile, clean-shaven, wearing a light blue oxford shirt in soft indoor lighting"
             referrerPolicy="no-referrer"
-            src={userPicture}
+            src={user.image || "/WhereRU.png"}
           />
           <button
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-error transition-all hover:bg-error/5 active:scale-95"
-            onClick={() => handleLogout()}
+            onClick={() => logout()}
           >
             Logout
           </button>

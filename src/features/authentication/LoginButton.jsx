@@ -1,47 +1,17 @@
-import { useRef } from "react";
-import { useNavigate } from "react-router";
 import { useGoogleLogin } from "@react-oauth/google";
 
-function LoginButton({ role }) {
-  const navigate = useNavigate();
-  const pendingRole = useRef(null);
-
+function LoginButton({ role, login }) {
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
-      try {
-        const res = await fetch(
-          "https://www.googleapis.com/oauth2/v3/userinfo",
-          {
-            headers: {
-              Authorization: `Bearer ${tokenResponse.access_token}`,
-            },
-          },
-        );
-
-        if (!res.ok) throw new Error("Failed to fetch user info");
-
-        const userInfo = await res.json();
-        localStorage.setItem("role", pendingRole.current);
-        localStorage.setItem("userName", userInfo.name);
-        localStorage.setItem("userPicture", userInfo.picture);
-
-        navigate("/home");
-      } catch (err) {
-        console.error("Fetch user info error:", err);
-      }
+      login({ accessToken: tokenResponse.access_token });
     },
-    onError: (error) => console.log("Google login failed:", error),
+    onError: (error) => console.error("Google login failed:", error),
   });
-
-  const handleChooseRole = (role) => {
-    pendingRole.current = role;
-    googleLogin();
-  };
 
   return role === "student" ? (
     <button
       className="group relative flex flex-col items-center overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-10 text-left text-center shadow-sm transition-all duration-500 hover:border-primary/20 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-      onClick={() => handleChooseRole("student")}
+      onClick={() => googleLogin()}
     >
       <div className="absolute inset-0 bg-primary/0 transition-colors duration-500 group-hover:bg-primary/[0.02]"></div>
       <div className="relative z-10 mb-8 flex h-20 w-20 items-center justify-center rounded-full bg-surface-container transition-colors duration-500 group-hover:bg-primary-container">
@@ -84,7 +54,7 @@ function LoginButton({ role }) {
   ) : (
     <button
       className="group relative flex flex-col items-center overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-10 text-left text-center shadow-sm transition-all duration-500 hover:border-primary/20 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-primary/20"
-      onClick={() => handleChooseRole("instructor")}
+      onClick={() => googleLogin()}
     >
       <div className="absolute inset-0 bg-primary/0 transition-colors duration-500 group-hover:bg-primary/[0.02]"></div>
       <div className="relative z-10 mb-8 flex h-20 w-20 items-center justify-center rounded-full bg-surface-container transition-colors duration-500 group-hover:bg-secondary-container">

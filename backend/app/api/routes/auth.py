@@ -36,7 +36,7 @@ import secrets
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, status, Header, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -218,7 +218,7 @@ def _fetch_google_userinfo(access_token: str) -> dict:
     return resp.json()
 
 
-def _upsert_user(db: Session, google_sub: str, email: str, full_name: str) -> User:
+def _upsert_user(db: Session, google_sub: str, email: str, full_name: str, image: str) -> User:
     """
     Find an existing user by google_sub (preferred) or email, or create a
     new one.
@@ -227,12 +227,18 @@ def _upsert_user(db: Session, google_sub: str, email: str, full_name: str) -> Us
     - If found by email only: attach the google_sub; keep role & name.
     - If brand new: assign role via resolve_role_for_new_user().
     """
+    #  developing only: change role between instructor and student by setting GOOGLE_INSTRUCTOR_ALLOWLIST in .env to your email or leave it empty to default to student
+    role = resolve_role_for_new_user(email)
+
+
     # 1. Look up by Google subject ID (most reliable — survives email changes)
     user: User | None = db.query(User).filter(User.google_sub == google_sub).first()
 
     if user:
         # Keep the existing role — only refresh the display name.
         user.full_name = full_name
+        user.image = image
+        user.role = role
         db.commit()
         db.refresh(user)
         return user
@@ -242,6 +248,8 @@ def _upsert_user(db: Session, google_sub: str, email: str, full_name: str) -> Us
     if user:
         user.google_sub = google_sub
         user.full_name = full_name
+        user.image = image
+        user.role = role
         db.commit()
         db.refresh(user)
         return user
@@ -254,6 +262,7 @@ def _upsert_user(db: Session, google_sub: str, email: str, full_name: str) -> Us
         full_name=full_name,
         role=role,
         status="active",
+        image=image,
     )
     db.add(user)
     db.commit()
@@ -265,37 +274,37 @@ def _upsert_user(db: Session, google_sub: str, email: str, full_name: str) -> Us
 # Route: redirect to Google
 # ---------------------------------------------------------------------------
 
-@router.get(
-    "/google/login",
-    summary="Initiate Google OAuth 2.0 login",
-    description=(
-        "Redirects the browser to Google's consent screen. "
-        "Sets an HttpOnly `oauth_state` cookie to prevent CSRF attacks."
-    ),
-)
-def google_login():
-    if not settings.google_client_id or not settings.google_client_secret:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=(
-                "Google OAuth is not configured. "
-                "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the environment."
-            ),
-        )
+# @router.get(
+#     "/google/login",
+#     summary="Initiate Google OAuth 2.0 login",
+#     description=(
+#         "Redirects the browser to Google's consent screen. "
+#         "Sets an HttpOnly `oauth_state` cookie to prevent CSRF attacks."
+#     ),
+# )
+# def google_login():
+#     if not settings.google_client_id or not settings.google_client_secret:
+#         raise HTTPException(
+#             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+#             detail=(
+#                 "Google OAuth is not configured. "
+#                 "Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in the environment."
+#             ),
+#         )
 
-    state = secrets.token_hex(32)
-    auth_url = _build_google_auth_url(state)
+#     state = secrets.token_hex(32)
+#     auth_url = _build_google_auth_url(state)
 
-    response = RedirectResponse(url=auth_url, status_code=302)
-    response.set_cookie(
-        key=_OAUTH_STATE_COOKIE,
-        value=state,
-        httponly=True,
-        samesite="lax",
-        max_age=600,          # 10 minutes — more than enough to complete the flow
-        secure=not settings.debug,  # HTTPS-only in production
-    )
-    return response
+#     response = RedirectResponse(url=auth_url, status_code=302)
+#     response.set_cookie(
+#         key=_OAUTH_STATE_COOKIE,
+#         value=state,
+#         httponly=True,
+#         samesite="lax",
+#         max_age=600,          # 10 minutes — more than enough to complete the flow
+#         secure=not settings.debug,  # HTTPS-only in production
+#     )
+#     return response
 
 
 # ---------------------------------------------------------------------------
@@ -466,39 +475,138 @@ def google_callback(
 # Route: current user profile
 # ---------------------------------------------------------------------------
 
-@router.get(
-    "/me",
-    response_model=UserOut,
-    summary="Get current user profile",
-    description=(
-        "Returns the profile of the authenticated user. "
-        "Requires a valid Bearer JWT in the Authorization header."
-    ),
-)
-def get_current_user_profile(
-    current_user: User = Depends(get_current_user),
-):
-    """Return the logged-in user's profile."""
-    return current_user
+# @router.get(
+#     "/me",
+#     response_model=UserOut,
+#     summary="Get current user profile",
+#     description=(
+#         "Returns the profile of the authenticated user. "
+#         "Requires a valid Bearer JWT in the Authorization header."
+#     ),
+# )
+# def get_current_user_profile(
+#     current_user: User = Depends(get_current_user),
+# ):
+#     """Return the logged-in user's profile."""
+#     return current_user
 
 
 # ---------------------------------------------------------------------------
 # Route: logout
 # ---------------------------------------------------------------------------
 
-@router.post(
-    "/logout",
-    summary="Log out",
-    description=(
-        "For stateless JWTs the client simply discards its token. "
-        "This endpoint exists so the frontend has a clean call to make "
-        "and for future server-side token revocation."
-    ),
+# @router.post(
+#     "/logout",
+#     summary="Log out",
+#     description=(
+#         "For stateless JWTs the client simply discards its token. "
+#         "This endpoint exists so the frontend has a clean call to make "
+#         "and for future server-side token revocation."
+#     ),
+# )
+# def logout():
+#     """
+#     Stateless logout — the client discards its JWT.
+#     If a token blacklist / Redis revocation list is added later,
+#     extract the token here via Depends(get_current_user) and insert it.
+#     """
+#     return {"detail": "Logged out successfully."}
+
+
+
+
+
+# new endpoint
+
+@router.get(
+    "/google/login",
+    summary="Integration",
 )
-def logout():
-    """
-    Stateless logout — the client discards its JWT.
-    If a token blacklist / Redis revocation list is added later,
-    extract the token here via Depends(get_current_user) and insert it.
-    """
-    return {"detail": "Logged out successfully."}
+def login_with_google(
+    response: Response,
+    Authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    if not Authorization or not Authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header")
+
+    token = Authorization[len("Bearer "):]
+
+    userinfo = _fetch_google_userinfo(token)
+    google_sub: str | None = userinfo.get("sub")
+    email: str | None = userinfo.get("email")
+    full_name: str = userinfo.get("name")
+    image : str | None = userinfo.get("picture")
+
+    if not is_login_domain_allowed(email):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Your email domain is not permitted to access this application. "
+                "Please use your university account."
+            ),
+        )
+
+    user = _upsert_user(db, google_sub=google_sub, email=email, full_name=full_name, image=image)
+
+    if user.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been suspended. Please contact support.",
+        )
+
+    jwt_token = create_access_token(
+        user_id=str(user.id),
+        role=user.role,
+        email=user.email,
+    )
+
+    response.set_cookie(
+        key="access_token",
+        value=jwt_token,
+        httponly=True,
+        secure=False, 
+        samesite="lax",
+        max_age=60 * 60 * 24,
+    )
+
+
+    return {
+        "user": {
+            "email": user.email,
+            "full_name": user.full_name,
+            "role": user.role,
+            "image": user.image,
+        },
+    }
+
+
+@router.post("/google/logout",
+             summary="Integration",
+)
+def logout(response: Response):
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        secure=False,
+        samesite="lax",
+    )
+    return {"message": "Logged out"}
+
+
+
+@router.get(
+    "/google/me",
+    response_model=UserOut,
+    summary="Integration",
+   
+)
+def get_user_info(
+    current_user: User = Depends(get_current_user),
+):
+
+    return current_user
+
+
+
+

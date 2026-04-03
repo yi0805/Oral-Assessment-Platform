@@ -1,54 +1,9 @@
-import styled from "styled-components";
 import { NavLink } from "react-router";
 
-import useRequireAuth from "../hooks/useRequireAuth";
-
-const StyledSidebar = styled.div`
-  background: var(--color-light);
-  border-right: 1px solid var(--color-light-2);
-  padding: var(--space-3xl) var(--space-xl);
-  min-height: 90%;
-  grid-area: sidebar;
-  border-radius: 12px;
-  margin: 10px 5px;
-
-  @media (max-width: 768px) {
-    min-height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--color-light-2);
-    padding: var(--space-m) var(--space-xl);
-  }
-`;
-
-const Nav = styled.nav`
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-m);
-
-  @media (max-width: 768px) {
-    flex-direction: row;
-  }
-`;
-
-const Item = styled(NavLink)`
-  text-decoration: none;
-  color: var(--color-dark-2);
-  padding: var(--space-m) var(--space-l);
-  border-radius: var(--radius-md);
-
-  &:hover:not(.active) {
-    background: var(--color-primary-tint);
-  }
-
-  &.active {
-    background: var(--color-secondary-tint);
-    color: var(--color-primary);
-    font-weight: 700;
-  }
-`;
+import { useUser } from "../features/authentication/useUser";
 
 function Sidebar() {
-  const role = useRequireAuth();
+  const { user } = useUser();
 
   return (
     <aside className="fixed left-0 top-0 z-30 hidden h-screen w-64 flex-col gap-y-2 bg-[#eaeff1] pr-4 pt-20 dark:bg-slate-800/50 md:flex">
@@ -61,7 +16,7 @@ function Sidebar() {
               className="h-8 w-8 object-contain"
             />
           </div>
-          {role === "instructor" ? (
+          {user.role === "instructor" ? (
             <div>
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
                 Curator Portal
@@ -97,7 +52,7 @@ function Sidebar() {
           </span>
           <span>Courses</span>
         </NavLink>
-        {role === "student" && (
+        {user.role === "student" && (
           <NavLink
             className={({ isActive }) =>
               `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" : "text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
@@ -113,7 +68,7 @@ function Sidebar() {
             <span>Previous Assessments</span>
           </NavLink>
         )}
-        {role === "instructor" && (
+        {user.role === "instructor" && (
           <NavLink
             className={({ isActive }) =>
               `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" : "text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`

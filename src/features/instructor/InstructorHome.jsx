@@ -8,11 +8,15 @@ import getCourseInfoByInstructor from "../../utils/getCourseInfoByInstructor";
 function InstructorHome() {
   const navigate = useNavigate();
 
-  const Username = localStorage.getItem("userName");
-  const instructor = getInstructorByName(Username);
-  const courses = getCourseInfoByInstructor(instructor);
+  // const Username = localStorage.getItem("userName") || "";
+  // const instructor = getInstructorByName(Username) || [];
+  // const courses = getCourseInfoByInstructor(instructor) || [];
 
-  const unGradedAssessments = getUngradedAssessmentsByInstructor(instructor);
+  // const Username = localStorage.getItem("userName") || "";
+  // const instructor = getInstructorByName(Username) || [];
+  // const courses = getCourseInfoByInstructor(instructor) || [];
+
+  // const unGradedAssessments = getUngradedAssessmentsByInstructor(instructor);
 
   return (
     <>
@@ -39,7 +43,7 @@ function InstructorHome() {
                     </span>
                   </div>
                   <h2 className="text-center font-headline text-4xl font-extrabold leading-none tracking-tight text-primary">
-                    {unGradedAssessments.length}
+                    {/* {unGradedAssessments.length} */}
                   </h2>
                 </div>
                 <div className="hidden h-10 w-[1px] bg-outline-variant/20 md:block"></div>
@@ -51,13 +55,13 @@ function InstructorHome() {
               <div className="flex w-full flex-row gap-3 md:w-auto">
                 <button
                   className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 font-headline text-xs font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
-                  onClick={() => {
-                    navigate("/instructor/pendingGrades", {
-                      state: {
-                        unGradedAssessments,
-                      },
-                    });
-                  }}
+                  // onClick={() => {
+                  //   navigate("/instructor/pendingGrades", {
+                  //     state: {
+                  //       unGradedAssessments,
+                  //     },
+                  //   });
+                  // }}
                 >
                   Review Submissions
                   <span className="material-symbols-outlined text-xs">
@@ -69,7 +73,7 @@ function InstructorHome() {
           </div>
 
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            <InstructorCourseCard courses={courses} />
+            {/* <InstructorCourseCard courses={courses} /> */}
           </div>
         </div>
       </main>

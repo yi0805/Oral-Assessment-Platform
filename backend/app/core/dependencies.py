@@ -24,7 +24,7 @@ require_enrollment    – Authenticated user actively enrolled in {course_id}.
 """
 from uuid import UUID
 
-from fastapi import Depends, HTTPException, Path, status
+from fastapi import Depends, HTTPException, Path, status, Cookie
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -60,7 +60,7 @@ _CREDENTIALS_EXCEPTION = HTTPException(
 # ---------------------------------------------------------------------------
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
+    access_token: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> User:
     """
@@ -70,11 +70,11 @@ def get_current_user(
     user_id does not exist in the database.
     Raises HTTP 403 when the account is suspended.
     """
-    token = credentials.credentials if credentials else None
-    if not token:
+    if not access_token:
         raise _CREDENTIALS_EXCEPTION
 
-    payload = verify_token(token)
+
+    payload = verify_token(access_token)
     if payload is None:
         raise _CREDENTIALS_EXCEPTION
 

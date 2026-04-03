@@ -1,6 +1,12 @@
 import LoginButton from "../features/authentication/LoginButton";
+import { useLogin } from "../features/authentication/useLogin";
+import Loading from "../ui/Loading";
 
 function Login() {
+  const { login, isPending } = useLogin();
+
+  if (isPending) return <Loading />;
+
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-6 sm:p-12">
       <div className="pointer-events-none absolute left-0 top-0 z-0 h-full w-full">
@@ -28,8 +34,8 @@ function Login() {
         </header>
 
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
-          <LoginButton role="student" />
-          <LoginButton role="instructor" />
+          <LoginButton role="student" login={login} />
+          <LoginButton role="instructor" login={login} />
         </div>
 
         <footer className="mt-20 flex flex-col items-center gap-4 text-center">

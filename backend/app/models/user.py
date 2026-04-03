@@ -27,6 +27,7 @@ class User(Base):
     )
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String, nullable=False)
+    image : Mapped[str | None] = mapped_column(String, nullable=True, comment="URL to profile image")
     role: Mapped[str] = mapped_column(
         String, nullable=False, comment="student | instructor | admin"
     )
