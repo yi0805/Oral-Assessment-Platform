@@ -53,8 +53,8 @@ router = APIRouter()
 # Helper: load session or 404
 # ---------------------------------------------------------------------------
 
-def _get_session_or_404(db: Session, session_id: UUID) -> AssessmentSession:
-    sess = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
+def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> AssessmentSession:
+    sess = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).filter(AssessmentSession.student_id == student_id).first()
     if not sess:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     return sess
@@ -320,54 +320,54 @@ def accept_ai_and_release(
 # Release workflow
 # ---------------------------------------------------------------------------
 
-@router.put(
-    "/sessions/{session_id}/release",
-    response_model=FeedbackOut,
-    summary="Release results to student",
-    description=(
-        "Instructor-only. Marks the feedback as released, making it visible to the "
-        "student via GET /sessions/{id}/results. Transitions the session to 'released'. "
-        "Requires: final_grade must be set and student_visible_comments must not be empty."
-    ),
-)
-def release_results(
-    session_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    sess = _get_session_or_404(db, session_id)
+# @router.put(
+#     "/sessions/{session_id}/release",
+#     response_model=FeedbackOut,
+#     summary="Release results to student",
+#     description=(
+#         "Instructor-only. Marks the feedback as released, making it visible to the "
+#         "student via GET /sessions/{id}/results. Transitions the session to 'released'. "
+#         "Requires: final_grade must be set and student_visible_comments must not be empty."
+#     ),
+# )
+# def release_results(
+#     session_id: UUID,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(require_instructor),
+# ):
+#     sess = _get_session_or_404(db, session_id)
 
-    feedback = db.query(InstructorFeedback).filter(
-        InstructorFeedback.session_id == session_id
-    ).first()
-    if not feedback:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No feedback found. Submit instructor feedback before releasing.",
-        )
+#     feedback = db.query(InstructorFeedback).filter(
+#         InstructorFeedback.session_id == session_id
+#     ).first()
+#     if not feedback:
+#         raise HTTPException(
+#             status_code=status.HTTP_404_NOT_FOUND,
+#             detail="No feedback found. Submit instructor feedback before releasing.",
+#         )
 
-    if feedback.released_to_student:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Results have already been released to this student.",
-        )
+#     if feedback.released_to_student:
+#         raise HTTPException(
+#             status_code=status.HTTP_409_CONFLICT,
+#             detail="Results have already been released to this student.",
+#         )
 
-    if not feedback.final_grade:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="final_grade must be set before releasing results to the student.",
-        )
+#     if not feedback.final_grade:
+#         raise HTTPException(
+#             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+#             detail="final_grade must be set before releasing results to the student.",
+#         )
 
-    now = datetime.now(timezone.utc)
-    feedback.released_to_student = True
-    feedback.released_at = now
+#     now = datetime.now(timezone.utc)
+#     feedback.released_to_student = True
+#     feedback.released_at = now
 
-    sess.status = "released"
-    sess.released_at = now
+#     sess.status = "released"
+#     sess.released_at = now
 
-    db.commit()
-    db.refresh(feedback)
-    return feedback
+#     db.commit()
+#     db.refresh(feedback)
+#     return feedback
 
 
 # ---------------------------------------------------------------------------
@@ -426,3 +426,53 @@ def get_student_results(
         released_at=feedback.released_at,
         transcript_messages=[TranscriptMessageOut.model_validate(m) for m in transcript],
     )
+
+
+
+# Integration
+
+
+@router.put(
+    "/sessions/{session_id}/{student_id}/release/session",
+    summary="Integration",
+)
+def release_result(
+    session_id: UUID,
+    student_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    sess = _get_session_or_404(db, session_id, student_id)
+
+    feedback = db.query(InstructorFeedback).filter(
+        InstructorFeedback.session_id == session_id
+    ).first()
+    if not feedback:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No feedback found. Submit instructor feedback before releasing.",
+        )
+
+    if feedback.released_to_student:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Results have already been released to this student.",
+        )
+
+    if feedback.final_grade is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="final_grade must be set before releasing results to the student.",
+        )
+
+    now = datetime.now(timezone.utc)
+    feedback.released_to_student = True
+    feedback.released_at = now
+
+    sess.status = "released"
+    sess.released_at = now
+
+    db.commit()
+    db.refresh(feedback)
+
+    return {"message": f"Results released to student {student_id} for session {session_id}."}

@@ -11,6 +11,8 @@ function InstructorPendingGrades() {
   if (isLoading) return <Spinner />;
 
   const extractedReviews = pendingReviews.map((review) => {
+    const sessionId = review.session.id;
+    const studentId = review.session.student_id;
     const email = review.user.email;
     const fullName = review.user.full_name;
     const image = review.user.image;
@@ -18,7 +20,16 @@ function InstructorPendingGrades() {
     const title = review.assessment_config.title;
     const suggestedGrade = review.aisummary?.suggested_grade;
 
-    return { email, fullName, image, courseCode, title, suggestedGrade };
+    return {
+      sessionId,
+      studentId,
+      email,
+      fullName,
+      image,
+      courseCode,
+      title,
+      suggestedGrade,
+    };
   });
 
   const filteredReviews = extractedReviews.filter((item) => {

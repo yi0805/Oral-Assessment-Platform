@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { useReleaseResult } from "../features/instructor/useReleaseResult";
 
 function PendingStudentTable({ filteredReviews = [] }) {
   const navigate = useNavigate();
-
-  const rowsPerPage = 6;
   const [currentPage, setCurrentPage] = useState(1);
 
+  const { releaseResult } = useReleaseResult();
+
+  const rowsPerPage = 6;
   const totalPages = Math.ceil(filteredReviews.length / rowsPerPage);
 
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -24,6 +26,12 @@ function PendingStudentTable({ filteredReviews = [] }) {
   function goToNextPage() {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   }
+
+  function handleRelease(sessionId, studentId) {
+    releaseResult({ sessionId, studentId });
+  }
+
+  console.log(filteredReviews);
   return (
     <>
       <div className="overflow-x-auto">
@@ -80,7 +88,13 @@ function PendingStudentTable({ filteredReviews = [] }) {
                 >
                   <td className="px-6 py-5">
                     <label className="relative inline-flex cursor-pointer items-center">
-                      <input className="peer sr-only" type="checkbox" />
+                      <input
+                        className="peer sr-only"
+                        type="checkbox"
+                        onChange={() =>
+                          handleRelease(review.sessionId, review.studentId)
+                        }
+                      />
                       <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
                     </label>
                   </td>
