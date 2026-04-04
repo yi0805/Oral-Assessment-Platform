@@ -71,3 +71,4 @@ global-bundle.pem
 backend/alembic/
 
 backend/alembic.ini
+.vite/

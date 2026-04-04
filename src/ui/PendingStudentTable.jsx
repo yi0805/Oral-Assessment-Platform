@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useReleaseResult } from "../features/instructor/useReleaseResult";
-import { useGrading } from "../features/instructor/useGrading,js";
+import { useGrading } from "../features/instructor/useGrading.js";
 
 function PendingStudentTable({
   filteredReviews = [],

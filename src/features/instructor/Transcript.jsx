@@ -1,14 +1,29 @@
-import { useEffect } from "react";
-import { NavLink } from "react-router";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router";
 
 import { useMoveBack } from "../../hooks/useMoveBack";
+import { useTranscript } from "./useTranscript";
+import Spinner from "../../ui/Spinner";
+import { buildQuestionBlocks } from "../../utils/buildQuestionBlocks";
 
 function Transcipt() {
+  const { sessionId } = useParams();
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const moveback = useMoveBack();
+  const { transcript, isLoading } = useTranscript(sessionId);
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
 
-  const moveback = useMoveBack();
+  if (isLoading) return <Spinner />;
+
+  console.log(transcript);
+
+  const questionBlocks = buildQuestionBlocks(transcript.transcript);
+  const block = questionBlocks[currentIndex];
+  console.log(block);
 
   return (
     <div className="font-body">
@@ -50,13 +65,15 @@ function Transcipt() {
                     <img
                       alt="Student avatar"
                       className="h-full w-full rounded-full object-cover"
-                      src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYuZmk-CbqdAOi1wZcjVE5z9s7ISH4vGRk8NXikuHzkrpemW3Jt0zIHT8yToMcOlgUs9c3iMgrGzl52rr60yhdLAgJC9keR1SytRGyFnh6UAx5wGzxt354whQBEE7hO327TMifBRnkML-4K--9UDPnOB9maUhZn2y9jERfH5xCTKcNngbeFihS_YnNH8hkIgxUJB79qXZze8LGCHGIk6qVxpM0D0WD7C6AfeZ_2VlVmsg4xEsJqAeGbxKUo5Mvv_js5dr4yWIbc6Nz"
+                      src={transcript.student.image || "/WhereRU.png"}
                     />
                   </div>
                   <h2 className="font-headline text-xl font-bold text-on-surface">
-                    XXXXXX
+                    {transcript.student.full_name || "Known Student"}
                   </h2>
-                  <p className="mb-4 text-sm text-outline">XXXXX</p>
+                  <p className="mb-4 text-sm text-outline">
+                    {transcript.assessment.title || "Unknown Assessment"}
+                  </p>
 
                   <div className="flex gap-2">
                     <span className="rounded-full bg-tertiary-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-tertiary-container">
@@ -78,14 +95,15 @@ function Transcipt() {
 
                 <div className="flex items-baseline gap-1">
                   <span className="font-headline text-5xl font-extrabold tracking-tighter text-on-primary-container">
-                    xxxx
+                    {transcript.ai_summary.suggested_grade || "Unknown grade"}
                   </span>
                   <span className="text-lg font-bold text-on-primary-container opacity-60">
-                    /xxxxx
+                    /10
                   </span>
                 </div>
                 <p className="mt-4 text-xs font-medium leading-snug text-on-primary-container">
-                  xxxxxxxxxxxx
+                  {transcript.ai_summary.summary_text ||
+                    "No AI summary available for this response."}
                 </p>
               </div>
             </div>
@@ -95,7 +113,8 @@ function Transcipt() {
                 <div className="flex items-center gap-4">
                   <button
                     className="flex items-center gap-1 text-sm font-bold text-primary hover:text-primary-dim disabled:cursor-not-allowed disabled:opacity-30"
-                    disabled=""
+                    onClick={() => setCurrentIndex((prev) => prev - 1)}
+                    disabled={currentIndex === 0}
                   >
                     <span className="material-symbols-outlined text-base">
                       chevron_left
@@ -103,7 +122,11 @@ function Transcipt() {
                     PREVIOUS
                   </button>
                   <span className="h-4 w-[1px] bg-outline-variant/30"></span>
-                  <button className="flex items-center gap-1 text-sm font-bold text-primary hover:text-primary-dim">
+                  <button
+                    className="flex items-center gap-1 text-sm font-bold text-primary hover:text-primary-dim disabled:cursor-not-allowed disabled:opacity-30"
+                    onClick={() => setCurrentIndex((prev) => prev + 1)}
+                    disabled={currentIndex === questionBlocks.length - 1}
+                  >
                     NEXT
                     <span className="material-symbols-outlined text-base">
                       chevron_right
@@ -112,46 +135,72 @@ function Transcipt() {
                 </div>
 
                 <span className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                  Question xxx of xxxx
+                  Question {currentIndex + 1} of
+                  {questionBlocks.length}
                 </span>
               </div>
 
               <div className="space-y-6">
-                <div className="group">
-                  <div className="mb-6 flex items-start gap-4">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container font-headline font-bold text-primary">
-                      xxxxxx
-                    </span>
+                {block && (
+                  <div className="group">
+                    <div className="mb-6 flex items-start gap-4">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-container font-headline font-bold text-primary">
+                        1
+                      </span>
 
-                    <div className="pt-1.5">
-                      <h3 className="mb-2 font-headline text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
-                        xxxxxxxx
-                      </h3>
-                      <p className="font-body text-lg font-medium leading-relaxed text-on-surface">
-                        xxxxxxxxxxxxxxxxxxx
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="ml-14 overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
-                    <div className="flex items-center justify-between border-b border-outline-variant/10 bg-surface-container-low px-8 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-sm text-secondary">
-                          subject
-                        </span>
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                          Student Response Transcript
-                        </span>
+                      <div className="pt-1.5">
+                        <h3 className="mb-2 font-headline text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
+                          Main Question
+                        </h3>
+                        <p className="font-body text-lg font-medium leading-relaxed text-on-surface">
+                          {block.question}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="space-y-6 p-8">
-                      <p className="text-sm leading-relaxed text-on-surface">
-                        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-                      </p>
+                    <div className="ml-14 overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
+                      <div className="flex items-center justify-between border-b border-outline-variant/10 bg-surface-container-low px-8 py-4">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-sm text-secondary">
+                            subject
+                          </span>
+                          <span className="text-[11px] font-bold uppercase tracking-widest text-outline">
+                            Student Response Transcript
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-6 p-8">
+                        <p className="text-sm leading-relaxed text-on-surface">
+                          {block.answer || "No answer yet"}
+                        </p>
+
+                        {block.followups.length > 0 && (
+                          <div className="space-y-4 border-t border-outline-variant/10 pt-6">
+                            {block.followups.map((followup, followupIndex) => (
+                              <div
+                                key={followup.sequenceNo}
+                                className="space-y-2"
+                              >
+                                <h4 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                                  Follow-up {followupIndex + 1}
+                                </h4>
+
+                                <p className="text-sm font-medium leading-relaxed text-on-surface">
+                                  {followup.question}
+                                </p>
+
+                                <p className="text-sm leading-relaxed text-on-surface-variant">
+                                  {followup.answer || "No answer yet"}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="mt-4 rounded-xl border-2 border-primary/20 bg-surface-container-lowest p-8 shadow-xl">
@@ -179,10 +228,15 @@ function Transcipt() {
                         <input
                           className="w-24 border-b-2 border-primary bg-transparent font-headline text-3xl font-extrabold text-primary focus:outline-none"
                           type="number"
+                          min="0"
+                          max="10"
+                          defaultValue={
+                            transcript.instructor_feedback.final_grade || "0"
+                          }
                         />
 
                         <span className="text-lg font-bold text-outline">
-                          / xxxxx
+                          / 10
                         </span>
                       </div>
                     </div>

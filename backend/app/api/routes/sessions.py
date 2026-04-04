@@ -814,6 +814,34 @@ class PendingReviewOut(BaseModel):
     course: CourseOut 
     aisummary: AISummaryOut | None
 
+class StudentInfoOut(BaseModel):
+    full_name: str
+    email: str | None = None
+    image: str | None = None
+
+class AssessmentInfoOut(BaseModel):
+    title: str
+
+class AISummaryInfoOut(BaseModel):
+    suggested_grade: int | None = None
+    summary_text: str | None = None
+
+class InstructorFeedbackOut(BaseModel):
+    final_grade: int | None = None
+
+class TranscriptMessageOut(BaseModel):
+    sequence_no: int
+    message_type: str
+    content: str
+
+class TranscriptDetailOut(BaseModel):
+    session_id: UUID
+    student: StudentInfoOut
+    assessment: AssessmentInfoOut
+    ai_summary: AISummaryInfoOut | None = None
+    instructor_feedback: InstructorFeedbackOut | None = None
+    transcript: list[TranscriptMessageOut]
+
 @router.get(
     "/pendingReviews",
     response_model=list[PendingReviewOut],
@@ -864,3 +892,58 @@ def pending_Reviews(
         }
         for session, assessment_config, user, course, ai_summary in pendingReviews
     ]
+
+@router.get("/transcript/{session_id}", response_model=TranscriptDetailOut, summary="Integration",)
+def get_transcript_detail(
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    generalInfo = (
+        db.query(AssessmentSession, User, AssessmentConfig, AISummary, InstructorFeedback)
+        .join(User, User.id == AssessmentSession.student_id)
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .outerjoin(AISummary, AISummary.session_id == AssessmentSession.id)
+        .outerjoin(InstructorFeedback, InstructorFeedback.session_id == AssessmentSession.id)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+
+    if not generalInfo:
+        raise HTTPException(status_code=404, detail="Transcript not found")
+
+    session_obj, user_obj, assessment_obj, ai_obj, feedback_obj = generalInfo
+
+    transcripts = (
+        db.query(TranscriptMessage)
+        .filter(TranscriptMessage.session_id == session_id)
+        .order_by(TranscriptMessage.sequence_no.asc())
+        .all()
+    )
+
+    return {
+        "session_id": session_obj.id,
+        "student": {
+            "full_name": user_obj.full_name,
+            "email": user_obj.email,
+            "image": user_obj.image,
+        },
+        "assessment": {
+            "title": assessment_obj.title,
+        },
+        "ai_summary": None if not ai_obj else {
+            "suggested_grade": ai_obj.suggested_grade,
+            "summary_text": ai_obj.summary_text,
+        },
+        "instructor_feedback": None if not feedback_obj else {
+            "final_grade": feedback_obj.final_grade,
+        },
+        "transcript": [
+            {
+                "sequence_no": transcript.sequence_no,
+                "message_type": transcript.message_type,
+                "content": transcript.content,
+            }
+            for transcript in transcripts
+        ],
+    }

@@ -1,9 +1,7 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { updateReviewGrade } from "../../services/apiSession";
 
 export function useGrading() {
-  const queryClient = useQueryClient();
-
   const { mutate: updateGrade, isPending } = useMutation({
     mutationFn: ({ sessionId, grade }) => updateReviewGrade(sessionId, grade),
     onSuccess: () => {},

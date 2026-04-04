@@ -26,3 +26,8 @@ export async function updateReviewGrade(sessionId, grade) {
   });
   return response.data;
 }
+
+export async function getTranscript(sessionId) {
+  const response = await api.get(`/transcript/${sessionId}`);
+  return response.data;
+}
