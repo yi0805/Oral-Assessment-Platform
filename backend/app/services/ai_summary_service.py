@@ -42,6 +42,7 @@ Guidelines:
 - Be specific and evidence-based. Quote short fragments (< 15 words) from the transcript.
 - Be constructive. Identify concrete gaps without being harsh.
 - Be accurate. Only reference content actually present in the transcript.
+- Do not return letter grades. Return only a numeric score from 0 to 100.
 - Output must be valid JSON — no markdown fences, no extra text.
 """
 
@@ -61,7 +62,7 @@ Return a single JSON object with these fields:
   "summary_text": "string — 2-4 paragraph narrative overview of the student's performance",
   "strengths": "string — bullet-point list (use \\n- prefix) of demonstrated strengths with evidence",
   "gaps": "string — bullet-point list (use \\n- prefix) of knowledge gaps or weak areas with evidence",
-  "suggested_grade": "string — e.g. A, B+, C, Pass, Fail — advisory only",
+  "suggested_grade": "number - integer from 0 to 100 — advisory only",
   "evidence_quotes": ["array", "of", "short", "direct", "quotes", "from", "transcript"]
 }}
 
@@ -138,7 +139,7 @@ async def generate_summary(db: Session, session_id: UUID) -> AISummary:
     strengths = ""
     gaps = ""
     evidence_refs: list[str] = []
-    suggested_grade: str | None = None
+    suggested_grade: int | None = None
     error_message: str | None = None
     summary_status = "success"
 
@@ -153,7 +154,15 @@ async def generate_summary(db: Session, session_id: UUID) -> AISummary:
         summary_text = parsed["summary_text"]
         strengths = parsed["strengths"]
         gaps = parsed["gaps"]
-        suggested_grade = parsed.get("suggested_grade")
+
+        raw_grade = parsed.get("suggested_grade")
+        try:
+            suggested_grade = int(raw_grade) if raw_grade is not None else None
+        except (TypeError, ValueError):
+            suggested_grade = None
+        if suggested_grade is not None:
+        suggested_grade = max(0, min(100, suggested_grade))
+
         evidence_refs = parsed.get("evidence_refs", [])
     except (RuntimeError, ValueError) as exc:
         logger.error("AI summary LLM call failed for session %s: %s", session_id, exc)
@@ -166,6 +175,7 @@ async def generate_summary(db: Session, session_id: UUID) -> AISummary:
         )
         strengths = "[Not available — AI generation failed]"
         gaps = "[Not available — AI generation failed]"
+        suggested_grade = None
         # Still reference student message IDs as placeholders
         evidence_refs = [str(m.id) for m in messages if m.sender_role == "student"][:5]
 

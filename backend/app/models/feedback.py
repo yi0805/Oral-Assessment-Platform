@@ -33,9 +33,9 @@ class AISummary(Base):
         server_default="true",
         comment="Always true because the AI summary is advisory only.",
     )
-    suggested_grade: Mapped[str | None] = mapped_column(
-        String, nullable=True,
-        comment="Advisory grade suggested by the AI (e.g. A, B+, Pass). Never auto-assigned.",
+    suggested_grade: Mapped[int | None] = mapped_column(
+        Integer, nullable=True,
+        comment="Advisory numeric score suggested by the AI (0-100). Never auto-assigned.",
     )
     status: Mapped[str] = mapped_column(String, nullable=False, server_default="success", comment="success | failed")
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -65,8 +65,8 @@ class InstructorFeedback(Base):
     )
     comments: Mapped[str | None] = mapped_column(Text, nullable=True, comment="Internal instructor notes.")
     grading_rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
-    provisional_grade: Mapped[str | None] = mapped_column(String, nullable=True)
-    final_grade: Mapped[str | None] = mapped_column(String, nullable=True)
+    provisional_grade: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    final_grade: Mapped[int | None] = mapped_column(Integer, nullable=True)
     student_visible_comments: Mapped[str | None] = mapped_column(
         Text, nullable=True, comment="Feedback shown to the student after release."
     )

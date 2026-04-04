@@ -21,6 +21,7 @@ from app.core.dependencies import get_current_user, require_instructor
 from app.models.assessment import AssessmentConfig
 from app.models.course import Course
 from app.models.question import QuestionPool
+from app.models.rubric import Rubric
 from app.models.user import User
 from app.schemas.pagination import Page
 from app.schemas.assessment import (
@@ -62,6 +63,23 @@ def create_assessment(
             detail="The question pool must be approved before creating an assessment.",
         )
 
+    rubric = db.query(Rubric).filter(Rubric.id == payload.rubric_id).first()
+    if not rubric:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
+
+    # Validate business rules
+    if payload.total_time_minutes < 10:
+        raise HTTPException(
+            status_code=422,
+            detail="total_time_minutes must be at least 10 minutes"
+        )
+
+    if payload.open_at and payload.close_at and payload.close_at <= payload.open_at:
+        raise HTTPException(
+            status_code=422,
+            detail="close_at must be after open_at"
+    )
+
     # Guard: duplicate title within same course
     existing_config = (
         db.query(AssessmentConfig)
@@ -89,7 +107,7 @@ def create_assessment(
         assessment_mode=payload.assessment_mode,
         rubric_id=payload.rubric_id,
         total_time_minutes=payload.total_time_minutes,
-        per_question_time_limit_seconds=payload.per_question_time_limit_seconds,
+        per_question_time_limit_minutes=payload.per_question_time_limit_minutes,
         max_main_questions=payload.max_main_questions,
         max_followups_per_main=payload.max_followups_per_main,
         followup_enabled=payload.followup_enabled,

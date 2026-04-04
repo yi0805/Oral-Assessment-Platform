@@ -62,7 +62,7 @@ class AssessmentConfig(Base):
     total_time_minutes: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="15"
     )
-    per_question_time_limit_seconds: Mapped[int | None] = mapped_column(
+    per_question_time_limit_minutes: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True,
         comment="Null means the overall session timer is the only enforced limit.",
