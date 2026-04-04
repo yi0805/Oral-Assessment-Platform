@@ -46,6 +46,8 @@ from app.schemas.feedback import (
     StudentResultsOut,
 )
 
+from pydantic import BaseModel, Field
+
 router = APIRouter()
 
 
@@ -510,3 +512,40 @@ def release_result(
     db.refresh(feedback)
 
     return {"message": f"Results released to student {student_id} for session {session_id}."}
+
+
+class GradeUpdate(BaseModel):
+    grade: int = Field(ge=0, le=100)
+
+@router.put(
+    "/sessions/{session_id}/grade",
+    summary="Integration",
+)
+def update_grade(
+    session_id: UUID,
+    payload: GradeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    feedback = db.query(InstructorFeedback).filter(
+        InstructorFeedback.session_id == session_id
+    ).first()
+    if not feedback:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No feedback found. Submit instructor feedback updating the grade.",
+        )
+
+    if feedback.released_to_student:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Results have already been released to this student.",
+        )
+
+    feedback.final_grade = payload.grade
+
+
+    db.commit()
+    db.refresh(feedback)
+
+    return {"message": f"Grade updated for session {session_id}."}

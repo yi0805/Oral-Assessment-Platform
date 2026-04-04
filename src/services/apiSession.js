@@ -11,3 +11,10 @@ export async function updatePendingReview(sessionId, studentId) {
   );
   return response.data;
 }
+
+export async function updateReviewGrade(sessionId, grade) {
+  const response = await api.put(`/sessions/${sessionId}/grade`, {
+    grade: grade,
+  });
+  return response.data;
+}

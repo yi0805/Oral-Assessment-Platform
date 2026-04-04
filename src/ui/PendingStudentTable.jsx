@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useReleaseResult } from "../features/instructor/useReleaseResult";
+import { useGrading } from "../features/instructor/useGrading,js";
 
 function PendingStudentTable({ filteredReviews = [] }) {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
 
   const { releaseResult } = useReleaseResult();
+  const { updateGrade } = useGrading();
 
   const rowsPerPage = 6;
   const totalPages = Math.ceil(filteredReviews.length / rowsPerPage);
@@ -29,6 +31,16 @@ function PendingStudentTable({ filteredReviews = [] }) {
 
   function handleRelease(sessionId, studentId) {
     releaseResult({ sessionId, studentId });
+  }
+
+  function handleGradeChange(sessionId, grade) {
+    if (grade === "") return;
+
+    const numericGrade = Number(grade);
+    if (Number.isNaN(numericGrade) || numericGrade < 0 || numericGrade > 100)
+      return;
+
+    updateGrade({ sessionId, grade: numericGrade });
   }
 
   console.log(filteredReviews);
@@ -81,10 +93,10 @@ function PendingStudentTable({ filteredReviews = [] }) {
                 </td>
               </tr>
             ) : (
-              currentRows.map((review, index) => (
+              currentRows.map((review) => (
                 <tr
                   className="group transition-colors hover:bg-surface-container-low/30"
-                  key={index}
+                  key={review.sessionId}
                 >
                   <td className="px-6 py-5">
                     <label className="relative inline-flex cursor-pointer items-center">
@@ -130,6 +142,9 @@ function PendingStudentTable({ filteredReviews = [] }) {
                     <input
                       className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
                       type="text"
+                      onBlur={(e) => {
+                        handleGradeChange(review.sessionId, e.target.value);
+                      }}
                     />
                   </td>
                   <td className="px-6 py-5 text-right">
