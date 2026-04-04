@@ -161,7 +161,9 @@ function PendingStudentTable({
                       <button
                         className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
                         onClick={() => {
-                          navigate("/instructor/transcript");
+                          navigate(
+                            `/instructor/transcript/${review.sessionId}`,
+                          );
                         }}
                       >
                         Review

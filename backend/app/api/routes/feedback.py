@@ -467,22 +467,27 @@ def get_student_results(
 
 # Integration
 
+class ReleaseReview(BaseModel):
+    session_id: UUID
+    student_id: UUID
 
-@router.put(
-    "/sessions/{session_id}/{student_id}/release/session",
-    summary="Integration",
-)
-def release_result(
+class ReleaseAllReviews(BaseModel):
+    assessments: list[ReleaseReview]
+
+class GradeUpdate(BaseModel):
+    grade: int = Field(ge=0, le=100)
+
+def _release_one_result(
+    db: Session,
     session_id: UUID,
     student_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
 ):
     sess = _get_session_or_404(db, session_id, student_id)
 
     feedback = db.query(InstructorFeedback).filter(
         InstructorFeedback.session_id == session_id
     ).first()
+
     if not feedback:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -508,14 +513,54 @@ def release_result(
     sess.status = "released"
     sess.released_at = now
 
+
+@router.put(
+    "/sessions/{session_id}/{student_id}/release/session",
+    summary="Integration",
+)
+def release_result(
+    session_id: UUID,
+    student_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    _release_one_result(db, session_id, student_id)
+
     db.commit()
-    db.refresh(feedback)
+    
 
     return {"message": f"Results released to student {student_id} for session {session_id}."}
 
 
-class GradeUpdate(BaseModel):
-    grade: int = Field(ge=0, le=100)
+@router.put(
+    "/sessions/release/allSessions",
+    summary="Integration",
+)
+def release_all_results(
+    payload: ReleaseAllReviews,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    if not payload.assessments:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No sessions provided.",
+        )
+
+    for assessment in payload.assessments:
+        _release_one_result(
+            db=db,
+            session_id=assessment.session_id,
+            student_id=assessment.student_id,
+        )
+
+    db.commit()
+    return {
+        "message": "All results released successfully"
+    }
+
+
+
 
 @router.put(
     "/sessions/{session_id}/grade",

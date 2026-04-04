@@ -3,11 +3,14 @@ import PendingStudentTable from "../../ui/PendingStudentTable";
 import { useState } from "react";
 import { usePendingReviews } from "./usePendingReviews";
 import Spinner from "../../ui/Spinner";
+import { useReleaseAllResults } from "./useReleaseAllResults";
 
 function InstructorPendingGrades() {
   const [searchValue, setSearchValue] = useState("");
   const [grades, setGrades] = useState({});
+
   const { pendingReviews, isLoading } = usePendingReviews();
+  const { releaseAllResults } = useReleaseAllResults();
 
   if (isLoading) return <Spinner />;
 
@@ -65,12 +68,13 @@ function InstructorPendingGrades() {
     );
 
   function handlePublishAll() {
-    if (!canPublishAll) {
-      console.log("Not allowed");
-      return;
-    }
+    if (!canPublishAll) return;
 
-    console.log("publish all");
+    const assessments = filteredReviews.map((review) => ({
+      session_id: review.sessionId,
+      student_id: review.studentId,
+    }));
+    releaseAllResults({ assessments });
   }
 
   return (

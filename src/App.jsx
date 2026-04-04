@@ -53,17 +53,20 @@ function App() {
                 path="instructor/updateMaterial"
                 element={<UpdateMaterial />}
               />
-              <Route path="instructor/transcript" element={<Transcript />} />
+              <Route
+                path="instructor/transcript/:sessionId"
+                element={<Transcript />}
+              />
             </Route>
+
+            <Route
+              path="student/:courseId/:assessmentId"
+              element={<StudentAssessment />}
+            />
           </Route>
 
           <Route path="login" element={<Login />} />
           <Route path="*" element={<PageNotFound />} />
-
-          <Route
-            path="student/:courseId/:assessmentId"
-            element={<StudentAssessment />}
-          />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

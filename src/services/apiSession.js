@@ -12,6 +12,14 @@ export async function updatePendingReview(sessionId, studentId) {
   return response.data;
 }
 
+export async function updateAllPendingReviews(assessments) {
+  const response = await api.put("/sessions/release/allSessions", {
+    assessments: assessments,
+  });
+
+  return response.data;
+}
+
 export async function updateReviewGrade(sessionId, grade) {
   const response = await api.put(`/sessions/${sessionId}/grade`, {
     grade: grade,
