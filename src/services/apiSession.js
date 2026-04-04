@@ -5,6 +5,11 @@ export async function getPendingReviews() {
   return response.data;
 }
 
+export async function getTranscript(sessionId) {
+  const response = await api.get(`/transcript/${sessionId}`);
+  return response.data;
+}
+
 export async function updatePendingReview(sessionId, studentId) {
   const response = await api.put(
     `/sessions/${sessionId}/${studentId}/release/session`,
@@ -27,7 +32,10 @@ export async function updateReviewGrade(sessionId, grade) {
   return response.data;
 }
 
-export async function getTranscript(sessionId) {
-  const response = await api.get(`/transcript/${sessionId}`);
+export async function upsertReview(sessionId, finalGrade, comments) {
+  const response = await api.put(`/sessions/${sessionId}/review`, {
+    final_grade: finalGrade,
+    comments: comments,
+  });
   return response.data;
 }

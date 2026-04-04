@@ -477,6 +477,10 @@ class ReleaseAllReviews(BaseModel):
 class GradeUpdate(BaseModel):
     grade: int = Field(ge=0, le=100)
 
+class InstructorReviewUpdate(BaseModel):
+    final_grade: int = Field(ge=0, le=100)
+    comments: str | None = None
+
 def _release_one_result(
     db: Session,
     session_id: UUID,
@@ -594,3 +598,32 @@ def update_grade(
     db.refresh(feedback)
 
     return {"message": f"Grade updated for session {session_id}."}
+
+@router.put("/sessions/{session_id}/review")
+def upsert_review(
+    session_id: UUID,
+    payload: InstructorReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    feedback = (
+        db.query(InstructorFeedback)
+        .filter(InstructorFeedback.session_id == session_id)
+        .first()
+    )
+
+    if not feedback:
+        feedback = InstructorFeedback(
+            session_id=session_id,
+            final_grade=payload.final_grade,
+            comments=payload.comments,
+        )
+        db.add(feedback)
+    else:
+        feedback.final_grade = payload.final_grade
+        feedback.comments = payload.comments
+
+    db.commit()
+    db.refresh(feedback)
+
+    return {"message": f"Instructor review saved for session {session_id}."}

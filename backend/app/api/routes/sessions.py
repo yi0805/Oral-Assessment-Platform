@@ -828,6 +828,7 @@ class AISummaryInfoOut(BaseModel):
 
 class InstructorFeedbackOut(BaseModel):
     final_grade: int | None = None
+    comments: str | None = None
 
 class TranscriptMessageOut(BaseModel):
     sequence_no: int
@@ -937,6 +938,7 @@ def get_transcript_detail(
         },
         "instructor_feedback": None if not feedback_obj else {
             "final_grade": feedback_obj.final_grade,
+            "comments": feedback_obj.comments,
         },
         "transcript": [
             {

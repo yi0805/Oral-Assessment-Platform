@@ -163,6 +163,14 @@ function PendingStudentTable({
                         onClick={() => {
                           navigate(
                             `/instructor/transcript/${review.sessionId}`,
+                            {
+                              state: {
+                                reviews: filteredReviews,
+                                currentReviewIndex: filteredReviews.findIndex(
+                                  (item) => item.sessionId === review.sessionId,
+                                ),
+                              },
+                            },
                           );
                         }}
                       >
