@@ -6,6 +6,7 @@ import Spinner from "../../ui/Spinner";
 
 function InstructorPendingGrades() {
   const [searchValue, setSearchValue] = useState("");
+  const [grades, setGrades] = useState({});
   const { pendingReviews, isLoading } = usePendingReviews();
 
   if (isLoading) return <Spinner />;
@@ -41,6 +42,37 @@ function InstructorPendingGrades() {
     return studentName.includes(keyword) || courseCode.includes(keyword);
   });
 
+  function handleGradeChange(sessionId, grade) {
+    setGrades((prev) => ({
+      ...prev,
+      [sessionId]: grade,
+    }));
+  }
+
+  function isValidGrade(grade) {
+    if (grade == null || grade.trim() === "") return false;
+
+    const numericGrade = Number(grade);
+    return (
+      !Number.isNaN(numericGrade) && numericGrade >= 0 && numericGrade <= 100
+    );
+  }
+
+  const canPublishAll =
+    filteredReviews.length > 0 &&
+    filteredReviews.every((review) =>
+      isValidGrade(grades[review.sessionId] ?? ""),
+    );
+
+  function handlePublishAll() {
+    if (!canPublishAll) {
+      console.log("Not allowed");
+      return;
+    }
+
+    console.log("publish all");
+  }
+
   return (
     <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
       <div className="mb-8">
@@ -64,7 +96,11 @@ function InstructorPendingGrades() {
       <div className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-[0_4px_24px_rgba(43,52,55,0.04)]">
         <div className="flex flex-col justify-between gap-4 bg-surface-container-low/30 p-6 md:flex-row md:items-center">
           <div className="flex items-center gap-4">
-            <button className="headline-font flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-headline text-sm font-semibold text-on-primary transition-all hover:bg-primary-dim">
+            <button
+              className="headline-font flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-headline text-sm font-semibold text-on-primary transition-all hover:bg-primary-dim disabled:opacity-50"
+              onClick={handlePublishAll}
+              disabled={!canPublishAll}
+            >
               <span
                 className="material-symbols-outlined text-lg"
                 style={{
@@ -102,7 +138,12 @@ function InstructorPendingGrades() {
           </div>
         </div>
 
-        <PendingStudentTable filteredReviews={filteredReviews} />
+        <PendingStudentTable
+          filteredReviews={filteredReviews}
+          grades={grades}
+          onGradeChange={handleGradeChange}
+          isValidGrade={isValidGrade}
+        />
       </div>
     </main>
   );

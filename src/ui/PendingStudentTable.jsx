@@ -3,7 +3,12 @@ import { useNavigate } from "react-router";
 import { useReleaseResult } from "../features/instructor/useReleaseResult";
 import { useGrading } from "../features/instructor/useGrading,js";
 
-function PendingStudentTable({ filteredReviews = [] }) {
+function PendingStudentTable({
+  filteredReviews = [],
+  grades,
+  onGradeChange,
+  isValidGrade,
+}) {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -34,13 +39,9 @@ function PendingStudentTable({ filteredReviews = [] }) {
   }
 
   function handleGradeChange(sessionId, grade) {
-    if (grade === "") return;
+    if (!isValidGrade(grade)) return;
 
-    const numericGrade = Number(grade);
-    if (Number.isNaN(numericGrade) || numericGrade < 0 || numericGrade > 100)
-      return;
-
-    updateGrade({ sessionId, grade: numericGrade });
+    updateGrade({ sessionId, grade: Number(grade) });
   }
 
   console.log(filteredReviews);
@@ -93,72 +94,82 @@ function PendingStudentTable({ filteredReviews = [] }) {
                 </td>
               </tr>
             ) : (
-              currentRows.map((review) => (
-                <tr
-                  className="group transition-colors hover:bg-surface-container-low/30"
-                  key={review.sessionId}
-                >
-                  <td className="px-6 py-5">
-                    <label className="relative inline-flex cursor-pointer items-center">
-                      <input
-                        className="peer sr-only"
-                        type="checkbox"
-                        onChange={() =>
-                          handleRelease(review.sessionId, review.studentId)
-                        }
-                      />
-                      <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
-                    </label>
-                  </td>
-                  <td className="px-6 py-5">
-                    <div className="flex items-center gap-3">
-                      <img
-                        className="h-10 w-10 rounded-full object-cover ring-2 ring-white"
-                        data-alt="Close up of Elena Mitsotakis, a smiling female student with long brown hair in a bright outdoor campus setting"
-                        src={review.image || "/WhereRU.png"}
-                      />
-                      <div>
-                        <div className="headline-font text-sm font-bold text-on-surface">
-                          {review.fullName || "Unknown Student"}
-                        </div>
-                        <div className="text-xs text-on-surface-variant">
-                          {review.email || "No email provided"}
+              currentRows.map((review) => {
+                const currentGrade = grades[review.sessionId] ?? "";
+                const canPublish = isValidGrade(currentGrade);
+
+                return (
+                  <tr
+                    className="group transition-colors hover:bg-surface-container-low/30"
+                    key={review.sessionId}
+                  >
+                    <td className="px-6 py-5">
+                      <label className="relative inline-flex cursor-pointer items-center">
+                        <input
+                          className="peer sr-only"
+                          type="checkbox"
+                          disabled={!canPublish}
+                          onChange={() =>
+                            handleRelease(review.sessionId, review.studentId)
+                          }
+                        />
+                        <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                      </label>
+                    </td>
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <img
+                          className="h-10 w-10 rounded-full object-cover ring-2 ring-white"
+                          data-alt="Close up of Elena Mitsotakis, a smiling female student with long brown hair in a bright outdoor campus setting"
+                          src={review.image || "/WhereRU.png"}
+                        />
+                        <div>
+                          <div className="headline-font text-sm font-bold text-on-surface">
+                            {review.fullName || "Unknown Student"}
+                          </div>
+                          <div className="text-xs text-on-surface-variant">
+                            {review.email || "No email provided"}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-5">
-                    <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
-                      {review.courseCode || "Unknown Course"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-sm font-medium text-on-surface-variant">
-                    {review.title || "Unknown Assessment"}
-                  </td>
-                  <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
-                    {review.suggestedGrade || 0}/10
-                  </td>
-                  <td className="px-6 py-5 text-center">
-                    <input
-                      className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
-                      type="text"
-                      onBlur={(e) => {
-                        handleGradeChange(review.sessionId, e.target.value);
-                      }}
-                    />
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <button
-                      className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
-                      onClick={() => {
-                        navigate("/instructor/transcript");
-                      }}
-                    >
-                      Review
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-6 py-5">
+                      <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
+                        {review.courseCode || "Unknown Course"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5 text-sm font-medium text-on-surface-variant">
+                      {review.title || "Unknown Assessment"}
+                    </td>
+                    <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
+                      {review.suggestedGrade || 0}/10
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <input
+                        className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+                        type="text"
+                        value={currentGrade}
+                        onChange={(e) =>
+                          onGradeChange(review.sessionId, e.target.value)
+                        }
+                        onBlur={(e) => {
+                          handleGradeChange(review.sessionId, e.target.value);
+                        }}
+                      />
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <button
+                        className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
+                        onClick={() => {
+                          navigate("/instructor/transcript");
+                        }}
+                      >
+                        Review
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
