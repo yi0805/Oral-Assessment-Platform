@@ -12,7 +12,7 @@ GET    /assessments/{assessment_id}/sessions         List all sessions (instruct
 Server-side timer enforcement
 ------------------------------
   start   → expires_at = now() + total_time_minutes
-  respond → if now() > expires_at: auto-complete with status='time_expired', raise 403
+  respond → if now() > expires_at: auto-finalize with status='time_expired' and return next_question=None
 
 AI follow-up generation (respond endpoint)
 ------------------------------------------
@@ -241,6 +241,7 @@ async def submit_response(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Session is not in progress (current status: {session.status}).",
         )
+
     if session.transcript_locked:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -250,13 +251,23 @@ async def submit_response(
     # Server-side timer enforcement — total session timer
     now = datetime.now(timezone.utc)
     if session.expires_at and now > session.expires_at:
-        session.status = "time_expired"
+        # If expired now, auto-submit/finalize
+        session.status = session.status
         session.ended_at = now
         session.transcript_locked = True
+        session.total_messages = (
+            db.query(TranscriptMessage)
+            .filter(TranscriptMessage.session_id == session_id)
+            .count()
+        )
         db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your session has expired. The transcript has been locked.",
+        db.refresh(session)
+
+        return StudentResponseResponse(
+            message_saved=None,
+            next_question=None,
+            session_status="time_expired",
+            time_remaining_seconds=0,
         )
 
     config = (
@@ -266,28 +277,31 @@ async def submit_response(
     )
 
     # Per-question time limit enforcement
-    # If per_question_time_limit_seconds is configured, check the time elapsed
+    # If per_question_time_limit_minutes is configured, check the time elapsed
     # since the most recent assistant question was asked.
-    if config and config.per_question_time_limit_seconds:
-        last_question_msg = (
-            db.query(TranscriptMessage)
-            .filter(
-                TranscriptMessage.session_id == session_id,
-                TranscriptMessage.sender_role == "assistant",
-            )
-            .order_by(TranscriptMessage.sequence_no.desc())
-            .first()
+    if config and config.per_question_time_limit_minutes:
+        time_limit_seconds = config.per_question_time_limit_minutes * 60
+
+    last_question_msg = (
+        db.query(TranscriptMessage)
+        .filter(
+            TranscriptMessage.session_id == session_id,
+            TranscriptMessage.sender_role == "assistant",
         )
-        if last_question_msg:
-            elapsed = (now - last_question_msg.created_at.replace(tzinfo=timezone.utc)).total_seconds()
-            if elapsed > config.per_question_time_limit_seconds:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=(
-                        f"Per-question time limit of {config.per_question_time_limit_seconds}s exceeded "
-                        f"({int(elapsed)}s elapsed). The question has been skipped."
-                    ),
-                )
+        .order_by(TranscriptMessage.sequence_no.desc())
+        .first()
+    )
+
+    if last_question_msg:
+        elapsed = (now - last_question_msg.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+        if elapsed > time_limit_seconds:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=(
+                    f"Per-question time limit of {config.per_question_time_limit_minutes} minutes exceeded "
+                    f"({int(elapsed)} seconds elapsed). The question has been skipped."
+                ),
+            )
 
     # Determine next sequence number
     last_msg = (
@@ -441,7 +455,7 @@ def complete_session(
             detail="You do not have access to this session.",
         )
 
-    if session.status not in ("in_progress",):
+    if session.status != "in_progress":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Session cannot be completed from status '{session.status}'.",
@@ -634,32 +648,8 @@ def get_assessment_stats(
         .all()
     )
 
-    # Parse final_grade values to floats (supports "85", "85/100", "85%", "A" mapped to 4.0 etc.)
-    numeric_grades: list[float] = []
-    for fb in feedbacks:
-        grade_str = (fb.final_grade or "").strip()
-        # Try raw float first (e.g. "85", "92.5")
-        try:
-            numeric_grades.append(float(grade_str))
-            continue
-        except (ValueError, TypeError):
-            pass
-        # Try "85/100" style
-        if "/" in grade_str:
-            try:
-                num, denom = grade_str.split("/", 1)
-                numeric_grades.append(float(num.strip()) / float(denom.strip()) * 100)
-                continue
-            except (ValueError, ZeroDivisionError):
-                pass
-        # Try "85%" style
-        if grade_str.endswith("%"):
-            try:
-                numeric_grades.append(float(grade_str[:-1].strip()))
-                continue
-            except ValueError:
-                pass
-        # Skip letter grades or unparseable values
+    # Parse final_grade values to floats
+    numeric_grades: list[float] = [float(fb.final_grade) for fb in feedbacks]
 
     graded_count = len(numeric_grades)
 

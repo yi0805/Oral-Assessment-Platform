@@ -234,7 +234,7 @@ CREATE TABLE IF NOT EXISTS assessment_configs (
                                     CHECK (assessment_mode IN ('generic', 'personalized')),
     rubric_id                   UUID        REFERENCES rubrics(id)                ON DELETE SET NULL,
     total_time_minutes          INT         NOT NULL DEFAULT 15,
-    per_question_time_limit_seconds INT,
+    per_question_time_limit_minutes INT,
     max_main_questions          INT,
     max_followups_per_main      INT         NOT NULL DEFAULT 3,
     followup_enabled            BOOLEAN     NOT NULL DEFAULT true,
@@ -259,7 +259,7 @@ CREATE INDEX IF NOT EXISTS idx_assessment_configs_course_id ON assessment_config
 CREATE INDEX IF NOT EXISTS idx_assessment_configs_status    ON assessment_configs(status);
 COMMENT ON TABLE  assessment_configs                         IS 'Assessment setup: timing, mode, and question source.';
 COMMENT ON COLUMN assessment_configs.max_main_questions      IS 'Max main questions per session (null = use all in pool).';
-COMMENT ON COLUMN assessment_configs.per_question_time_limit_seconds IS 'Null means only the overall timer is enforced.';
+COMMENT ON COLUMN assessment_configs.per_question_time_limit_minutes IS 'Null means only the overall timer is enforced.';
 
 
 -- ============================================================
@@ -358,7 +358,7 @@ CREATE TABLE IF NOT EXISTS ai_summaries (
     summary_text    TEXT        NOT NULL,
     strengths       TEXT,
     gaps            TEXT,
-    suggested_grade VARCHAR,    -- Advisory only (e.g. "A", "B+", "Pass")
+    suggested_grade INTEGER,    -- Advisory only (e.g. 0-100)
     evidence_refs   JSONB,
     model_name      VARCHAR     NOT NULL,
     advisory_only   BOOLEAN     NOT NULL DEFAULT true,
@@ -369,7 +369,7 @@ CREATE TABLE IF NOT EXISTS ai_summaries (
 
 COMMENT ON TABLE  ai_summaries                IS 'AI-generated evidence summary to support instructor judgement.';
 COMMENT ON COLUMN ai_summaries.advisory_only  IS 'Always true — the AI never assigns the official grade.';
-COMMENT ON COLUMN ai_summaries.suggested_grade IS 'Advisory grade from AI (e.g. A, B+, Pass). Never auto-assigned.';
+COMMENT ON COLUMN ai_summaries.suggested_grade IS 'Advisory grade from AI (e.g. 0-100). Never auto-assigned.';
 
 
 -- ============================================================
@@ -382,8 +382,8 @@ CREATE TABLE IF NOT EXISTS instructor_feedback (
     instructor_id           UUID        REFERENCES users(id) ON DELETE SET NULL,
     comments                TEXT,
     grading_rationale       TEXT,
-    provisional_grade       VARCHAR,
-    final_grade             VARCHAR,
+    provisional_grade       INTEGER,
+    final_grade             INTEGER,
     student_visible_comments TEXT,
     released_to_student     BOOLEAN     NOT NULL DEFAULT false,
     released_at             TIMESTAMPTZ,

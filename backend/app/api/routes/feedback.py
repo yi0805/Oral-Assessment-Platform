@@ -50,7 +50,7 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
-# Helper: load session or 404
+# Helper:
 # ---------------------------------------------------------------------------
 
 def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> AssessmentSession:
@@ -59,6 +59,43 @@ def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> Asse
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     return sess
 
+def format_for_student(ai_summary: AISummary, final_grade: int) -> str:
+    parts = []
+
+    if ai_summary.summary_text:
+        parts.append("Overall feedback:")
+        parts.append(ai_summary.summary_text.strip())
+
+    if ai_summary.strengths:
+        parts.append("\nStrengths:")
+        parts.append(ai_summary.strengths.strip())
+
+    if ai_summary.gaps:
+        parts.append("\nAreas for improvement:")
+        parts.append(ai_summary.gaps.strip())
+
+    parts.append(f"\nFinal grade: {final_grade}")
+
+    return "\n".join(parts)
+
+def format_for_instructor(ai_summary: AISummary) -> str | None:
+    if not ai_summary.summary_text:
+        return None
+
+    parts = []
+
+    parts.append("AI Summary:")
+    parts.append(ai_summary.summary_text.strip())
+
+    if ai_summary.strengths:
+        parts.append("\nStrengths:")
+        parts.append(ai_summary.strengths.strip())
+
+    if ai_summary.gaps:
+        parts.append("\nGaps:")
+        parts.append(ai_summary.gaps.strip())
+
+    return "\n".join(parts)
 
 # ---------------------------------------------------------------------------
 # AI Summary
@@ -83,7 +120,7 @@ async def generate_ai_summary(
 ):
     sess = _get_session_or_404(db, session_id)
 
-    if sess.status not in ("submitted", "time_expired", "under_review"):
+    if sess.status not in ("submitted", "under_review"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -152,7 +189,7 @@ def create_feedback(
 ):
     sess = _get_session_or_404(db, session_id)
 
-    if sess.status not in ("under_review", "submitted", "time_expired"):
+    if sess.status not in ("under_review", "submitted"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Feedback cannot be added to a session with status '{sess.status}'.",
@@ -235,7 +272,7 @@ def update_feedback(
         "Instructor-only. Convenience endpoint: if the instructor is satisfied with the "
         "AI-generated advisory grade and summary, they can accept it in a single call. "
         "This will: (1) create an InstructorFeedback record using the AI suggested_grade "
-        "as final_grade, (2) optionally attach a custom visible comment, and (3) "
+        "as final_grade, (2) use the AI summary as the student-visible feedback, and (3) "
         "immediately release the results to the student. "
         "Requires an AI summary to have been generated first "
         "(POST /sessions/{id}/ai-summary/generate). "
@@ -244,18 +281,17 @@ def update_feedback(
 )
 def accept_ai_and_release(
     session_id: UUID,
-    payload: FeedbackCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
     sess = _get_session_or_404(db, session_id)
 
-    if sess.status not in ("under_review", "submitted", "time_expired"):
+    if sess.status not in ("under_review", "submitted"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 f"Cannot accept AI grade for session with status '{sess.status}'. "
-                "Session must be in 'under_review', 'submitted', or 'time_expired' state."
+                "Session must be in 'under_review', or 'submitted' state."
             ),
         )
 
@@ -269,7 +305,7 @@ def accept_ai_and_release(
                 "Call POST /sessions/{id}/ai-summary/generate first."
             ),
         )
-    if ai_summary.status != "success" or not ai_summary.suggested_grade:
+    if ai_summary.status != "success" or ai_summary.suggested_grade is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -287,19 +323,17 @@ def accept_ai_and_release(
             detail="Feedback already exists for this session. Use PUT /feedback to update.",
         )
 
-    # Use AI suggested grade as the final grade; allow instructor to override with payload
-    final_grade = payload.final_grade or ai_summary.suggested_grade
-    student_visible_comments = (
-        payload.student_visible_comments
-        or f"Your assessment has been reviewed. Grade: {final_grade}."
-    )
+    # Use AI suggested grade as the final grade
+    final_grade = ai_summary.suggested_grade
+    student_visible_comments = format_for_student(ai_summary, final_grade)
+    grading_rationale = format_for_instructor(ai_summary)
 
     now = datetime.now(timezone.utc)
     feedback = InstructorFeedback(
         session_id=session_id,
         instructor_id=current_user.id,
-        comments=payload.comments or f"[AI grade accepted by {current_user.full_name or current_user.email}]",
-        grading_rationale=payload.grading_rationale or (ai_summary.summary_text[:500] if ai_summary else None),
+        comments=f"[AI grade accepted by {current_user.full_name or current_user.email}]",
+        grading_rationale=grading_rationale,
         provisional_grade=ai_summary.suggested_grade,
         final_grade=final_grade,
         student_visible_comments=student_visible_comments,

@@ -1,8 +1,10 @@
 """Pydantic schemas for question pool and individual question API."""
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.schemas.enums import QuestionKind, AnswerStyle, Difficulty, PoolStatus
+from app.schemas.assessment import AssessmentConfigBase
+from typing import Optional
 
 
 class QuestionCreate(BaseModel):
@@ -107,3 +109,7 @@ class QuestionPoolBrief(BaseModel):
     status: PoolStatus
     generation_method: str
     created_at: datetime
+
+class PublishAsAssessmentRequest(AssessmentConfigBase):
+    """POST /question-pools/{pool_id}/publish-as-assessment"""
+    pass

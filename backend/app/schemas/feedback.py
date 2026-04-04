@@ -13,7 +13,7 @@ class AISummaryOut(BaseModel):
     - Evidence-based (short quotes from transcript)
     - Rubric-linked (evaluates against the rubric)
     - Strengths and gaps clearly identified
-    - Advisory only (suggested grade, never auto-assigned)
+    - Advisory only (suggested numeric score, never auto-assigned)
     """
     model_config = ConfigDict(from_attributes=True, protected_namespaces=())
 
@@ -37,8 +37,8 @@ class FeedbackCreate(BaseModel):
     """POST /sessions/:id/feedback — instructor submits grade and comments."""
     comments: str | None = None
     grading_rationale: str | None = None
-    provisional_grade: str | None = None
-    final_grade: str | None = None
+    provisional_grade: int | None = None
+    final_grade: int | None = None
     student_visible_comments: str | None = None
 
 
@@ -46,8 +46,8 @@ class FeedbackUpdate(BaseModel):
     """PUT /sessions/:id/feedback — instructor revises feedback before release."""
     comments: str | None = None
     grading_rationale: str | None = None
-    provisional_grade: str | None = None
-    final_grade: str | None = None
+    provisional_grade: int | None = None
+    final_grade: int | None = None
     student_visible_comments: str | None = None
 
 
@@ -60,8 +60,8 @@ class FeedbackOut(BaseModel):
     instructor_id: UUID
     comments: str | None
     grading_rationale: str | None
-    provisional_grade: str | None
-    final_grade: str | None
+    provisional_grade: int | None
+    final_grade: int | None
     student_visible_comments: str | None
     released_to_student: bool
     released_at: datetime | None
@@ -85,7 +85,7 @@ class StudentResultsOut(BaseModel):
     and reveals internal system errors they should not see.
     """
     session_id: UUID
-    final_grade: str | None
+    final_grade: int | None
     student_visible_comments: str | None
     released_at: datetime | None
     # ai_summary intentionally excluded — instructor-only per user flow Phase 5/6

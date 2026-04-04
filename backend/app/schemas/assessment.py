@@ -14,29 +14,54 @@ from app.schemas.enums import (
     AssessmentMode, AssessmentStatus, SessionStatus,
     QuestionKind, GeneratedBy, SenderRole, MessageType,
 )
-
-
-# ---- Assessment Config ----
-
-class AssessmentConfigCreate(BaseModel):
-    """POST /courses/:id/assessments — instructor creates a new assessment."""
-    question_pool_id: UUID | None = None  # Required for generic mode; null for personalized
+    
+class AssessmentConfigBase(BaseModel):
+    """
+    Base model for assessments containing core fields and automated validation logic.
+    
+    Subclasses (Request/Response models) should inherit from this class to reuse 
+    common fields and avoid code duplication.
+    """
     title: str
     instructions: str | None = None
     assessment_mode: AssessmentMode = AssessmentMode.generic
     rubric_id: UUID | None = None
     total_time_minutes: int = 15
-    per_question_time_limit_seconds: int | None = None
-    max_main_questions: int = 3   # How many main questions the student sees per session
-    max_followups_per_main: int = 2  # Max AI follow-ups per main question
+    per_question_time_limit_minutes: int | None = None
+    max_main_questions: int = 3
+    max_followups_per_main: int = 1
     followup_enabled: bool = True
     open_at: datetime | None = None
     close_at: datetime | None = None
 
     @model_validator(mode="after")
-    def check_schedule_order(self):
+    def validate_assessment_logic(self):
+        if self.per_question_time_limit_minutes is None:
+            if self.max_main_questions > 0:
+                self.per_question_time_limit_minutes = max(
+                    3, # at least 3 minutes per question
+                    self.total_time_minutes // self.max_main_questions
+                )
+            else:
+                self.per_question_time_limit_minutes = self.total_time_minutes
+
         if self.open_at and self.close_at and self.close_at <= self.open_at:
             raise ValueError("close_at must be after open_at")
+
+        return self
+
+
+# ---- Assessment Config ----
+
+class AssessmentConfigCreate(AssessmentConfigBase):
+    """POST /courses/:id/assessments — instructor creates a new assessment."""
+    question_pool_id: UUID | None = None
+    assessment_mode: AssessmentMode = AssessmentMode.generic
+
+    @model_validator(mode="after")
+    def validate_create_logic(self):
+        if self.assessment_mode == AssessmentMode.generic and self.question_pool_id is None:
+            raise ValueError("question_pool_id is required for generic mode")
         return self
 
 
@@ -44,9 +69,10 @@ class AssessmentConfigUpdate(BaseModel):
     """PUT /assessments/:id — update assessment settings before publishing."""
     title: str | None = None
     instructions: str | None = None
+    assessment_mode: AssessmentMode | None = None
     rubric_id: UUID | None = None
     total_time_minutes: int | None = None
-    per_question_time_limit_seconds: int | None = None
+    per_question_time_limit_minutes: int | None = None
     max_main_questions: int | None = None
     max_followups_per_main: int | None = None
     followup_enabled: bool | None = None
@@ -54,7 +80,7 @@ class AssessmentConfigUpdate(BaseModel):
     close_at: datetime | None = None
 
 
-class AssessmentConfigOut(BaseModel):
+class AssessmentConfigOut(AssessmentConfigBase):
     """Response shape for assessment configuration."""
     model_config = ConfigDict(from_attributes=True)
 
@@ -111,7 +137,7 @@ class StudentResponseRequest(BaseModel):
 
 class StudentResponseResponse(BaseModel):
     """Returned after a student submits an answer."""
-    message_saved: "TranscriptMessageOut"
+    message_saved: "TranscriptMessageOut | None"
     next_question: "SessionQuestionItemOut | None"
     session_status: SessionStatus
     time_remaining_seconds: int
@@ -151,8 +177,8 @@ class SessionBrief(BaseModel):
     # Enriched fields for the instructor grading dashboard (populated by the list endpoint)
     student_name: str | None = None
     student_email: str | None = None
-    ai_suggested_grade: str | None = None   # advisory grade from AISummary
-    final_grade: str | None = None          # instructor-assigned final grade (if already graded)
+    ai_suggested_grade: int | None = None   # advisory grade from AISummary
+    final_grade: int | None = None          # instructor-assigned final grade (if already graded)
 
 
 class AssessmentStatsOut(BaseModel):

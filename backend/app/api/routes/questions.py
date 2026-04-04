@@ -25,6 +25,7 @@ from app.models.assessment import AssessmentConfig
 from app.models.course import Course
 from app.models.question import Question, QuestionPool
 from app.models.user import User
+from app.models.rubric import Rubric
 from app.core.limiter import limiter
 from app.core.config import settings
 from app.schemas.assessment import AssessmentConfigOut
@@ -37,6 +38,7 @@ from app.schemas.question import (
     QuestionPoolGenerateRequest,
     QuestionPoolOut,
     QuestionUpdate,
+    PublishAsAssessmentRequest
 )
 
 router = APIRouter()
@@ -239,22 +241,6 @@ class _PublishAsAssessmentRequest(QuestionPoolCreate.__class__):
     """
     pass
 
-
-from pydantic import BaseModel as _BaseModel  # noqa: E402
-
-class PublishAsAssessmentRequest(_BaseModel):
-    """POST /question-pools/{pool_id}/publish-as-assessment"""
-    title: str
-    instructions: str | None = None
-    total_time_minutes: int = 15
-    max_main_questions: int = 3
-    max_followups_per_main: int = 2
-    followup_enabled: bool = True
-    rubric_id: UUID | None = None
-    open_at: datetime | None = None
-    close_at: datetime | None = None
-
-
 @router.post(
     "/question-pools/{pool_id}/publish-as-assessment",
     response_model=AssessmentConfigOut,
@@ -300,6 +286,23 @@ def publish_pool_as_assessment(
                 "Manage the existing assessment instead of creating a duplicate."
             ),
         )
+    
+    rubric = db.query(Rubric).filter(Rubric.id == payload.rubric_id).first()
+    if not rubric:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
+    
+    # Validate business rules
+    if payload.total_time_minutes < 10:
+        raise HTTPException(
+            status_code=422,
+            detail="total_time_minutes must be at least 10 minutes"
+        )
+
+    if payload.open_at and payload.close_at and payload.close_at <= payload.open_at:
+        raise HTTPException(
+            status_code=422,
+            detail="close_at must be after open_at"
+    )
 
     # Step 1: Auto-approve the pool if it is still in draft
     if pool.status == "draft":
@@ -317,6 +320,7 @@ def publish_pool_as_assessment(
         assessment_mode="generic",
         rubric_id=payload.rubric_id,
         total_time_minutes=payload.total_time_minutes,
+        per_question_time_limit_minutes=payload.per_question_time_limit_minutes,
         max_main_questions=payload.max_main_questions,
         max_followups_per_main=payload.max_followups_per_main,
         followup_enabled=payload.followup_enabled,
