@@ -17,11 +17,15 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 
+
+from app.models.feedback import AISummary, InstructorFeedback
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 from app.models.course import Course, CourseEnrollment
 from app.models.user import User
+from app.models.assessment import AssessmentConfig, AssessmentSession
 from app.schemas.course import (
     BulkEnrollResult,
     CourseBrief,
@@ -29,12 +33,14 @@ from app.schemas.course import (
     EnrollmentCreate,
     EnrollmentOut,
     StudentListItem,
+    
 )
 from app.schemas.pagination import Page
 from app.schemas.user import UserBrief
 
 from datetime import datetime, timezone
 from pydantic import BaseModel, ConfigDict
+from typing import List
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -394,7 +400,6 @@ def import_students_csv(
 
 
 class CourseOut(BaseModel):
-    """Response shape for GET /courses and GET /courses/:id."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -407,16 +412,45 @@ class CourseOut(BaseModel):
     updated_at: datetime | None
 
 class CourseCreate(BaseModel):
-    """POST /courses — create a new course."""
     course_code: str 
     course_name: str
     description: str | None = None
+
+class InstructorDashboardStudentRow(BaseModel):
+    session_id: UUID
+    student_id: UUID
+    student_name: str
+    student_email: str
+    student_image: str | None = None
+    ai_suggested_score: int | None = None
+    ai_summary: str | None = None
+    final_grade: int | None = None
+    status: str
+
+
+class InstructorDashboardAssessmentOut(BaseModel):
+    course_code: str
+    course_name: str
+    assessment_config_id: UUID
+    assessment_title: str
+    published_average_score: float | None = None
+    ai_average_score: float | None = None
+    submitted_count: int
+    total_students: int
+    students: list[InstructorDashboardStudentRow]
 
 def generate_term() -> str:
     now = datetime.now()
     year_short = str(now.year)[-2:]
     semester = "S1" if now.month <= 6 else "S2"
     return f"{year_short}{semester}"
+
+def dashboard_status(session_status: str) -> str:
+    if session_status == "released":
+        return "published"
+    if session_status == "under_review" or session_status == "submitted" or session_status == "time_expired":
+        return "review"
+    return "inprogress"
 
 @router.get(
     "",
@@ -492,3 +526,178 @@ def create_course(
     db.commit()
 
     return {"message": f"Course '{payload.course_name}' created successfully with term '{term}'."}
+
+
+
+@router.get(
+    "/{course_id}/instructor/dashboard",
+    response_model=list[InstructorDashboardAssessmentOut],
+    summary="Integration",
+)
+def get_instructor_dashboard(
+    course_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found.",
+        )
+
+
+    total_students = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.course_role == "student",
+            CourseEnrollment.is_active.is_(True),
+        )
+        .count()
+    )
+
+    rows = (
+        db.query(
+            AssessmentSession,
+            AssessmentConfig,
+            User,
+            AISummary,
+            InstructorFeedback,
+            
+        )
+        .join(
+            AssessmentConfig,
+            AssessmentConfig.id == AssessmentSession.assessment_config_id,
+        )
+        .join(
+            User,
+            User.id == AssessmentSession.student_id,
+        )
+        .outerjoin(
+            AISummary,
+            AISummary.session_id == AssessmentSession.id,
+        )
+        .outerjoin(
+            InstructorFeedback,
+            and_(
+                InstructorFeedback.session_id == AssessmentSession.id,
+                InstructorFeedback.instructor_id == current_user.id,
+            ),
+        )
+        .filter(
+            AssessmentSession.course_id == course_id,
+            AssessmentConfig.course_id == course_id,
+        )
+        .order_by(AssessmentConfig.created_at.asc(), User.full_name.asc())
+        .all()
+    )
+
+    print(f"Total assessment sessions found: {len(rows)}")
+
+
+    assessment_configs = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.course_id == course_id)
+        .order_by(AssessmentConfig.created_at.asc())
+        .all()
+    )
+
+    grouped = {}
+
+    for assessment_config in assessment_configs:
+        grouped[str(assessment_config.id)] = {
+            "course_code": course.course_code,
+            "course_name": course.course_name,
+            "assessment_config_id": assessment_config.id,
+            "assessment_title": assessment_config.title,
+            "published_scores": [],
+            "ai_scores": [],
+            "submitted_count": 0,
+            "students": [],
+        }
+    print(f"Total assessment configs found: {len(assessment_configs)}")
+    print(f"Initial grouped dict keys (assessment config IDs): {list(grouped.keys())}")
+
+    for session, assessment_config, student, ai_summary, instructor_feedback in rows:
+        group = grouped[str(assessment_config.id)]
+
+        if session.status in {"submitted", "under_review", "released", "time_expired"}:
+            group["submitted_count"] += 1
+
+        if ai_summary and ai_summary.suggested_grade is not None:
+            group["ai_scores"].append(ai_summary.suggested_grade)
+
+        if (
+            instructor_feedback
+            and instructor_feedback.released_to_student is True
+            and instructor_feedback.final_grade is not None
+        ):
+            group["published_scores"].append(instructor_feedback.final_grade)
+
+        final_grade = (
+            instructor_feedback.final_grade
+            if instructor_feedback and instructor_feedback.final_grade is not None
+            else None
+        )
+
+        student_row = InstructorDashboardStudentRow(
+            session_id=session.id,
+            student_id=student.id,
+            student_name=student.full_name,
+            student_email=student.email,
+            student_image=student.image,
+            ai_suggested_score=(
+                ai_summary.suggested_grade
+                if ai_summary and ai_summary.suggested_grade is not None
+                else None
+            ),
+            ai_summary=(
+                ai_summary.summary_text
+                if ai_summary and ai_summary.summary_text
+                else None
+            ),
+            final_grade=final_grade,
+            status=dashboard_status(session.status),
+        )
+
+        group["students"].append(student_row)
+
+    print(grouped)
+
+    response = []
+
+    for group in grouped.values():
+        published_scores = group["published_scores"]
+        ai_scores = group["ai_scores"]
+        student_rows = group["students"]
+
+        published_average_score = (
+            round(sum(published_scores) / len(published_scores), 2)
+            if published_scores
+            else None
+        )
+
+        ai_average_score = (
+            round(sum(ai_scores) / len(ai_scores), 2)
+            if ai_scores
+            else None
+        )
+
+
+        response.append(
+            InstructorDashboardAssessmentOut(
+                course_code=group["course_code"],
+                course_name=group["course_name"],
+                assessment_config_id=group["assessment_config_id"],
+                assessment_title=group["assessment_title"],
+                published_average_score=published_average_score,
+                ai_average_score=ai_average_score,
+                submitted_count=group["submitted_count"],
+                total_students=total_students,
+                students=student_rows,
+            )
+        )
+
+    return response

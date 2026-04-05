@@ -99,7 +99,7 @@ function Transcipt() {
               arrow_back
             </span>
             <span className="font-body uppercase tracking-widest">
-              Back to Pending Reviews
+              Back to Reviews
             </span>
           </button>
           <div className="mb-12">

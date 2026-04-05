@@ -1,31 +1,43 @@
-import { useLocation, NavLink } from "react-router";
-import { useState } from "react";
+import { NavLink, useParams } from "react-router";
+import { useEffect, useState } from "react";
 
-import getAssessmentsByCourse from "../../utils/getAssessmentsByCourse";
+import { useDashboard } from "./useDashboard";
+import Spinner from "../../ui/Spinner";
 import DashboardTable from "../../ui/DashboardTable";
 
 export default function InstructorDashboard() {
-  // const { state } = useLocation();
-  // const course = state?.course || [];
+  const { courseId } = useParams();
+  const { dashboard = [], isLoading } = useDashboard(courseId);
+  const [selectedAssessment, setSelectedAssessment] = useState("");
+  const [searchValue, setSearchValue] = useState("");
 
-  // const assessments = getAssessmentsByCourse(course.id);
+  useEffect(() => {
+    if (!dashboard.length) return;
 
-  // const assessmentOptions = [
-  //   ...new Set(assessments.map((item) => item.assessment)),
-  // ];
-  // const [selectedAssessment, setSelectedAssessment] = useState(
-  //   assessmentOptions[0] || "",
-  // );
+    setSelectedAssessment((current) =>
+      current ? current : dashboard[0].assessment_config_id,
+    );
+  }, [dashboard]);
 
-  // const selectedAssessmentResults = assessments.filter(
-  //   (item) => item.assessment === selectedAssessment,
-  // );
+  if (isLoading) return <Spinner />;
 
-  // const averageGrade =
-  //   selectedAssessmentResults.reduce(
-  //     (sum, item) => sum + parseFloat(item.grade),
-  //     0,
-  //   ) / selectedAssessmentResults.length;
+  const assessment = dashboard.find(
+    (assessment) => assessment.assessment_config_id === selectedAssessment,
+  );
+  const students = assessment?.students || [];
+  const aiAverageScore = assessment?.ai_average_score ?? "-";
+  const publishedAverageScore = assessment?.published_average_score ?? "-";
+  const submittedCount = assessment?.submitted_count ?? 0;
+  const totalStudents = assessment?.total_students ?? 0;
+  const completionRate = totalStudents
+    ? Math.round((submittedCount / totalStudents) * 100)
+    : 0;
+  const remainingToPublish = students.filter(
+    (student) => student.status !== "published",
+  ).length;
+  const filteredStudents = students.filter((student) =>
+    student.student_name.toLowerCase().includes(searchValue.toLowerCase()),
+  );
 
   return (
     <div className="min-h-screen">
@@ -44,7 +56,7 @@ export default function InstructorDashboard() {
               </span>
             </NavLink>
             <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
-              {/* {course.id} */}
+              {assessment?.course_code} • {assessment?.course_name}
             </span>
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
               Assessment Dashboard
@@ -57,14 +69,17 @@ export default function InstructorDashboard() {
             <div className="relative">
               <select
                 className="w-full cursor-pointer appearance-none rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-10 py-3 font-headline text-sm font-semibold text-on-surface transition-colors hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                // value={selectedAssessment}
-                // onChange={(e) => setSelectedAssessment(e.target.value)}
+                value={selectedAssessment}
+                onChange={(e) => setSelectedAssessment(e.target.value)}
               >
-                {/* {assessmentOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
+                {dashboard.map((assessment) => (
+                  <option
+                    key={assessment.assessment_config_id}
+                    value={assessment.assessment_config_id}
+                  >
+                    {assessment.assessment_title}
                   </option>
-                ))} */}
+                ))}
               </select>
               <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary">
                 description
@@ -84,7 +99,7 @@ export default function InstructorDashboard() {
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="font-headline text-5xl font-extrabold text-primary">
-                  {/* {averageGrade} */}
+                  {aiAverageScore}
                 </span>
                 <span className="text-lg font-bold text-outline">/ 10</span>
               </div>
@@ -108,19 +123,46 @@ export default function InstructorDashboard() {
             </p>
             <div className="flex items-baseline gap-2">
               <span className="font-headline text-5xl font-extrabold text-on-surface">
-                {/* {selectedAssessmentResults.length} */}
+                {submittedCount}
               </span>
-              <span className="text-lg font-bold text-outline">/xxxxx</span>
+              <span className="text-lg font-bold text-outline">
+                / {totalStudents}
+              </span>
             </div>
             <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-container">
               <div
                 className="h-full rounded-full bg-primary"
-                style={{ width: "94%" }}
+                style={{ width: `{completionRate}%` }}
               ></div>
             </div>
             <p className="mt-2 text-[10px] font-medium text-on-surface-variant">
-              xxxxxx Completion rate
+              {completionRate}% Completion rate
             </p>
+          </div>
+
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
+            <div className="relative z-10">
+              <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
+                Publication Avg. Score
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="font-headline text-5xl font-extrabold text-secondary">
+                  {publishedAverageScore}
+                </span>
+                <span className="text-lg font-bold text-outline">/ 10</span>
+              </div>
+              <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">
+                <span className="material-symbols-outlined text-xs">
+                  verified
+                </span>
+                Finalized Score
+              </div>
+            </div>
+            <div className="absolute -bottom-4 -right-4 opacity-5">
+              <span className="material-symbols-outlined text-[120px]">
+                check_circle
+              </span>
+            </div>
           </div>
 
           <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
@@ -129,7 +171,8 @@ export default function InstructorDashboard() {
                 Publication Status
               </p>
               <p className="font-body text-sm leading-relaxed text-on-surface-variant">
-                xxxx scores pending manual review before release.
+                {remainingToPublish} scores pending manual review before
+                release.
               </p>
             </div>
             <button className="mt-4 w-full rounded-xl bg-secondary py-3 font-headline text-sm font-bold text-on-secondary shadow-sm transition-all duration-200 hover:bg-secondary-dim active:scale-95">
@@ -152,6 +195,8 @@ export default function InstructorDashboard() {
                   className="w-64 rounded-lg border border-outline-variant/20 bg-surface py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
                   placeholder="Filter students..."
                   type="text"
+                  value={searchValue}
+                  onChange={(e) => setSearchValue(e.target.value)}
                 />
               </div>
               <button className="flex items-center gap-2 rounded-lg border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container">
@@ -163,9 +208,7 @@ export default function InstructorDashboard() {
             </div>
           </div>
 
-          {/* <DashboardTable
-            selectedAssessmentResults={selectedAssessmentResults}
-          /> */}
+          <DashboardTable filteredStudents={filteredStudents} />
         </div>
       </main>
     </div>

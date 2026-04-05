@@ -499,7 +499,7 @@ def _release_one_result(
         )
 
     if feedback.released_to_student:
-        raise HTTPException(
+        raise HTTPException( 
             status_code=status.HTTP_409_CONFLICT,
             detail="Results have already been released to this student.",
         )

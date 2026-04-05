@@ -6,11 +6,17 @@ export async function getCourses() {
 }
 
 export async function createCourse(course_code, course_name, description) {
-  const { data } = await api.post("/courses", {
+  const response = await api.post("/courses", {
     course_code: course_code,
     course_name: course_name,
     description: description,
   });
 
-  return data;
+  return response.data;
+}
+
+export async function getDashboard(courseId) {
+  const response = await api.get(`/courses/${courseId}/instructor/dashboard`);
+
+  return response.data;
 }

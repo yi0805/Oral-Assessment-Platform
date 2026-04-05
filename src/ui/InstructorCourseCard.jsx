@@ -15,9 +15,7 @@ function InstructorCourseCard({ courses }) {
       key={course.id}
       className="group flex flex-col overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest text-left shadow-sm transition-all duration-300 hover:shadow-xl hover:shadow-primary/5"
       onClick={() => {
-        navigate(`/instructor/${course.id}`, {
-          state: { course },
-        });
+        navigate(`/instructor/${course.id}`);
       }}
     >
       <div className="relative h-48 overflow-hidden">
