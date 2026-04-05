@@ -25,7 +25,6 @@ from app.models.user import User
 from app.schemas.course import (
     BulkEnrollResult,
     CourseBrief,
-    CourseCreate,
     CourseOut,
     EnrollmentCreate,
     EnrollmentOut,
@@ -34,64 +33,67 @@ from app.schemas.course import (
 from app.schemas.pagination import Page
 from app.schemas.user import UserBrief
 
+from datetime import datetime, timezone
+from pydantic import BaseModel, ConfigDict
+
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post(
-    "",
-    response_model=CourseOut,
-    status_code=status.HTTP_201_CREATED,
-    summary="Create a new course",
-    description="Instructor-only. Creates a course and records the creator.",
-)
-def create_course(
-    payload: CourseCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    # Guard against duplicate courses created by accidental double-clicks.
-    # A course is considered a duplicate if the same instructor already owns
-    # a course with the same course_name AND term.
-    existing = (
-        db.query(Course)
-        .filter(
-            Course.course_name == payload.course_name,
-            Course.term == payload.term,
-            Course.created_by == current_user.id,
-        )
-        .first()
-    )
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"You already have a course named '{payload.course_name}' "
-                f"for term '{payload.term}' (id: {existing.id}). "
-                "Use a different name or term, or manage the existing course."
-            ),
-        )
+# @router.post(
+#     "",
+#     response_model=CourseOut,
+#     status_code=status.HTTP_201_CREATED,
+#     summary="Create a new course",
+#     description="Instructor-only. Creates a course and records the creator.",
+# )
+# def create_course(
+#     payload: CourseCreate,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(require_instructor),
+# ):
+#     # Guard against duplicate courses created by accidental double-clicks.
+#     # A course is considered a duplicate if the same instructor already owns
+#     # a course with the same course_name AND term.
+#     existing = (
+#         db.query(Course)
+#         .filter(
+#             Course.course_name == payload.course_name,
+#             Course.term == payload.term,
+#             Course.created_by == current_user.id,
+#         )
+#         .first()
+#     )
+#     if existing:
+#         raise HTTPException(
+#             status_code=status.HTTP_409_CONFLICT,
+#             detail=(
+#                 f"You already have a course named '{payload.course_name}' "
+#                 f"for term '{payload.term}' (id: {existing.id}). "
+#                 "Use a different name or term, or manage the existing course."
+#             ),
+#         )
 
-    course = Course(
-        course_code=payload.course_code,
-        course_name=payload.course_name,
-        term=payload.term,
-        description=payload.description,
-        created_by=current_user.id,
-    )
-    db.add(course)
-    db.flush()
+#     course = Course(
+#         course_code=payload.course_code,
+#         course_name=payload.course_name,
+#         term=payload.term,
+#         description=payload.description,
+#         created_by=current_user.id,
+#     )
+#     db.add(course)
+#     db.flush()
 
-    # Auto-enroll the creator as instructor so they can manage it immediately.
-    enrollment = CourseEnrollment(
-        course_id=course.id,
-        user_id=current_user.id,
-        course_role="instructor",
-    )
-    db.add(enrollment)
-    db.commit()
-    db.refresh(course)
-    return course
+#     # Auto-enroll the creator as instructor so they can manage it immediately.
+#     enrollment = CourseEnrollment(
+#         course_id=course.id,
+#         user_id=current_user.id,
+#         course_role="instructor",
+#     )
+#     db.add(enrollment)
+#     db.commit()
+#     db.refresh(course)
+#     return course
 
 
 # @router.get(
@@ -390,6 +392,32 @@ def import_students_csv(
 
 # Integration
 
+
+class CourseOut(BaseModel):
+    """Response shape for GET /courses and GET /courses/:id."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_code: str | None
+    course_name: str | None
+    term: str | None
+    description: str | None
+    created_by: UUID | None
+    created_at: datetime | None
+    updated_at: datetime | None
+
+class CourseCreate(BaseModel):
+    """POST /courses — create a new course."""
+    course_code: str 
+    course_name: str
+    description: str | None = None
+
+def generate_term() -> str:
+    now = datetime.now()
+    year_short = str(now.year)[-2:]
+    semester = "S1" if now.month <= 6 else "S2"
+    return f"{year_short}{semester}"
+
 @router.get(
     "",
     response_model=list[CourseOut],
@@ -411,3 +439,56 @@ def list_courses(
     return courses
 
 
+@router.post(
+    "",
+    status_code=status.HTTP_201_CREATED,
+    summary="Integration",
+)
+def create_course(
+    payload: CourseCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    term = generate_term()
+
+    existing = (
+        db.query(Course)
+        .filter(
+            Course.course_code == payload.course_code,
+            Course.created_by == current_user.id,
+            Course.term == term,
+        )
+        .first()
+    )
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"You already have a course with code '{payload.course_code}' "
+                f"for term '{term}' (id: {existing.id}). "
+                "Use a different course code."
+            ),
+        )
+
+    course = Course(
+        course_code=payload.course_code,
+        course_name=payload.course_name,
+        term=term,
+        description=payload.description,
+        created_by=current_user.id,
+    )
+
+    db.add(course)
+    db.flush()
+
+    enrollment = CourseEnrollment(
+        course_id=course.id,
+        user_id=current_user.id,
+        course_role="instructor",
+    )
+    db.add(enrollment)
+
+    db.commit()
+
+    return {"message": f"Course '{payload.course_name}' created successfully with term '{term}'."}

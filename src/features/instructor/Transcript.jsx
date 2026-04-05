@@ -42,16 +42,13 @@ function Transcipt() {
   const questionBlocks = buildQuestionBlocks(transcript.transcript) || [];
   const block = questionBlocks[currentIndex];
 
-  console.log(transcript);
-  console.log(questionBlocks);
-  console.log(block);
-
   function handlePrevStudent() {
     if (currentReviewIndex <= 0) return;
 
     const prevReview = reviews[currentReviewIndex - 1];
 
     navigate(`/instructor/transcript/${prevReview.sessionId}`, {
+      replace: true,
       state: {
         reviews,
         currentReviewIndex: currentReviewIndex - 1,
@@ -65,6 +62,7 @@ function Transcipt() {
     const nextReview = reviews[currentReviewIndex + 1];
 
     navigate(`/instructor/transcript/${nextReview.sessionId}`, {
+      replace: true,
       state: {
         reviews,
         currentReviewIndex: currentReviewIndex + 1,
@@ -82,6 +80,13 @@ function Transcipt() {
     });
   }
 
+  console.log(transcript);
+  console.log(questionBlocks);
+  console.log(block);
+  console.log(reviews);
+  console.log(currentReviewIndex);
+  console.log(location.state?.from || "no location state");
+
   return (
     <div className="font-body">
       <main className="min-h-screen pl-64 pt-16">
@@ -94,7 +99,7 @@ function Transcipt() {
               arrow_back
             </span>
             <span className="font-body uppercase tracking-widest">
-              Back to Dashboard
+              Back to Pending Reviews
             </span>
           </button>
           <div className="mb-12">
@@ -163,14 +168,14 @@ function Transcipt() {
 
                 <div className="flex items-baseline gap-1">
                   <span className="font-headline text-5xl font-extrabold tracking-tighter text-on-primary-container">
-                    {transcript.ai_summary.suggested_grade || "Unknown grade"}
+                    {transcript.ai_summary?.suggested_grade || "Unknown grade"}
                   </span>
                   <span className="text-lg font-bold text-on-primary-container opacity-60">
                     /10
                   </span>
                 </div>
                 <p className="mt-4 text-xs font-medium leading-snug text-on-primary-container">
-                  {transcript.ai_summary.summary_text ||
+                  {transcript.ai_summary?.summary_text ||
                     "No AI summary available for this response."}
                 </p>
               </div>
@@ -205,10 +210,12 @@ function Transcipt() {
                   </button>
                 </div>
 
-                <span className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                  Question {currentIndex + 1} of
-                  {questionBlocks.length}
-                </span>
+                {questionBlocks.length > 0 && (
+                  <span className="text-[11px] font-bold uppercase tracking-widest text-outline">
+                    Question {currentIndex + 1} of
+                    {questionBlocks.length}
+                  </span>
+                )}
               </div>
 
               <div className="space-y-6">

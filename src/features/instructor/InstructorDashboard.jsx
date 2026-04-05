@@ -5,27 +5,27 @@ import getAssessmentsByCourse from "../../utils/getAssessmentsByCourse";
 import DashboardTable from "../../ui/DashboardTable";
 
 export default function InstructorDashboard() {
-  const { state } = useLocation();
-  const course = state?.course || [];
+  // const { state } = useLocation();
+  // const course = state?.course || [];
 
-  const assessments = getAssessmentsByCourse(course.id);
+  // const assessments = getAssessmentsByCourse(course.id);
 
-  const assessmentOptions = [
-    ...new Set(assessments.map((item) => item.assessment)),
-  ];
-  const [selectedAssessment, setSelectedAssessment] = useState(
-    assessmentOptions[0] || "",
-  );
+  // const assessmentOptions = [
+  //   ...new Set(assessments.map((item) => item.assessment)),
+  // ];
+  // const [selectedAssessment, setSelectedAssessment] = useState(
+  //   assessmentOptions[0] || "",
+  // );
 
-  const selectedAssessmentResults = assessments.filter(
-    (item) => item.assessment === selectedAssessment,
-  );
+  // const selectedAssessmentResults = assessments.filter(
+  //   (item) => item.assessment === selectedAssessment,
+  // );
 
-  const averageGrade =
-    selectedAssessmentResults.reduce(
-      (sum, item) => sum + parseFloat(item.grade),
-      0,
-    ) / selectedAssessmentResults.length;
+  // const averageGrade =
+  //   selectedAssessmentResults.reduce(
+  //     (sum, item) => sum + parseFloat(item.grade),
+  //     0,
+  //   ) / selectedAssessmentResults.length;
 
   return (
     <div className="min-h-screen">
@@ -44,7 +44,7 @@ export default function InstructorDashboard() {
               </span>
             </NavLink>
             <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
-              {course.id}
+              {/* {course.id} */}
             </span>
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
               Assessment Dashboard
@@ -57,14 +57,14 @@ export default function InstructorDashboard() {
             <div className="relative">
               <select
                 className="w-full cursor-pointer appearance-none rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-10 py-3 font-headline text-sm font-semibold text-on-surface transition-colors hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                value={selectedAssessment}
-                onChange={(e) => setSelectedAssessment(e.target.value)}
+                // value={selectedAssessment}
+                // onChange={(e) => setSelectedAssessment(e.target.value)}
               >
-                {assessmentOptions.map((option) => (
+                {/* {assessmentOptions.map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
-                ))}
+                ))} */}
               </select>
               <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-primary">
                 description
@@ -84,7 +84,7 @@ export default function InstructorDashboard() {
               </p>
               <div className="flex items-baseline gap-2">
                 <span className="font-headline text-5xl font-extrabold text-primary">
-                  {averageGrade}
+                  {/* {averageGrade} */}
                 </span>
                 <span className="text-lg font-bold text-outline">/ 10</span>
               </div>
@@ -108,7 +108,7 @@ export default function InstructorDashboard() {
             </p>
             <div className="flex items-baseline gap-2">
               <span className="font-headline text-5xl font-extrabold text-on-surface">
-                {selectedAssessmentResults.length}
+                {/* {selectedAssessmentResults.length} */}
               </span>
               <span className="text-lg font-bold text-outline">/xxxxx</span>
             </div>
@@ -163,9 +163,9 @@ export default function InstructorDashboard() {
             </div>
           </div>
 
-          <DashboardTable
+          {/* <DashboardTable
             selectedAssessmentResults={selectedAssessmentResults}
-          />
+          /> */}
         </div>
       </main>
     </div>
