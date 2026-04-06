@@ -32,7 +32,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_instructor, require_student
+from app.core.dependencies import get_current_user, require_instructor, require_student, get_current_user
 from app.models.assessment import AssessmentSession
 from app.models.feedback import AISummary, InstructorFeedback
 from app.models.session_runtime import TranscriptMessage
@@ -423,12 +423,12 @@ def accept_ai_and_release(
 def get_student_results(
     session_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_student),
+    current_user: User = Depends(get_current_user),
 ):
     sess = _get_session_or_404(db, session_id)
 
     # Ownership check — students can only view their own sessions
-    if sess.student_id != current_user.id:
+    if current_user.role == "student" and sess.student_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this session.",

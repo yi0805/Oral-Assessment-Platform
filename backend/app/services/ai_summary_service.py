@@ -161,7 +161,7 @@ async def generate_summary(db: Session, session_id: UUID) -> AISummary:
         except (TypeError, ValueError):
             suggested_grade = None
         if suggested_grade is not None:
-        suggested_grade = max(0, min(100, suggested_grade))
+            suggested_grade = max(0, min(100, suggested_grade))
 
         evidence_refs = parsed.get("evidence_refs", [])
     except (RuntimeError, ValueError) as exc:

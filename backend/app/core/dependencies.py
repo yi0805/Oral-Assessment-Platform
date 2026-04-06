@@ -17,10 +17,10 @@ To get a token during development:
 
 Available dependencies
 ----------------------
-get_current_user      – Any authenticated user (student, instructor, or admin).
-require_instructor    – Authenticated user whose role is instructor OR admin.
-require_student       – Authenticated user whose role is student.
-require_enrollment    – Authenticated user actively enrolled in {course_id}.
+get_current_user      - Any authenticated user (student, instructor, or admin).
+require_instructor    - Authenticated user whose role is instructor OR admin.
+require_student       - Authenticated user whose role is student.
+require_enrollment    - Authenticated user actively enrolled in {course_id}.
 """
 from uuid import UUID
 
