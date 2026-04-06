@@ -17,6 +17,7 @@ class MaterialUploadResponse(BaseModel):
     file_size_bytes: int | None
     processing_status: ProcessingStatus
     uploaded_at: datetime
+    material_category: str
 
 
 class MaterialOut(BaseModel):
@@ -40,7 +41,7 @@ class MaterialOut(BaseModel):
     uploaded_at: datetime
     processed_at: datetime | None
     updated_at: datetime
-
+    material_category: str
 
 class MaterialStatusOut(BaseModel):
     """Lightweight polling response for GET /materials/:id/status."""
@@ -64,6 +65,7 @@ class MaterialListItem(BaseModel):
     processing_status: ProcessingStatus
     total_chunks: int | None
     uploaded_at: datetime
+    material_category: str
 
 
 class ChunkOut(BaseModel):

@@ -120,7 +120,7 @@ async def generate_ai_summary(
 ):
     sess = _get_session_or_404(db, session_id)
 
-    if sess.status not in ("submitted", "under_review"):
+    if sess.status not in ("submitted", "under_review", "time_expired"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(

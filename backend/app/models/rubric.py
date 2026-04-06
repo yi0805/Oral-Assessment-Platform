@@ -46,11 +46,17 @@ class Rubric(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    material_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("materials.id", ondelete="SET NULL"),
+        nullable=True
+    )
 
     # --- Relationships ---
     course = relationship("Course", back_populates="rubrics")
     creator = relationship("User", foreign_keys=[created_by])
     assessment_configs = relationship("AssessmentConfig", back_populates="rubric")
+    material = relationship("Material", back_populates="rubric")
 
     def __repr__(self) -> str:
         return f"<Rubric {self.title}>"

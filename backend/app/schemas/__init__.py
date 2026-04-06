@@ -17,7 +17,7 @@ from app.schemas.question import (
 from app.schemas.assessment import (
     AssessmentConfigCreate, AssessmentConfigUpdate, AssessmentConfigOut, AssessmentConfigBrief,
     SessionStartResponse, StudentResponseRequest, StudentResponseResponse,
-    SessionOut, SessionBrief, SessionQuestionItemOut, TranscriptMessageOut, FullTranscriptOut,
+    SessionOut, SessionBrief, SessionBriefWithAIGrades, SessionQuestionItemOut, TranscriptMessageOut, FullTranscriptOut,
 )
 from app.schemas.feedback import (
     AISummaryOut, FeedbackCreate, FeedbackUpdate, FeedbackOut, StudentResultsOut,

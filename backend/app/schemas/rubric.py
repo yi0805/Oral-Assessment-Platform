@@ -33,6 +33,8 @@ class RubricOut(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+    material_id: UUID | None = None
+    mime_type: str | None = None
 
 
 class RubricBrief(BaseModel):

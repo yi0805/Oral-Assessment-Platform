@@ -22,8 +22,8 @@ stays testable end-to-end without live API keys.
 
 Configuration keys (set in .env)
 ---------------------------------
-  GEMINI_API_KEY       – Google AI Studio key (Gemini embedding)
-  OPENROUTER_API_KEY   – OpenRouter key (chat completions)
+  GEMINI_API_KEY       - Google AI Studio key (Gemini embedding)
+  OPENROUTER_API_KEY   - OpenRouter key (chat completions)
 """
 from __future__ import annotations
 
@@ -262,13 +262,25 @@ async def chat_complete(
             # Explicitly decode as UTF-8 to avoid charset-detection failures when
             # response bodies contain Unicode math symbols or non-ASCII characters.
             data = __import__("json").loads(response.content.decode("utf-8"))
-            content: str = data["choices"][0]["message"]["content"]
+            choices = data.get("choices") or []
+            if not choices:
+                raise RuntimeError(f"OpenRouter returned no choices: {data}")
+
+            message = choices[0].get("message") or {}
+            content = message.get("content")
+
+            if content is None or not str(content).strip():
+                raise RuntimeError(f"OpenRouter returned empty content: {data}")
+
+            content = str(content).strip()
+
             logger.info(
                 "[AI Gateway] OpenRouter chat: %d input tokens, reply=%d chars",
                 data.get("usage", {}).get("prompt_tokens", 0),
                 len(content),
             )
             return content
+        
         except httpx.HTTPStatusError as exc:
             logger.error(
                 "[AI Gateway] OpenRouter HTTP %s: %s",
