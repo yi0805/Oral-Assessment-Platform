@@ -8,6 +8,7 @@ export function useReleaseAllResults() {
     mutationFn: ({ assessments }) => updateAllPendingReviews(assessments),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["pendingReviews"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (error) => {
       console.error("Failed to release all results:", error);

@@ -1,12 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
-function DashboardTable({ filteredStudents }) {
-  const navigate = useNavigate();
+import { useGrading } from "../features/instructor/useGrading";
+import { useReleaseResult } from "../features/instructor/useReleaseResult";
 
-  const rowsPerPage = 6;
+function DashboardTable({
+  filteredStudents,
+  isValidGrade,
+  grades,
+  onGradeChange,
+}) {
+  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
 
+  const { updateGrade } = useGrading();
+  const { releaseResult } = useReleaseResult();
+
+  const rowsPerPage = 6;
   const totalPages = Math.ceil(filteredStudents.length / rowsPerPage);
 
   const startIndex = (currentPage - 1) * rowsPerPage;
@@ -23,6 +33,16 @@ function DashboardTable({ filteredStudents }) {
 
   function goToNextPage() {
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
+  }
+
+  function handleGradeChange(sessionId, grade) {
+    if (!isValidGrade(grade)) return;
+
+    updateGrade({ sessionId, grade: Number(grade) });
+  }
+
+  function handleRelease(sessionId, studentId) {
+    releaseResult({ sessionId, studentId });
   }
 
   console.log(filteredStudents);
@@ -57,106 +77,142 @@ function DashboardTable({ filteredStudents }) {
           </thead>
           <tbody className="divide-y divide-surface-container">
             {currentRows.length > 0 ? (
-              currentRows.map((student, index) => (
-                <tr
-                  className="group transition-colors hover:bg-surface-container-high/30"
-                  key={index}
-                >
-                  <td className="px-8 py-5">
-                    {student.status === "published" ? (
-                      <div className="flex items-center justify-center gap-1 text-emerald-600">
-                        <span className="material-symbols-outlined text-sm">
-                          check_circle
-                        </span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider">
-                          Published
-                        </span>
-                      </div>
-                    ) : (
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input
-                          className="peer sr-only"
-                          type="checkbox"
-                          // disabled={!canPublish}
-                          // onChange={() =>
-                          //   handleRelease(review.sessionId, review.studentId)
-                          // }
+              currentRows.map((student) => {
+                const currentGrade = grades[student.session_id] ?? "";
+                const canPublish = isValidGrade(currentGrade);
+                return (
+                  <tr
+                    className="group transition-colors hover:bg-surface-container-high/30"
+                    key={student.session_id}
+                  >
+                    <td className="px-8 py-5">
+                      {student.status === "published" ? (
+                        <label className="relative inline-flex cursor-pointer items-center">
+                          <input
+                            className="peer sr-only"
+                            type="checkbox"
+                            checked={true}
+                            disabled={true}
+                          />
+                          <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                        </label>
+                      ) : (
+                        <label className="relative inline-flex cursor-pointer items-center">
+                          <input
+                            className="peer sr-only"
+                            type="checkbox"
+                            disabled={!canPublish}
+                            onChange={() => {
+                              handleRelease(
+                                student.session_id,
+                                student.student_id,
+                              );
+                            }}
+                          />
+                          <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
+                        </label>
+                      )}
+                    </td>
+
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-3">
+                        <img
+                          alt="Student Avatar"
+                          className="h-10 w-10 rounded-full object-cover"
+                          src={student.student_image || "/WhereRU.png"}
                         />
-                        <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
-                      </label>
-                    )}
-                  </td>
-
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-3">
-                      <img
-                        alt="Student Avatar"
-                        className="h-10 w-10 rounded-full object-cover"
-                        src={student.student_image || "/WhereRU.png"}
-                      />
-                      <div>
-                        <p className="text-sm font-bold text-on-surface">
-                          {student.student_name || "Unknown Student"}
-                        </p>
-                        <p className="text-[10px] text-on-surface-variant">
-                          {student.student_email || "No email available"}
-                        </p>
+                        <div>
+                          <p className="text-sm font-bold text-on-surface">
+                            {student.student_name || "Unknown Student"}
+                          </p>
+                          <p className="text-[10px] text-on-surface-variant">
+                            {student.student_email || "No email available"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  <td className="px-8 py-5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-headline text-sm font-bold text-tertiary">
-                        {student.ai_suggested_score || "-"}/10
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-headline text-sm font-bold text-tertiary">
+                          {student.ai_suggested_score ?? "-"}/10
+                        </span>
+                        <span className="material-symbols-outlined text-[16px] text-outline">
+                          auto_awesome
+                        </span>
+                      </div>
+                    </td>
+                    <td className="max-w-xs px-8 py-5">
+                      <p className="line-clamp-2 text-xs italic text-on-surface-variant">
+                        {student.ai_summary || "No summary available."}
+                      </p>
+                    </td>
+                    <td className="px-8 py-5">
+                      {student.status === "published" ? (
+                        <span className="inline-flex min-w-[3rem] items-center justify-center rounded-lg bg-surface-container px-3 py-1.5 text-sm font-bold text-on-surface shadow-sm">
+                          {student.final_grade ?? "-"}
+                        </span>
+                      ) : (
+                        <input
+                          className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
+                          type="text"
+                          value={currentGrade}
+                          onChange={(e) =>
+                            onGradeChange(student.session_id, e.target.value)
+                          }
+                          onBlur={(e) => {
+                            handleGradeChange(
+                              student.session_id,
+                              e.target.value,
+                            );
+                          }}
+                        />
+                      )}
+                    </td>
+                    <td className="px-8 py-5">
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${student.status === "published" ? "bg-primary-container text-on-primary-container" : "bg-error-container/20 text-error"}`}
+                      >
+                        {student.status === "published"
+                          ? "Published"
+                          : "Review"}
                       </span>
-                      <span className="material-symbols-outlined text-[16px] text-outline">
-                        auto_awesome
-                      </span>
-                    </div>
-                  </td>
-                  <td className="max-w-xs px-8 py-5">
-                    <p className="line-clamp-2 text-xs italic text-on-surface-variant">
-                      {student.ai_summary || "No summary available."}
-                    </p>
-                  </td>
-                  <td className="px-8 py-5">
-                    <input
-                      className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
-                      type="text"
-                      // value={currentGrade}
-                      // onChange={(e) =>
-                      //   onGradeChange(review.sessionId, e.target.value)
-                      // }
-                      // onBlur={(e) => {
-                      //   handleGradeChange(review.sessionId, e.target.value);
-                      // }}
-                    />
-                  </td>
-                  <td className="px-8 py-5">
-                    <span
-                      className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${student.status === "published" ? "bg-primary-container text-on-primary-container" : "bg-error-container/20 text-error"}`}
-                    >
-                      {student.status === "published" ? "Published" : "Review"}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <button
-                      className="whitespace-now-content flex items-center gap-1.5 rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
-                      onClick={() => {
-                        navigate(
-                          `/instructor/transcript/${student.session_id}`,
-                        );
-                      }}
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        visibility
-                      </span>
-                      View Answer
-                    </button>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button
+                        className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
+                        onClick={() => {
+                          const formattedStudents = filteredStudents.map(
+                            (item) => ({
+                              ...item,
+                              sessionId: item.session_id,
+                              studentId: item.student_id,
+                              studentName: item.student_name,
+                            }),
+                          );
+                          navigate(
+                            `/instructor/transcript/${student.session_id}`,
+                            {
+                              state: {
+                                reviews: formattedStudents,
+                                currentReviewIndex: formattedStudents.findIndex(
+                                  (item) =>
+                                    item.sessionId === student.session_id,
+                                ),
+                              },
+                            },
+                          );
+                        }}
+                      >
+                        <span className="material-symbols-outlined text-sm">
+                          visibility
+                        </span>
+                        View Answer
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan="7" className="px-6 py-10 text-center">
@@ -181,7 +237,9 @@ function DashboardTable({ filteredStudents }) {
       {filteredStudents.length > 0 && (
         <div className="flex items-center justify-between border-t border-surface-container bg-surface-container-low px-8 py-4">
           <span className="text-xs font-medium text-on-surface-variant">
-            Showing {currentRows.length} of xxx submissions
+            Showing {startIndex + 1}-
+            {Math.min(endIndex, filteredStudents.length)} of{" "}
+            {filteredStudents.length} submissions
           </span>
           <div className="flex gap-2">
             <button

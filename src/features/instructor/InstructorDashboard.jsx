@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useDashboard } from "./useDashboard";
 import Spinner from "../../ui/Spinner";
 import DashboardTable from "../../ui/DashboardTable";
+import { useReleaseAllResults } from "./useReleaseAllResults";
 
 export default function InstructorDashboard() {
   const { courseId } = useParams();
   const { dashboard = [], isLoading } = useDashboard(courseId);
   const [selectedAssessment, setSelectedAssessment] = useState("");
   const [searchValue, setSearchValue] = useState("");
+  const [grades, setGrades] = useState({});
+  const { releaseAllResults } = useReleaseAllResults();
 
   useEffect(() => {
     if (!dashboard.length) return;
@@ -24,20 +27,58 @@ export default function InstructorDashboard() {
   const assessment = dashboard.find(
     (assessment) => assessment.assessment_config_id === selectedAssessment,
   );
+
   const students = assessment?.students || [];
-  const aiAverageScore = assessment?.ai_average_score ?? "-";
-  const publishedAverageScore = assessment?.published_average_score ?? "-";
-  const submittedCount = assessment?.submitted_count ?? 0;
-  const totalStudents = assessment?.total_students ?? 0;
-  const completionRate = totalStudents
-    ? Math.round((submittedCount / totalStudents) * 100)
-    : 0;
+  const reviewStudents = students.filter(
+    (student) => student.status === "review",
+  );
   const remainingToPublish = students.filter(
     (student) => student.status !== "published",
   ).length;
   const filteredStudents = students.filter((student) =>
     student.student_name.toLowerCase().includes(searchValue.toLowerCase()),
   );
+
+  const aiAverageScore = assessment?.ai_average_score ?? "-";
+  const publishedAverageScore = assessment?.published_average_score ?? "-";
+  const submittedCount = assessment?.submitted_count ?? 0;
+  const totalStudents = assessment?.total_students ?? 0;
+
+  const completionRate = totalStudents
+    ? Math.round((submittedCount / totalStudents) * 100)
+    : 0;
+
+  function handleGradeChange(sessionId, grade) {
+    setGrades((prev) => ({
+      ...prev,
+      [sessionId]: grade,
+    }));
+  }
+
+  function isValidGrade(grade) {
+    if (grade === null || grade === undefined || grade === "") return false;
+
+    const numericGrade = Number(grade);
+    return (
+      !Number.isNaN(numericGrade) && numericGrade >= 0 && numericGrade <= 100
+    );
+  }
+
+  const canPublishAll =
+    reviewStudents.length > 0 &&
+    reviewStudents.every((student) =>
+      isValidGrade(grades[student.session_id] ?? ""),
+    );
+
+  function handlePublishAll() {
+    if (!canPublishAll) return;
+
+    const assessments = reviewStudents.map((student) => ({
+      session_id: student.session_id,
+      student_id: student.student_id,
+    }));
+    releaseAllResults({ assessments });
+  }
 
   return (
     <div className="min-h-screen">
@@ -132,7 +173,7 @@ export default function InstructorDashboard() {
             <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-container">
               <div
                 className="h-full rounded-full bg-primary"
-                style={{ width: `{completionRate}%` }}
+                style={{ width: `${completionRate}%` }}
               ></div>
             </div>
             <p className="mt-2 text-[10px] font-medium text-on-surface-variant">
@@ -175,7 +216,18 @@ export default function InstructorDashboard() {
                 release.
               </p>
             </div>
-            <button className="mt-4 w-full rounded-xl bg-secondary py-3 font-headline text-sm font-bold text-on-secondary shadow-sm transition-all duration-200 hover:bg-secondary-dim active:scale-95">
+
+            <button
+              className={`mt-4 w-full rounded-xl py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
+                canPublishAll
+                  ? "bg-secondary text-on-secondary hover:bg-secondary-dim"
+                  : "cursor-not-allowed bg-surface-container text-outline"
+              }`}
+              disabled={!canPublishAll}
+              onClick={() => {
+                handlePublishAll();
+              }}
+            >
               Publish All Scores
             </button>
           </div>
@@ -199,16 +251,15 @@ export default function InstructorDashboard() {
                   onChange={(e) => setSearchValue(e.target.value)}
                 />
               </div>
-              <button className="flex items-center gap-2 rounded-lg border border-outline-variant/20 px-4 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container">
-                <span className="material-symbols-outlined text-sm">
-                  filter_list
-                </span>
-                Sort
-              </button>
             </div>
           </div>
 
-          <DashboardTable filteredStudents={filteredStudents} />
+          <DashboardTable
+            filteredStudents={filteredStudents}
+            isValidGrade={isValidGrade}
+            grades={grades}
+            onGradeChange={handleGradeChange}
+          />
         </div>
       </main>
     </div>

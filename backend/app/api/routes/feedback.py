@@ -572,7 +572,7 @@ def release_all_results(
 )
 def update_grade(
     session_id: UUID,
-    payload: GradeUpdate,
+    payload: GradeUpdate, 
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):

@@ -80,12 +80,12 @@ function Transcipt() {
     });
   }
 
-  console.log(transcript);
-  console.log(questionBlocks);
-  console.log(block);
+  // console.log(transcript);
+  // console.log(questionBlocks);
+  // console.log(block);
   console.log(reviews);
-  console.log(currentReviewIndex);
-  console.log(location.state?.from || "no location state");
+  // console.log(currentReviewIndex);
+  // console.log(location.state?.from || "no location state");
 
   return (
     <div className="font-body">
