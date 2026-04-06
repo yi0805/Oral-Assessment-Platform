@@ -105,7 +105,10 @@ CREATE TABLE IF NOT EXISTS materials (
     total_chunks      INT,
     uploaded_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     processed_at      TIMESTAMPTZ,
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    material_category VARCHAR     NOT NULL DEFAULT 'course_material' CHECK (
+                        material_category IN ('course_material', 'rubric')
+                        )
 );
 
 CREATE INDEX IF NOT EXISTS idx_materials_course_id         ON materials(course_id);
@@ -160,7 +163,9 @@ CREATE TABLE IF NOT EXISTS rubrics (
     storage_key       VARCHAR,
     created_by        UUID        REFERENCES users(id) ON DELETE SET NULL,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    material_id       UUID        REFERENCES materials(id) ON DELETE SET NULL,
+    UNIQUE (material_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_rubrics_course_id ON rubrics(course_id);

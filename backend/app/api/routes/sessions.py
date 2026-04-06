@@ -49,6 +49,7 @@ from app.schemas.assessment import (
     AssessmentStatsOut,
     FullTranscriptOut,
     SessionBrief,
+    SessionBriefWithAIGrades, 
     SessionOut,
     SessionQuestionItemOut,
     SessionStartResponse,
@@ -252,7 +253,7 @@ async def submit_response(
     now = datetime.now(timezone.utc)
     if session.expires_at and now > session.expires_at:
         # If expired now, auto-submit/finalize
-        session.status = session.status
+        session.status = "time_expired"
         session.ended_at = now
         session.transcript_locked = True
         session.total_messages = (
@@ -282,26 +283,26 @@ async def submit_response(
     if config and config.per_question_time_limit_minutes:
         time_limit_seconds = config.per_question_time_limit_minutes * 60
 
-    last_question_msg = (
-        db.query(TranscriptMessage)
-        .filter(
-            TranscriptMessage.session_id == session_id,
-            TranscriptMessage.sender_role == "assistant",
-        )
-        .order_by(TranscriptMessage.sequence_no.desc())
-        .first()
-    )
-
-    if last_question_msg:
-        elapsed = (now - last_question_msg.created_at.replace(tzinfo=timezone.utc)).total_seconds()
-        if elapsed > time_limit_seconds:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=(
-                    f"Per-question time limit of {config.per_question_time_limit_minutes} minutes exceeded "
-                    f"({int(elapsed)} seconds elapsed). The question has been skipped."
-                ),
+        last_question_msg = (
+            db.query(TranscriptMessage)
+            .filter(
+                TranscriptMessage.session_id == session_id,
+                TranscriptMessage.sender_role == "assistant",
             )
+            .order_by(TranscriptMessage.sequence_no.desc())
+            .first()
+        )
+
+        if last_question_msg:
+            elapsed = (now - last_question_msg.created_at.replace(tzinfo=timezone.utc)).total_seconds()
+            if elapsed > time_limit_seconds:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=(
+                        f"Per-question time limit of {config.per_question_time_limit_minutes} minutes exceeded "
+                        f"({int(elapsed)} seconds elapsed). The question has been skipped."
+                    ),
+                )
 
     # Determine next sequence number
     last_msg = (
@@ -553,7 +554,7 @@ def get_session_transcript(
 
 @router.get(
     "/assessments/{assessment_id}/sessions",
-    response_model=Page[SessionBrief],
+    response_model=Page[SessionBriefWithAIGrades],
     summary="List student sessions for an assessment",
     description=(
         "Instructor-only. Returns brief summaries of all student sessions (paginated). "
@@ -581,9 +582,9 @@ def list_sessions(
     sessions = q.offset((page - 1) * page_size).limit(page_size).all()
 
     # Enrich each session brief with student info, AI suggested grade, and final grade
-    enriched: list[SessionBrief] = []
+    enriched: list[SessionBriefWithAIGrades] = []
     for sess in sessions:
-        brief = SessionBrief.model_validate(sess)
+        brief = SessionBriefWithAIGrades.model_validate(sess)
 
         # Attach student name and email
         student = db.query(User).filter(User.id == sess.student_id).first()
@@ -687,6 +688,24 @@ def get_assessment_stats(
 # Private helpers
 # ---------------------------------------------------------------------------
 
+import re
+
+def _normalize_followup(text: str) -> str:
+    text = " ".join(text.strip().split())
+    text = re.sub(r"^['\"`\-\*\d\.\)\s]+", "", text)
+
+    # only retrive the first question
+    m = re.search(r".*?\?", text)
+    if m:
+        text = m.group(0)
+
+    # only keep 25 words if question is too long
+    words = text.split()
+    if len(words) > 25:
+        text = " ".join(words[:25]).rstrip(",.;:") + "?"
+
+    return text
+
 def _get_main_question_by_order(
     db: Session,
     config: AssessmentConfig | None,
@@ -746,51 +765,85 @@ async def _generate_ai_followup(
     # Build recent conversation context (last 8 turns for breadth).
     # Limit to the current main question block by filtering on main_group_no
     # so follow-ups don't bleed context from previous main questions.
-    recent_msgs = (
+    # recent_msgs = (
+    #     db.query(TranscriptMessage)
+    #     .filter(TranscriptMessage.session_id == session.id)
+    #     .order_by(TranscriptMessage.sequence_no.desc())
+    #     .limit(8)
+    #     .all()
+    # )
+    # recent_msgs.reverse()
+
+    # history_lines = []
+    # for m in recent_msgs:
+    #     prefix = "Assessor" if m.sender_role == "assistant" else "Student"
+    #     history_lines.append(f"{prefix}: {m.content}")
+    # history = "\n".join(history_lines)
+
+    # main_context = (
+    #     f"\n\nThe main question being assessed is:\n\"{main_question_text}\"\n"
+    #     if main_question_text else ""
+    # )
+
+    # Retrieve student's latest answer
+    latest_student_msg = (
         db.query(TranscriptMessage)
-        .filter(TranscriptMessage.session_id == session.id)
+        .filter(
+            TranscriptMessage.session_id == session.id,
+            TranscriptMessage.sender_role == "student",
+            TranscriptMessage.message_type == "student_answer",
+        )
         .order_by(TranscriptMessage.sequence_no.desc())
-        .limit(8)
-        .all()
-    )
-    recent_msgs.reverse()
-
-    history_lines = []
-    for m in recent_msgs:
-        prefix = "Assessor" if m.sender_role == "assistant" else "Student"
-        history_lines.append(f"{prefix}: {m.content}")
-    history = "\n".join(history_lines)
-
-    main_context = (
-        f"\n\nThe main question being assessed is:\n\"{main_question_text}\"\n"
-        if main_question_text else ""
+        .first()
     )
 
-    system_prompt = (
-        "You are an academic assessor conducting an oral assessment. "
-        "Your follow-up questions must be DIRECTLY related to the MAIN QUESTION "
-        "that was asked and the student's most recent answer. "
-        "Do not drift to unrelated topics. "
-        "Generate a single, concise probing follow-up that tests deeper understanding "
-        "of the same concept. Output ONLY the question text — no preamble, no quotes."
-    )
-    user_prompt = (
-        f"{main_context}"
-        f"Conversation so far:\n{history}\n\n"
-        f"This is follow-up #{current_followup + 1}. "
-        "Generate a follow-up question that is directly related to the main question above "
-        "and probes what the student just said more deeply:"
-    )
+    student_answer = latest_student_msg.content if latest_student_msg else ""
+
+    FOLLOWUP_SYSTEM_PROMPT = """\
+        You generate exactly one oral-assessment follow-up question.
+
+        Rules:
+        - Output exactly one single question.
+        - No explanation.
+        - No reasoning.
+        - No preamble.
+        - No quotes.
+        - No JSON.
+        - Maximum 25 words.
+        - Must reference a specific idea from the student's most recent answer.
+        """
+    
+    # user_prompt = (
+    #     f"{main_question_text}"
+    #     f"Conversation so far:\n{history}\n\n"
+    #     f"This is follow-up #{current_followup + 1}. "
+    #     "It must reference a specific part of the student's answer and must not be generic."
+    #     "Generate a follow-up question that is directly related to the main question above "
+    #     "and probes what the student just said more deeply:"
+    # )
+
+    user_prompt = f"""
+        Main question:
+        {main_question_text}
+
+        Student's latest answer:
+        {student_answer}
+
+        Write exactly one concise follow-up question that probes one specific point.
+        """
 
     try:
         result = await chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
-            system_prompt=system_prompt,
-            temperature=0.6,  # Slightly lower temperature for more focused, on-topic questions
-            max_tokens=150,
+            system_prompt=FOLLOWUP_SYSTEM_PROMPT,
+            temperature=0.2,  # Slightly lower temperature for more focused, on-topic questions
+            max_tokens=1800,
         )
+
+        followup_text = _normalize_followup(result)
         # Clean any accidental quotation wrapping
-        return result.strip().strip('"').strip("'")
+        return followup_text.strip().strip('"').strip("'")
+    
     except RuntimeError as exc:
         logger.warning("Follow-up AI generation failed: %s — using fallback", exc)
         fallback_probes = [

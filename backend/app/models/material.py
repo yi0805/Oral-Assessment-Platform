@@ -76,11 +76,17 @@ class Material(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+    material_category: Mapped[str] = mapped_column(
+        String, nullable=False, 
+        server_default="course_material",
+        comment="course_material | rubric"
+    )
 
     # --- Relationships ---
     course = relationship("Course", back_populates="materials")
     uploader = relationship("User", foreign_keys=[uploaded_by])
     chunks = relationship("MaterialChunk", back_populates="material", cascade="all, delete-orphan")
+    rubric = relationship("Rubric", back_populates="material", uselist=False)
 
     def __repr__(self) -> str:
         return f"<Material {self.title} [{self.processing_status}]>"

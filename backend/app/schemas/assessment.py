@@ -177,9 +177,10 @@ class SessionBrief(BaseModel):
     # Enriched fields for the instructor grading dashboard (populated by the list endpoint)
     student_name: str | None = None
     student_email: str | None = None
-    ai_suggested_grade: int | None = None   # advisory grade from AISummary
     final_grade: int | None = None          # instructor-assigned final grade (if already graded)
 
+class SessionBriefWithAIGrades(SessionBrief):
+    ai_suggested_grade: int | None = None
 
 class AssessmentStatsOut(BaseModel):
     """
