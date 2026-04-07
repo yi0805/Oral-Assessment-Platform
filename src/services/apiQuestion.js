@@ -20,15 +20,22 @@ export async function updateNow(
   return response.data;
 }
 
-export async function deleteQuestion(questionId) {
-  const response = await api.delete(`/questions/${questionId}`);
-
-  return response.data;
-}
-
 export async function updateQuestion(questionId, questionText) {
   const response = await api.put(`/questions/${questionId}`, {
     question_text: questionText,
   });
+  return response.data;
+}
+
+export async function publishAssessment(courseId, assessmentConfigId) {
+  const response = await api.post(
+    `/courses/${courseId}/assessments/${assessmentConfigId}/release`,
+  );
+  return response.data;
+}
+
+export async function deleteQuestion(questionId) {
+  const response = await api.delete(`/questions/${questionId}`);
+
   return response.data;
 }

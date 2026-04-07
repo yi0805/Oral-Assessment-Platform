@@ -18,9 +18,9 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
-from app.models.assessment import AssessmentConfig
-from app.models.course import Course
-from app.models.question import QuestionPool
+from app.models.assessment import AssessmentConfig,AssessmentSession
+from app.models.course import Course,CourseEnrollment
+from app.models.question import QuestionPool, Question
 from app.models.rubric import Rubric
 from app.models.user import User
 from app.schemas.pagination import Page
@@ -30,6 +30,10 @@ from app.schemas.assessment import (
     AssessmentConfigOut,
     AssessmentConfigUpdate,
 )
+
+
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy.exc import SQLAlchemyError
 
 router = APIRouter()
 
@@ -235,5 +239,99 @@ def publish_assessment(
     return config
 
 
-# GET /assessments/{assessment_id}/sessions is handled by sessions.py
-# to keep all session-related routes co-located.
+
+
+
+# //integration
+
+
+class ReleaseResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    assessment_config: AssessmentConfigOut
+    sessions_created: int
+
+@router.post(
+    "/courses/{course_id}/assessments/{assessment_config_id}/release",
+    response_model=ReleaseResponse,
+    summary="Integration",
+)
+def release_assessment(
+    course_id: UUID,
+    assessment_config_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    config = (
+        db.query(AssessmentConfig)
+        .filter(
+            AssessmentConfig.id == assessment_config_id,
+            AssessmentConfig.course_id == course_id,
+        )
+        .first()
+    )
+    if not config:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    if config.status != "draft":
+        raise HTTPException(status_code=409, detail="Assessment is already published or closed.")
+
+    if config.max_main_questions is None:
+        raise HTTPException(status_code=422, detail="max_main_questions must be set before publishing.")
+
+    active_q_count = (
+        db.query(Question)
+        .filter(
+            Question.question_pool_id == config.question_pool_id,
+            Question.question_kind == "main",
+            Question.is_active.is_(True),
+        )
+        .count()
+    )
+    if active_q_count == 0:
+        raise HTTPException(status_code=422, detail="No active main questions in the pool.")
+
+    now = datetime.now(timezone.utc)
+    config.status = "published"
+    config.published_at = now
+    config.published_by = current_user.id
+
+    student_enrollments = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.course_role == "student",
+            CourseEnrollment.is_active.is_(True),
+        )
+        .all()
+    )
+
+    sessions_created = 0
+    for enrollment in student_enrollments:
+        existing_session = (
+            db.query(AssessmentSession)
+            .filter(
+                AssessmentSession.assessment_config_id == assessment_config_id,
+                AssessmentSession.student_id == enrollment.user_id,
+            )
+            .first()
+        )
+        if not existing_session:
+            db.add(AssessmentSession(
+                assessment_config_id=config.id,
+                course_id=course_id,
+                student_id=enrollment.user_id,
+                status="not_started",
+            ))
+            sessions_created += 1
+
+    try:
+        db.commit()
+        db.refresh(config)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to publish assessment.") from exc
+
+    return ReleaseResponse(
+        assessment_config=AssessmentConfigOut.model_validate(config),
+        sessions_created=sessions_created,
+    )

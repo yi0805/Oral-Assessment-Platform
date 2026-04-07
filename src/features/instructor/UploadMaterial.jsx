@@ -7,6 +7,7 @@ import { useUploadRubric } from "./useLoadRubric";
 import { useUpdateNow } from "./useUpdateNow";
 import { useDeleteQuestion } from "./useDeleteQuestion";
 import { useUpdateQuestion } from "./useUpdateQuestion";
+import { usePublishAssessment } from "./usePublishAssessment";
 
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);
@@ -34,6 +35,7 @@ function UpdateMaterial() {
   const { updateNow } = useUpdateNow();
   const { deleteQuestion } = useDeleteQuestion();
   const { updateQuestion } = useUpdateQuestion();
+  const { publishAssessment } = usePublishAssessment();
 
   useEffect(() => {
     if (courses.length > 0 && !courseId) {
@@ -126,6 +128,16 @@ function UpdateMaterial() {
     setLoading(false);
   }
 
+  async function handlePublish() {
+    setLoading(true);
+    setStatusMessage("Publishing assessment...");
+    const response = await publishAssessment({ courseId, assessmentConfigId });
+    setSessionsCreated(response.sessions_created);
+    setPhase("published");
+    setStatusMessage("");
+    setLoading(false);
+  }
+
   console.log(questions);
   console.log(assessmentConfigId);
   return (
@@ -165,8 +177,8 @@ function UpdateMaterial() {
                 Assessment Published
               </h2>
               <p className="text-on-surface-variant">
-                {/* {sessionsCreated} student{sessionsCreated !== 1 ? "s" : ""} can
-                now take this assessment. */}
+                {sessionsCreated} student{sessionsCreated !== 1 ? "s" : ""} can
+                now take this assessment.
               </p>
             </div>
           )}
@@ -463,10 +475,10 @@ function UpdateMaterial() {
                 </h2>
                 <button
                   className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
-                  // onClick={handlePublish}
+                  onClick={handlePublish}
                   disabled={loading || questions.length === 0}
                 >
-                  {loading ? "Publishing..." : "Publish Assessment"}
+                  {loading ? "Working..." : "Publish Assessment"}
                 </button>
               </div>
               <p className="text-sm text-on-surface-variant">
