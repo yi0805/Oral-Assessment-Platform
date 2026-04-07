@@ -1,10 +1,105 @@
-import getInstructorByName from "../../utils/getInstructorByname";
-import getCoursesByInstructor from "../../utils/getCoursesByInstructor";
+import { useEffect, useState } from "react";
+
+import { useCourses } from "../../hooks/useCourses";
+import Spinner from "../../ui/Spinner";
+import { useUploadMaterial } from "./useUploadMaterial";
+import { useUploadRubric } from "./useLoadRubric";
+import { useUpdateNow } from "./useUpdateNow";
 
 function UpdateMaterial() {
-  // const Username = localStorage.getItem("userName");
-  // const instructor = getInstructorByName(Username);
-  // const courses = getCoursesByInstructor(instructor);
+  const [materialFile, setMaterialFile] = useState(null);
+  const [rubricFile, setRubricFile] = useState(null);
+  const [courseId, setCourseId] = useState("");
+  const [assessmentName, setAssessmentName] = useState("");
+  const [numQuestions, setNumQuestions] = useState("");
+  const [assessmentTime, setAssessmentTime] = useState("");
+  const [touched, setTouched] = useState({
+    assessmentName: false,
+    numQuestions: false,
+    assessmentTime: false,
+  });
+  const [phase, setPhase] = useState("setup");
+  const [statusMessage, setStatusMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const { courses, isLoading } = useCourses();
+  const { uploadMaterial } = useUploadMaterial();
+  const { uploadRubric } = useUploadRubric();
+  const { updateNow } = useUpdateNow();
+
+  useEffect(() => {
+    if (courses.length > 0 && !courseId) {
+      setCourseId(courses[0].id);
+    }
+  }, [courses, courseId]);
+
+  if (isLoading) return <Spinner />;
+
+  const num = Number(numQuestions);
+  const time = Number(assessmentTime);
+
+  const assessmentNameError =
+    assessmentName.trim() === "" ? "Assessment name is required." : "";
+  const numQuestionsError =
+    numQuestions === ""
+      ? "Number of questions is required."
+      : !Number.isInteger(num)
+        ? "Must be a whole number."
+        : num < 1 || num > 30
+          ? "Must be between 1 and 30."
+          : "";
+  const assessmentTimeError =
+    assessmentTime === ""
+      ? "Assessment time is required."
+      : !Number.isFinite(time)
+        ? "Must be a number."
+        : time < 1 || time > 60
+          ? "Must be between 1 and 60."
+          : "";
+  const isValid =
+    !numQuestionsError && !assessmentTimeError && !assessmentNameError;
+
+  // console.log(courseId);
+
+  async function handleSubmit() {
+    setLoading(true);
+    setStatusMessage("Uploading material...");
+
+    const MaterialId = await uploadMaterial({
+      courseId,
+      file: materialFile,
+      assessmentName,
+    });
+
+    setStatusMessage("Uploading rubric...");
+    const RubricId = await uploadRubric({
+      courseId,
+      file: rubricFile,
+      assessmentName,
+    });
+
+    console.log(MaterialId);
+    console.log(RubricId);
+
+    setStatusMessage("Generating questions with AI...");
+    const updateResponse = await updateNow({
+      courseId,
+      materialId: MaterialId,
+      rubricId: RubricId,
+      assessmentName,
+      numQuestions,
+      totalTime: time,
+    });
+
+    // setQuestions(updateRes.data.questions);
+    // setPoolId(updateRes.data.pool_id);
+    // setAssessmentId(updateRes.data.assessment.id);
+
+    // setPhase("review");
+    setStatusMessage("");
+    setLoading(false);
+
+    console.log(updateResponse);
+  }
 
   return (
     <div className="min-h-screen">
@@ -16,192 +111,433 @@ function UpdateMaterial() {
             </h1>
           </div>
 
-          <div className="grid grid-cols-12 items-start gap-6">
-            <div className="col-span-12 space-y-6 lg:col-span-5">
-              <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-                <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
-                  <span
-                    className="material-symbols-outlined text-primary"
-                    data-icon="description"
-                    style={{ verticalAlign: "middle" }}
-                  >
-                    description
-                  </span>
-                  Assessment Parameters
-                </h2>
+          {statusMessage && (
+            <div className="mb-6 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary">
+              <span className="material-symbols-outlined animate-spin text-lg">
+                progress_activity
+              </span>
+              {statusMessage}
+              <button
+                className="ml-4 font-bold underline"
+                onClick={() => {
+                  setStatusMessage("");
+                  setLoading(false);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
 
-                <form className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                      Select Course
-                    </label>
-                    <div className="group relative">
-                      <select className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20">
-                        {/* {courses.map((course) => (
-                          <option key={course.id}>{course.id}</option>
-                        ))} */}
-                      </select>
+          {phase === "published" && (
+            <div className="mb-8 rounded-xl border border-primary/20 bg-primary/5 p-8 text-center">
+              <span className="material-symbols-outlined mb-4 text-5xl text-primary">
+                check_circle
+              </span>
+              <h2 className="mb-2 text-2xl font-bold text-primary">
+                Assessment Published
+              </h2>
+              <p className="text-on-surface-variant">
+                {/* {sessionsCreated} student{sessionsCreated !== 1 ? "s" : ""} can
+                now take this assessment. */}
+              </p>
+            </div>
+          )}
+
+          {phase === "setup" && (
+            <div className="grid grid-cols-12 items-start gap-6">
+              <div className="col-span-12 space-y-6 lg:col-span-5">
+                <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+                  <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
+                    <span
+                      className="material-symbols-outlined text-primary"
+                      data-icon="description"
+                      style={{ verticalAlign: "middle" }}
+                    >
+                      description
+                    </span>
+                    Assessment Parameters
+                  </h2>
+
+                  <form className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                        Select Course
+                      </label>
+                      <div className="group relative">
+                        <select
+                          className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
+                          value={courseId}
+                          onChange={(e) => setCourseId(e.target.value)}
+                        >
+                          {courses.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.course_code || "Unknown Course"}
+                            </option>
+                          ))}
+                        </select>
+                        <span
+                          className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                          data-icon="expand_more"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          expand_more
+                        </span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                        Assessment Name
+                      </label>
+                      <input
+                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                        placeholder="e.g. A1 Intro to Python"
+                        type="text"
+                        value={assessmentName}
+                        onChange={(e) => setAssessmentName(e.target.value)}
+                        onBlur={() =>
+                          setTouched((current) => ({
+                            ...current,
+                            assessmentName: true,
+                          }))
+                        }
+                      />
+                      {touched.assessmentName && assessmentNameError && (
+                        <p className="ml-1 text-xs font-medium text-error">
+                          {assessmentNameError}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                        Number of Questions
+                      </label>
+                      <input
+                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                        min={1}
+                        max={30}
+                        step={1}
+                        placeholder="e.g. 15"
+                        type="number"
+                        value={numQuestions}
+                        onChange={(e) => setNumQuestions(e.target.value)}
+                        onBlur={() =>
+                          setTouched((current) => ({
+                            ...current,
+                            numQuestions: true,
+                          }))
+                        }
+                      />
+                      {touched.numQuestions && numQuestionsError && (
+                        <p className="ml-1 text-xs font-medium text-error">
+                          {numQuestionsError}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                        Assessment Time (minutes)
+                      </label>
+                      <input
+                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                        min={1}
+                        max={60}
+                        step={0.5}
+                        placeholder="e.g. 30"
+                        type="number"
+                        value={assessmentTime}
+                        onChange={(e) => setAssessmentTime(e.target.value)}
+                        onBlur={() =>
+                          setTouched((current) => ({
+                            ...current,
+                            assessmentTime: true,
+                          }))
+                        }
+                      />
+                      {touched.assessmentTime && assessmentTimeError && (
+                        <p className="ml-1 text-xs font-medium text-error">
+                          {assessmentTimeError}
+                        </p>
+                      )}
+                    </div>
+                  </form>
+                </section>
+              </div>
+
+              <div className="col-span-12 space-y-6 lg:col-span-7">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
                       <span
-                        className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
-                        data-icon="expand_more"
+                        className="material-symbols-outlined text-2xl text-primary"
+                        data-icon="upload_file"
                         style={{ verticalAlign: "middle" }}
                       >
-                        expand_more
+                        upload_file
                       </span>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                      Assessment Name
-                    </label>
-                    <input
-                      className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                      placeholder="e.g. Intro to Python"
-                      type="text"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                      Number of Questions
-                    </label>
-                    <input
-                      className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                      max="100"
-                      min="1"
-                      placeholder="e.g., 20"
-                      type="number"
-                    />
-                  </div>
-                </form>
-              </section>
-            </div>
+                    <h3 className="mb-1 text-base font-bold">Assessment PDF</h3>
+                    <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
+                      Upload the source material or a previous assessment to
+                      refine your questions.
+                    </p>
 
-            <div className="col-span-12 space-y-6 lg:col-span-7">
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
-                    <span
-                      className="material-symbols-outlined text-2xl text-primary"
-                      data-icon="upload_file"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      upload_file
-                    </span>
-                  </div>
-                  <h3 className="mb-1 text-base font-bold">Assessment PDF</h3>
-                  <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
-                    Upload the source material or a previous assessment to
-                    refine your questions.
-                  </p>
+                    <div className="w-full space-y-3">
+                      {materialFile && (
+                        <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-error/10 text-error">
+                            <span
+                              className="material-symbols-outlined text-xl"
+                              data-icon="picture_as_pdf"
+                              style={{ verticalAlign: "middle" }}
+                            >
+                              picture_as_pdf
+                            </span>
+                          </div>
 
-                  <div className="w-full space-y-3">
-                    <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-error/10 text-error">
-                        <span
-                          className="material-symbols-outlined text-xl"
-                          data-icon="picture_as_pdf"
-                          style={{ verticalAlign: "middle" }}
-                        >
-                          picture_as_pdf
-                        </span>
-                      </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {materialFile.name}
+                            </p>
+                            <p className="text-[9px] text-outline">
+                              {(materialFile.size / 1024 / 1024).toFixed(1)} MB
+                            </p>
+                          </div>
 
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold">
-                          Curriculum_2024_Final.pdf
-                        </p>
-                        <p className="text-[9px] text-outline">
-                          2.4 MB • Ready
-                        </p>
-                      </div>
-                      <button className="text-on-surface-variant transition-colors hover:text-error">
-                        <span
-                          className="material-symbols-outlined text-lg"
-                          data-icon="close"
-                          style={{ verticalAlign: "middle" }}
-                        >
-                          close
-                        </span>
-                      </button>
+                          <button
+                            className="text-on-surface-variant transition-colors hover:text-error"
+                            onClick={() => setMaterialFile(null)}
+                          >
+                            <span
+                              className="material-symbols-outlined text-lg"
+                              data-icon="close"
+                              style={{ verticalAlign: "middle" }}
+                            >
+                              close
+                            </span>
+                          </button>
+                        </div>
+                      )}
+
+                      <label className="block cursor-pointer">
+                        <input
+                          className="hidden"
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) =>
+                            setMaterialFile(e.target.files[0] || null)
+                          }
+                        />
+                        <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
+                          Browse Files
+                        </div>
+                      </label>
                     </div>
+                  </section>
 
-                    <label className="block cursor-pointer">
-                      <input className="hidden" type="file" accept=".pdf" />
-                      <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
-                        Browse Files
-                      </div>
-                    </label>
-                  </div>
-                </section>
-
-                <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
-                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
-                    <span
-                      className="material-symbols-outlined text-2xl text-secondary"
-                      data-icon="rule"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      rule
-                    </span>
-                  </div>
-                  <h3 className="mb-1 text-base font-bold">
-                    Assessment Rubrics
-                  </h3>
-                  <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
-                    Upload evaluation criteria for precise grading.
-                  </p>
-                  <div className="w-full space-y-3">
-                    <label className="block cursor-pointer">
-                      <input className="hidden" type="file" accept=".pdf" />
-                      <div className="group flex w-full flex-col items-center gap-1 rounded-xl border-2 border-dashed border-outline-variant/10 bg-surface-container-lowest/50 py-6 transition-all hover:border-primary/20 hover:bg-white">
-                        <span
-                          className="material-symbols-outlined text-xl text-outline transition-colors group-hover:text-primary"
-                          data-icon="add_circle"
-                          style={{ verticalAlign: "middle" }}
-                        >
-                          add_circle
-                        </span>
-                        <span className="text-[10px] font-medium text-on-surface-variant transition-colors group-hover:text-primary">
-                          Drop rubrics here
-                        </span>
-                      </div>
-                    </label>
-                    <label className="block cursor-pointer">
-                      <input className="hidden" type="file" accept=".pdf" />
-                      <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
-                        Browse Files
-                      </div>
-                    </label>
-                  </div>
-                </section>
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
-                <div className="flex items-center gap-4">
-                  <div className="rounded-lg bg-primary/10 p-3 text-primary">
-                    <span
-                      className="material-symbols-outlined"
-                      data-icon="auto_awesome"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      auto_awesome
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-primary">
-                      AI Question Generation
+                  <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
+                      <span
+                        className="material-symbols-outlined text-2xl text-secondary"
+                        data-icon="rule"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        rule
+                      </span>
+                    </div>
+                    <h3 className="mb-1 text-base font-bold">
+                      Assessment Rubrics
+                    </h3>
+                    <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
+                      Upload evaluation criteria for precise grading.
                     </p>
-                    <p className="text-[11px] text-on-surface-variant">
-                      Update questions based on material
-                    </p>
-                  </div>
+
+                    <div className="w-full space-y-3">
+                      {rubricFile && (
+                        <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-secondary/10 text-secondary">
+                            <span className="material-symbols-outlined text-xl">
+                              picture_as_pdf
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold">
+                              {rubricFile.name}
+                            </p>
+                            <p className="text-[9px] text-outline">
+                              {(rubricFile.size / 1024 / 1024).toFixed(1)} MB
+                            </p>
+                          </div>
+                          <button
+                            className="text-on-surface-variant transition-colors hover:text-error"
+                            onClick={() => setRubricFile(null)}
+                          >
+                            <span className="material-symbols-outlined text-lg">
+                              close
+                            </span>
+                          </button>
+                        </div>
+                      )}
+                      <label className="block cursor-pointer">
+                        <input
+                          className="hidden"
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) =>
+                            setRubricFile(e.target.files[0] || null)
+                          }
+                        />
+                        <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
+                          Browse Files
+                        </div>
+                      </label>
+                    </div>
+                  </section>
                 </div>
-                <button className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98]">
-                  Update Now
+
+                <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="rounded-lg bg-primary/10 p-3 text-primary">
+                      <span
+                        className="material-symbols-outlined"
+                        data-icon="auto_awesome"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        auto_awesome
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-primary">
+                        AI Question Generation
+                      </p>
+                      <p className="text-[11px] text-on-surface-variant">
+                        Update questions based on material
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={!isValid || loading}
+                    onClick={handleSubmit}
+                  >
+                    {loading ? "Processing..." : "Update Now"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {/* 
+          {phase === "review" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-on-surface">
+                  Review Generated Questions ({questions.length})
+                </h2>
+                <button
+                  className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                  onClick={handlePublish}
+                  disabled={loading || questions.length === 0}
+                >
+                  {loading ? "Publishing..." : "Publish Assessment"}
                 </button>
               </div>
+              <p className="text-sm text-on-surface-variant">
+                Review the AI-generated questions below. You can edit or delete
+                any question before publishing.
+              </p>
+
+              <div className="space-y-4">
+                {questions.map((q, idx) => (
+                  <div
+                    key={q.id}
+                    className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm"
+                  >
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
+                        Question {idx + 1}
+                        {q.difficulty && (
+                          <span className="ml-2 rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                            {q.difficulty}
+                          </span>
+                        )}
+                      </span>
+                      <div className="flex gap-2">
+                        {editingId !== q.id && (
+                          <>
+                            <button
+                              className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
+                              onClick={() => {
+                                setEditingId(q.id);
+                                setEditText(q.question_text);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="rounded-lg px-3 py-1 text-xs font-bold text-error transition-all hover:bg-error/10"
+                              onClick={() => handleDelete(q.id)}
+                            >
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {editingId === q.id ? (
+                      <div className="space-y-3">
+                        <textarea
+                          className="min-h-[80px] w-full resize-none rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            className="rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-on-primary"
+                            onClick={() => handleEditSave(q.id)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            className="rounded-lg px-4 py-1.5 text-xs font-bold text-on-surface-variant hover:bg-surface-container-high"
+                            onClick={() => setEditingId(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm leading-relaxed text-on-surface">
+                        {q.question_text}
+                      </p>
+                    )}
+
+                    {q.learning_objective && (
+                      <p className="mt-2 text-[11px] text-on-surface-variant">
+                        Objective: {q.learning_objective}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {questions.length === 0 && (
+                <div className="rounded-xl border-2 border-dashed border-outline-variant/20 p-12 text-center">
+                  <p className="text-sm text-on-surface-variant">
+                    All questions have been deleted. Go back to generate new
+                    ones.
+                  </p>
+                  <button
+                    className="mt-4 rounded-xl bg-primary px-6 py-2 text-sm font-bold text-on-primary"
+                    onClick={() => setPhase("setup")}
+                  >
+                    Back to Setup
+                  </button>
+                </div>
+              )}
             </div>
-          </div>
+          )} */}
 
           <div className="mt-6 grid grid-cols-12 gap-6">
             <div className="col-span-12">
@@ -216,13 +552,13 @@ function UpdateMaterial() {
                     Curator's Tip
                   </h4>
                   <p className="text-xs leading-relaxed text-on-surface-variant">
-                    Ensure clear headings and objectives for 30% faster AI
-                    results with OCR-processed documents.
+                    Ensure clear headings and objectives to improve AI results
+                    from OCR-processed documents.
                   </p>
                 </div>
-                <button className="shrink-0 rounded-lg px-4 py-2 text-xs font-bold text-primary transition-all hover:bg-white">
+                {/* <button className="shrink-0 rounded-lg px-4 py-2 text-xs font-bold text-primary transition-all hover:bg-white">
                   View Guide
-                </button>
+                </button> */}
               </div>
             </div>
           </div>

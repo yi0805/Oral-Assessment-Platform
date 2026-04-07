@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 from app.models.assessment import AssessmentConfig
-from app.models.course import Course
+from app.models.course import Course, CourseEnrollment
 from app.models.question import Question, QuestionPool
 from app.models.user import User
 from app.models.rubric import Rubric
@@ -40,6 +40,13 @@ from app.schemas.question import (
     QuestionUpdate,
     PublishAsAssessmentRequest
 )
+
+
+
+
+from pydantic import BaseModel, ConfigDict
+from app.services.question_generator import generate_pool
+from sqlalchemy.exc import SQLAlchemyError
 
 router = APIRouter()
 
@@ -438,3 +445,205 @@ def delete_question(
     db.delete(question)
     db.commit()
     return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# integration
+
+class UpdateNowRequest(BaseModel):
+    material_ids: list[UUID]
+    rubric_id: UUID
+    assessment_title: str
+    num_main_questions: int = 3
+    total_time_minutes: int = 15
+    max_followups_per_main: int = 3
+    followup_enabled: bool = True
+
+
+class UpdateNowResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    assessment: AssessmentConfigOut
+    pool_id: UUID
+    questions: list[QuestionOut]
+
+
+@router.post(
+    "/courses/{course_id}/update-now",
+    response_model=UpdateNowResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Integration",
+
+)
+async def update_now(
+    course_id: UUID,
+    payload: UpdateNowRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+            CourseEnrollment.course_role.in_(["instructor"]),
+            CourseEnrollment.is_active.is_(True),
+        )
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor in this course.")
+
+    rubric = db.query(Rubric).filter(Rubric.id == payload.rubric_id).first()
+    if not rubric:
+        raise HTTPException(status_code=404, detail="Rubric not found")
+
+    published = (
+        db.query(AssessmentConfig)
+        .filter(
+            AssessmentConfig.course_id == course_id,
+            AssessmentConfig.title == payload.assessment_title,
+            AssessmentConfig.status == "published",
+        )
+        .first()
+    )
+    if published:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"A published assessment titled '{payload.assessment_title}' already exists "
+                f"(id: {published.id}). Delete or close it first."
+            ),
+        )
+
+
+    pool = QuestionPool(
+        course_id=course_id,
+        title=payload.assessment_title,
+        generation_method="ai_generated",
+        created_by=current_user.id,
+        )
+    db.add(pool)
+    db.flush()
+    
+    try:
+        pool = await generate_pool(
+            db=db,
+            pool_id=pool.id,
+            material_ids=payload.material_ids,
+            rubric_id=payload.rubric_id,
+            num_main_questions=payload.num_main_questions,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=f"AI generation service error: {exc}") from exc
+
+    now = datetime.now(timezone.utc)
+    pool.status = "approved"
+    pool.approved_at = now
+    pool.approved_by = current_user.id
+    db.flush()
+
+    config = AssessmentConfig(
+        course_id=course_id,
+        question_pool_id=pool.id,
+        title=payload.assessment_title,
+        assessment_mode="generic",
+        rubric_id=payload.rubric_id,
+        total_time_minutes=payload.total_time_minutes,
+        max_main_questions=payload.num_main_questions,
+        max_followups_per_main=payload.max_followups_per_main,
+        followup_enabled=payload.followup_enabled,
+    )
+    db.add(config)
+
+    try:
+        db.commit()
+        db.refresh(config)
+        db.refresh(pool)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to save assessment.") from exc
+
+    questions = (
+        db.query(Question)
+        .filter(Question.question_pool_id == pool.id, Question.is_active.is_(True))
+        .order_by(Question.display_order.asc())
+        .all()
+    )
+
+    return UpdateNowResponse(
+        assessment=AssessmentConfigOut.model_validate(config),
+        pool_id=pool.id,
+        questions=[QuestionOut.model_validate(q) for q in questions],
+    )
+
+
