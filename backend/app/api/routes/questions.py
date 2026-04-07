@@ -382,69 +382,103 @@ def add_question(
     return question
 
 
-@router.put(
-    "/questions/{question_id}",
-    response_model=QuestionOut,
-    summary="Edit a question",
-    description=(
-        "Instructor-only. Updates the text or metadata of an existing question. "
-        "Allowed on pools in 'draft', 'approved', or 'published' status — "
-        "blocked only when the pool is 'archived'."
-    ),
-)
-def update_question(
-    question_id: UUID,
-    payload: QuestionUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    question = db.query(Question).filter(Question.id == question_id).first()
-    if not question:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+# @router.put(
+#     "/questions/{question_id}",
+#     response_model=QuestionOut,
+#     summary="Edit a question",
+#     description=(
+#         "Instructor-only. Updates the text or metadata of an existing question. "
+#         "Allowed on pools in 'draft', 'approved', or 'published' status — "
+#         "blocked only when the pool is 'archived'."
+#     ),
+# )
+# def update_question(
+#     question_id: UUID,
+#     payload: QuestionUpdate,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(require_instructor),
+# ):
+#     question = db.query(Question).filter(Question.id == question_id).first()
+#     if not question:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
-    if pool and pool.status == "archived":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot modify questions in an archived question pool.",
-        )
+#     pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
+#     if pool and pool.status == "archived":
+#         raise HTTPException(
+#             status_code=status.HTTP_409_CONFLICT,
+#             detail="Cannot modify questions in an archived question pool.",
+#         )
 
-    for field, value in payload.model_dump(exclude_unset=True).items():
-        setattr(question, field, value)
+#     for field, value in payload.model_dump(exclude_unset=True).items():
+#         setattr(question, field, value)
 
-    db.commit()
-    db.refresh(question)
-    return question
+#     db.commit()
+#     db.refresh(question)
+#     return question
 
 
-@router.delete(
-    "/questions/{question_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a question",
-    description=(
-        "Instructor-only. Permanently removes a question from its pool. "
-        "Blocked only when the pool is 'archived'."
-    ),
-)
-def delete_question(
-    question_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    question = db.query(Question).filter(Question.id == question_id).first()
-    if not question:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+# @router.delete(
+#     "/questions/{question_id}",
+#     status_code=status.HTTP_204_NO_CONTENT,
+#     summary="Delete a question",
+#     description=(
+#         "Instructor-only. Permanently removes a question from its pool. "
+#         "Blocked only when the pool is 'archived'."
+#     ),
+# )
+# def delete_question(
+#     question_id: UUID,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(require_instructor),
+# ):
+#     question = db.query(Question).filter(Question.id == question_id).first()
+#     if not question:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
-    if pool and pool.status == "archived":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot delete questions from an archived question pool.",
-        )
+#     pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
+#     if pool and pool.status == "archived":
+#         raise HTTPException(
+#             status_code=status.HTTP_409_CONFLICT,
+#             detail="Cannot delete questions from an archived question pool.",
+#         )
 
-    db.delete(question)
-    db.commit()
-    return None
+#     db.delete(question)
+#     db.commit()
+#     return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -523,10 +557,13 @@ class UpdateNowRequest(BaseModel):
     max_followups_per_main: int = 3
     followup_enabled: bool = True
 
+class QuestionUpdate(BaseModel):
+    question_text: str | None = None
+
 
 class UpdateNowResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    assessment: AssessmentConfigOut
+    assessment_config: AssessmentConfigOut
     pool_id: UUID
     questions: list[QuestionOut]
 
@@ -641,9 +678,58 @@ async def update_now(
     )
 
     return UpdateNowResponse(
-        assessment=AssessmentConfigOut.model_validate(config),
+        assessment_config=AssessmentConfigOut.model_validate(config),
         pool_id=pool.id,
         questions=[QuestionOut.model_validate(q) for q in questions],
     )
 
 
+@router.delete(
+    "/questions/{question_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Integration",
+
+)
+def delete_question(
+    question_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    question = db.query(Question).filter(Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    db.delete(question)
+    db.commit()
+    return {"message": "Question deleted successfully."}
+
+
+
+@router.put(
+    "/questions/{question_id}",
+    summary="Integration",
+
+)
+def update_question(
+    question_id: UUID,
+    payload: QuestionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    question = db.query(Question).filter(Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
+    if pool and pool.status == "archived":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify questions in an archived question pool.",
+        )
+
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(question, field, value)
+
+    db.commit()
+    db.refresh(question)
+    return {"message": "Question updated successfully."}

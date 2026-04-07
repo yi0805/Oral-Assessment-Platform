@@ -5,6 +5,8 @@ import Spinner from "../../ui/Spinner";
 import { useUploadMaterial } from "./useUploadMaterial";
 import { useUploadRubric } from "./useLoadRubric";
 import { useUpdateNow } from "./useUpdateNow";
+import { useDeleteQuestion } from "./useDeleteQuestion";
+import { useUpdateQuestion } from "./useUpdateQuestion";
 
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);
@@ -21,10 +23,17 @@ function UpdateMaterial() {
   const [phase, setPhase] = useState("setup");
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [questions, setQuestions] = useState([]);
+  const [assessmentConfigId, setAssessmentConfigId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState("");
+  const [sessionsCreated, setSessionsCreated] = useState(0);
   const { courses, isLoading } = useCourses();
   const { uploadMaterial } = useUploadMaterial();
   const { uploadRubric } = useUploadRubric();
   const { updateNow } = useUpdateNow();
+  const { deleteQuestion } = useDeleteQuestion();
+  const { updateQuestion } = useUpdateQuestion();
 
   useEffect(() => {
     if (courses.length > 0 && !courseId) {
@@ -77,8 +86,8 @@ function UpdateMaterial() {
       assessmentName,
     });
 
-    console.log(MaterialId);
-    console.log(RubricId);
+    // console.log(MaterialId);
+    // console.log(RubricId);
 
     setStatusMessage("Generating questions with AI...");
     const updateResponse = await updateNow({
@@ -90,17 +99,35 @@ function UpdateMaterial() {
       totalTime: time,
     });
 
-    // setQuestions(updateRes.data.questions);
-    // setPoolId(updateRes.data.pool_id);
-    // setAssessmentId(updateRes.data.assessment.id);
-
-    // setPhase("review");
+    setQuestions(updateResponse.questions);
+    setAssessmentConfigId(updateResponse.assessment_config.id);
+    setPhase("review");
     setStatusMessage("");
     setLoading(false);
 
     console.log(updateResponse);
   }
 
+  async function handleDelete(questionId) {
+    setLoading(true);
+    await deleteQuestion({ questionId });
+    setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+    setLoading(false);
+  }
+
+  async function handleUpdate(questionId, questionText) {
+    setLoading(true);
+    await updateQuestion({ questionId, questionText });
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === questionId ? { ...q, question_text: questionText } : q,
+      ),
+    );
+    setLoading(false);
+  }
+
+  console.log(questions);
+  console.log(assessmentConfigId);
   return (
     <div className="min-h-screen">
       <main className="ml-64 min-h-screen pt-16">
@@ -427,7 +454,7 @@ function UpdateMaterial() {
               </div>
             </div>
           )}
-          {/* 
+
           {phase === "review" && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -436,7 +463,7 @@ function UpdateMaterial() {
                 </h2>
                 <button
                   className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
-                  onClick={handlePublish}
+                  // onClick={handlePublish}
                   disabled={loading || questions.length === 0}
                 >
                   {loading ? "Publishing..." : "Publish Assessment"}
@@ -448,35 +475,35 @@ function UpdateMaterial() {
               </p>
 
               <div className="space-y-4">
-                {questions.map((q, idx) => (
+                {questions.map((question, index) => (
                   <div
-                    key={q.id}
+                    key={question.id}
                     className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm"
                   >
                     <div className="mb-2 flex items-center justify-between">
                       <span className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">
-                        Question {idx + 1}
-                        {q.difficulty && (
+                        Question {index + 1}
+                        {question.difficulty && (
                           <span className="ml-2 rounded bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            {q.difficulty}
+                            {question.difficulty}
                           </span>
                         )}
                       </span>
                       <div className="flex gap-2">
-                        {editingId !== q.id && (
+                        {editingId !== question.id && (
                           <>
                             <button
                               className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
                               onClick={() => {
-                                setEditingId(q.id);
-                                setEditText(q.question_text);
+                                setEditingId(question.id);
+                                setEditText(question.question_text);
                               }}
                             >
                               Edit
                             </button>
                             <button
                               className="rounded-lg px-3 py-1 text-xs font-bold text-error transition-all hover:bg-error/10"
-                              onClick={() => handleDelete(q.id)}
+                              onClick={() => handleDelete(question.id)}
                             >
                               Delete
                             </button>
@@ -485,7 +512,7 @@ function UpdateMaterial() {
                       </div>
                     </div>
 
-                    {editingId === q.id ? (
+                    {editingId === question.id ? (
                       <div className="space-y-3">
                         <textarea
                           className="min-h-[80px] w-full resize-none rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
@@ -495,7 +522,10 @@ function UpdateMaterial() {
                         <div className="flex gap-2">
                           <button
                             className="rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-on-primary"
-                            onClick={() => handleEditSave(q.id)}
+                            onClick={() => {
+                              handleUpdate(question.id, editText);
+                              setEditingId(null);
+                            }}
                           >
                             Save
                           </button>
@@ -509,13 +539,13 @@ function UpdateMaterial() {
                       </div>
                     ) : (
                       <p className="text-sm leading-relaxed text-on-surface">
-                        {q.question_text}
+                        {question.question_text}
                       </p>
                     )}
 
-                    {q.learning_objective && (
+                    {question.learning_objective && (
                       <p className="mt-2 text-[11px] text-on-surface-variant">
-                        Objective: {q.learning_objective}
+                        Objective: {question.learning_objective}
                       </p>
                     )}
                   </div>
@@ -537,7 +567,7 @@ function UpdateMaterial() {
                 </div>
               )}
             </div>
-          )} */}
+          )}
 
           <div className="mt-6 grid grid-cols-12 gap-6">
             <div className="col-span-12">

@@ -19,3 +19,16 @@ export async function updateNow(
   });
   return response.data;
 }
+
+export async function deleteQuestion(questionId) {
+  const response = await api.delete(`/questions/${questionId}`);
+
+  return response.data;
+}
+
+export async function updateQuestion(questionId, questionText) {
+  const response = await api.put(`/questions/${questionId}`, {
+    question_text: questionText,
+  });
+  return response.data;
+}
