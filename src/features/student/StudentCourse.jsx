@@ -3,6 +3,8 @@ import { NavLink, useNavigate, useParams } from "react-router";
 
 import getAssessmentByCourseAndStudent from "../../utils/getAssessmentByCourseAndStudent";
 import getEarliestAssessment from "../../utils/getEarliestAssessment";
+
+import { useCourseAssessments } from "./useCourseAssessments";
 import { useCourses } from "../../hooks/useCourses";
 import Spinner from "../../ui/Spinner";
 
@@ -12,22 +14,29 @@ export default function StudentCourse() {
   const [isOpen, setIsOpen] = useState(false);
   const [assessmentId, setAssessmentId] = useState(null);
   const { courses, isLoading } = useCourses();
+  const { assessments, isLoading: isAssessmentsLoading } =
+    useCourseAssessments(courseId);
 
-  if (isLoading) return <Spinner />;
+  if (isLoading || isAssessmentsLoading) return <Spinner />;
 
   const course = courses.find(
     (course) => String(course.id) === String(courseId),
   );
 
-  const assessments = getAssessmentByCourseAndStudent(courseId, "Yian") || [];
+  console.log(assessments);
   console.log(course);
 
-  // const earliestDeadline = getEarliestAssessment(assessments);
+  const sortedAssessments = [...assessments].sort(
+    (a, b) => new Date(a.close_at || 0) - new Date(b.close_at || 0),
+  );
 
-  // const sortedAssessments = [...assessments].sort(
-  //   (a, b) => new Date(a.deadline) - new Date(b.deadline),
-  // );
+  // const earliestDeadline =
+  //   sortedAssessments.length > 0
+  //     ? formatDeadline(sortedAssessments[0].close_at)
+  //     : null;
 
+  console.log(assessments);
+  console.log(course);
   return (
     <>
       <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
@@ -36,10 +45,10 @@ export default function StudentCourse() {
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
             to="/home"
           >
-            <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
+            <span className="material-symbols-outlined mb-5 text-sm transition-transform group-hover:-translate-x-1">
               arrow_back
             </span>
-            <span className="font-body uppercase tracking-widest">
+            <span className="mb-5 font-body uppercase tracking-widest">
               Back to Courses
             </span>
           </NavLink>
@@ -64,7 +73,7 @@ export default function StudentCourse() {
                 <p className="text-sm font-medium text-on-surface-variant">
                   Next Deadline:
                   <span className="font-bold text-error">
-                    {earliestDeadline}
+                    {/* {earliestDeadline} */}
                   </span>
                 </p>
               </div>
@@ -76,10 +85,10 @@ export default function StudentCourse() {
                     <div
                       key={index}
                       className="group col-span-12 cursor-pointer lg:col-span-8"
-                      onClick={() => {
-                        setIsOpen(true);
-                        setAssessmentId(assessment.assessment);
-                      }}
+                      // onClick={() => {
+                      //   setIsOpen(true);
+                      //   setAssessmentId(assessment.assessment);
+                      // }}
                     >
                       <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8 transition-all hover:shadow-2xl hover:shadow-primary/5">
                         <div className="absolute right-0 top-0 p-8">
@@ -96,10 +105,10 @@ export default function StudentCourse() {
                             analytics
                           </span>
                           <h2 className="mb-2 text-2xl font-bold text-on-surface">
-                            {assessment.assessment}
+                            {assessment.title}
                           </h2>
                           <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
-                            {assessment.summary}
+                            {assessment.instructions}
                           </p>
                         </div>
                         <div className="mt-12 flex items-center justify-between">
@@ -109,15 +118,15 @@ export default function StudentCourse() {
                                 Duration
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
-                                {assessment.duration}
+                                {assessment.total_time_minutes} mins
                               </span>
                             </div>
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                                Questions
+                                Main Questions
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
-                                {assessment.questionNumbers}
+                                {assessment.max_main_questions}
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -125,7 +134,8 @@ export default function StudentCourse() {
                                 Weight
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
-                                {assessment.grade} Final Grade
+                                {/* {assessment.grade}  */}
+                                Final Grade
                               </span>
                             </div>
                           </div>
@@ -152,10 +162,10 @@ export default function StudentCourse() {
                     <div
                       key={index}
                       className="group col-span-12 cursor-pointer lg:col-span-4"
-                      onClick={() => {
-                        setIsOpen(true);
-                        setAssessmentId(assessment.assessment);
-                      }}
+                      // onClick={() => {
+                      //   setIsOpen(true);
+                      //   setAssessmentId(assessment.assessment);
+                      // }}
                     >
                       <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
                         <div>
@@ -164,14 +174,14 @@ export default function StudentCourse() {
                               database
                             </span>
                             <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
-                              {assessment.deadline}
+                              {/* {assessment.deadline} */}
                             </span>
                           </div>
                           <h3 className="mb-2 text-lg font-bold text-on-surface">
-                            {assessment.assessment}
+                            {assessment.title}
                           </h3>
                           <p className="text-xs leading-relaxed text-on-surface-variant">
-                            {assessment.summary}
+                            {assessment.instructions}
                           </p>
                         </div>
                         <div className="mt-8">
@@ -199,16 +209,16 @@ export default function StudentCourse() {
                         menu_book
                       </span>
                       <h3 className="mb-1 font-bold text-on-surface">
-                        {assessment.assessment}
+                        {assessment.title}
                       </h3>
                       <p className="mb-6 text-xs text-on-surface-variant">
-                        {assessment.summary}
+                        {assessment.instructions}
                       </p>
                       <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
                         <span className="material-symbols-outlined text-sm">
                           schedule
                         </span>
-                        {assessment.duration}
+                        {assessment.total_time_minutes} mins
                       </div>
                     </div>
                   </div>
@@ -294,15 +304,15 @@ export default function StudentCourse() {
             <div className="flex flex-col gap-3">
               <button
                 className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
-                onClick={() =>
-                  navigate(`/student/${courseId}/${assessmentId}`, {
-                    state: {
-                      studentName,
-                      courseId,
-                      assessmentId,
-                    },
-                  })
-                }
+                // onClick={() =>
+                //   navigate(`/student/${courseId}/${assessmentId}`, {
+                //     state: {
+                //       studentName,
+                //       courseId,
+                //       assessmentId,
+                //     },
+                //   })
+                // }
               >
                 START ASSESSMENT
               </button>

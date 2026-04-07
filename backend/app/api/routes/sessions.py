@@ -59,10 +59,11 @@ from app.schemas.assessment import (
     AssessmentConfigOut
 )
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from app.schemas.feedback import AISummaryOut
 from app.schemas.user import UserOut
 from app.schemas.course import CourseOut
+from app.schemas.enums import SessionStatus
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -976,6 +977,20 @@ class TranscriptDetailOut(BaseModel):
     instructor_feedback: InstructorFeedbackOut | None = None
     transcript: list[TranscriptMessageOut]
 
+
+class StudentCourseAssessmentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    assessment_config_id: UUID
+    session_id: UUID
+    session_status: SessionStatus
+    title: str
+    instructions: str | None = None
+    total_time_minutes: int
+    max_main_questions: int | None = None
+    open_at: datetime | None = None
+    close_at: datetime | None = None
+
 @router.get(
     "/pendingReviews",
     response_model=list[PendingReviewOut],
@@ -1082,3 +1097,63 @@ def get_transcript_detail(
             for transcript in transcripts
         ],
     }
+
+
+
+
+
+
+@router.get(
+    "/courses/{course_id}/my-assessment-sessions",
+    response_model=list[StudentCourseAssessmentOut],
+    summary="Integration",
+
+)
+def list_my_course_assessments(
+    course_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+            CourseEnrollment.is_active.is_(True),
+        )
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not enrolled in this course.",
+        )
+
+    rows = (
+        db.query(AssessmentSession, AssessmentConfig)
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .filter(
+            AssessmentSession.course_id == course_id,
+            AssessmentSession.student_id == current_user.id,
+        )
+        .order_by(AssessmentConfig.created_at.desc())
+        .all()
+    )
+
+
+    items = [
+        StudentCourseAssessmentOut(
+            assessment_config_id=config.id,
+            session_id=session.id,
+            session_status=session.status,
+            title=config.title,
+            instructions=config.instructions,
+            total_time_minutes=config.total_time_minutes,
+            max_main_questions=config.max_main_questions,
+            open_at=config.open_at,
+            close_at=config.close_at,
+        )
+        for session, config in rows
+    ]
+
+    return items

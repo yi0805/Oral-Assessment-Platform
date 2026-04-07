@@ -10,6 +10,11 @@ export async function getTranscript(sessionId) {
   return response.data;
 }
 
+export async function getMyAssessmentSessions(courseId) {
+  const response = await api.get(`/courses/${courseId}/my-assessment-sessions`);
+  return response.data;
+}
+
 export async function updatePendingReview(sessionId, studentId) {
   const response = await api.put(
     `/sessions/${sessionId}/${studentId}/release/session`,
