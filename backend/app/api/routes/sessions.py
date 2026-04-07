@@ -799,18 +799,29 @@ async def _generate_ai_followup(
 
     student_answer = latest_student_msg.content if latest_student_msg else ""
 
-    FOLLOWUP_SYSTEM_PROMPT = """\
-        You generate exactly one oral-assessment follow-up question.
+    # FOLLOWUP_SYSTEM_PROMPT = """\
+    #     You generate exactly one oral-assessment follow-up question.
+
+    #     Rules:
+    #     - Output exactly one single question.
+    #     - No explanation.
+    #     - No reasoning.
+    #     - No preamble.
+    #     - No quotes.
+    #     - No JSON.
+    #     - Maximum 25 words.
+    #     - Must reference a specific idea from the student's most recent answer.
+    #     """
+
+    FOLLOWUP_SYSTEM_PROMPT = """
+        You are an expert academic assessor conducting an oral exam.
+        Your goal is to generate exactly one follow-up question to probe the student's understanding deeply but concisely.
 
         Rules:
-        - Output exactly one single question.
-        - No explanation.
-        - No reasoning.
-        - No preamble.
-        - No quotes.
-        - No JSON.
-        - Maximum 25 words.
-        - Must reference a specific idea from the student's most recent answer.
+        IDENTIFY: MUST pick one specific technical term or concept from the student's last answer and generate EXACTLY ONE follow-up question.
+        NO REPETITION: Do not repeat the current main question or restate the student's answer.
+        OUTPUT FORMAT: Output ONLY the question text. Strictly NO quotes, NO JSON, NO preamble and NO explanations.
+        CONSTRAINT: The question must be under 25 words.
         """
     
     # user_prompt = (

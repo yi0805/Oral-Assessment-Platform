@@ -1,20 +1,20 @@
 import { useState } from "react";
 
 import SearchCouse from "../../ui/SearchCouse";
-import getStudentByName from "../../utils/getStudentByname";
-import getCoursesByStudent from "../../utils/getCoursesByStudent";
 import CourseCard from "../../ui/CourseCard";
+import { useCourses } from "../../hooks/useCourses";
+import Spinner from "../../ui/Spinner";
+import { useUser } from "../authentication/useUser";
 
 export default function StudentHome() {
-  const userName = localStorage.getItem("userName");
-
-  const student = getStudentByName(userName);
-  const courses = getCoursesByStudent(student);
-
   const [search, setSearch] = useState("");
+  const { user, isLoading: isUserLoading } = useUser();
+  const { courses, isLoading } = useCourses();
+
+  if (isLoading || isUserLoading) return <Spinner />;
 
   const filteredCouses = courses.filter((course) =>
-    course.id.toLowerCase().includes(search.toLowerCase()),
+    course.course_code.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -30,7 +30,7 @@ export default function StudentHome() {
           <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] lg:col-span-8">
             <div className="relative z-10 flex h-full flex-col justify-center">
               <h2 className="headline-font mb-3 text-2xl font-bold text-primary">
-                Welcome back, {userName}
+                Welcome back, {user.full_name}!
               </h2>
               <p className="max-w-xl leading-relaxed text-on-surface-variant">
                 Manage your academic journey from one central workspace. Here
@@ -59,10 +59,10 @@ export default function StudentHome() {
             <CourseCard
               key={course.id}
               courseId={course.id}
-              courseName={course.name}
-              studentName={student.studentName}
-              index={index}
+              courseCode={course.course_code}
+              courseName={course.course_name}
               description={course.description}
+              index={index}
             />
           ))}
         </div>

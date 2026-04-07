@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router";
 
-function CourseCard({ courseId, courseName, index, description, studentName }) {
+function CourseCard({ courseId, courseCode, courseName, index, description }) {
   const navigate = useNavigate();
 
   const images = [
@@ -13,7 +13,10 @@ function CourseCard({ courseId, courseName, index, description, studentName }) {
   const image = images[index % images.length];
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-xl bg-surface-container-lowest shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)]">
+    <button
+      className="group flex flex-col overflow-hidden rounded-xl bg-surface-container-lowest shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] transition-all hover:shadow-[0_20px_40px_-10px_rgba(0,0,0,0.08)]"
+      onClick={() => navigate(`/student/${courseId}`)}
+    >
       <div className="relative h-48 overflow-hidden">
         <img
           alt="Advanced Molecular Biology"
@@ -22,7 +25,7 @@ function CourseCard({ courseId, courseName, index, description, studentName }) {
           src={image}
         />
         <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary shadow-sm backdrop-blur-md">
-          {courseId}
+          {courseCode}
         </div>
       </div>
       <div className="flex flex-grow flex-col p-6">
@@ -32,7 +35,7 @@ function CourseCard({ courseId, courseName, index, description, studentName }) {
         <p className="mb-6 flex-grow text-sm leading-relaxed text-on-surface-variant">
           {description}
         </p>
-        <div className="mt-auto flex items-center justify-between border-t border-surface-container pt-6">
+        {/* <div className="mt-auto flex items-center justify-between border-t border-surface-container pt-6">
           <button
             className="group/btn flex items-center gap-1 text-sm font-semibold text-primary"
             onClick={() =>
@@ -52,9 +55,9 @@ function CourseCard({ courseId, courseName, index, description, studentName }) {
               arrow_forward
             </span>
           </button>
-        </div>
+        </div> */}
       </div>
-    </div>
+    </button>
   );
 }
 
