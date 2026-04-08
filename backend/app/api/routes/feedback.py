@@ -55,8 +55,11 @@ router = APIRouter()
 # Helper:
 # ---------------------------------------------------------------------------
 
-def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> AssessmentSession:
-    sess = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).filter(AssessmentSession.student_id == student_id).first()
+def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID | None = None) -> AssessmentSession:
+    q = db.query(AssessmentSession).filter(AssessmentSession.id == session_id)
+    if student_id is not None:
+        q = q.filter(AssessmentSession.student_id == student_id)
+    sess = q.first()
     if not sess:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     return sess

@@ -1,50 +1,87 @@
-import { useLocation, useNavigate } from "react-router";
-import { useEffect, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
+import { useEffect, useRef, useState } from "react";
 import { googleLogout } from "@react-oauth/google";
 
-import mockAssessments from "../../data/mockAssessments";
+import { useStartSession } from "./useStartSession";
+import { getErrorMessage } from "../../utils/getErrorMessage";
+import { useCourses } from "../../hooks/useCourses";
+import Loading from "../../ui/Loading";
 
 export default function StudentAssessment() {
-  // const navigate = useNavigate();
-  // const { studentName, courseId, assessmentId } = useLocation().state || {};
+  const navigate = useNavigate();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
+  const [sessionId, setSessionId] = useState(null);
+  const [assessmentTitle, setAssessmentTitle] = useState("");
+
+  const [expiresAt, setExpiresAt] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(null);
+
+  const [currentQuestion, setCurrentQuestion] = useState(null);
   const [typedAnswer, setTypedAnswer] = useState("");
 
-  // const assessment = mockAssessments.find(
-  //   (a) =>
-  //     a.studentName === studentName &&
-  //     a.courseId === courseId &&
-  //     a.assessment === assessmentId,
-  // );
+  const [sessionStatus, setSessionStatus] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // const totalQuestions = assessment.questions.length;
-  // const currentQuestion = assessment.questions[currentQuestionIndex];
-  // const progressPercent = ((currentQuestionIndex + 1) / totalQuestions) * 100;
+  const { courseId, assessmentConfigId } = useParams();
 
-  const handleLogout = () => {
-    localStorage.removeItem("role");
-    localStorage.removeItem("userName");
-    localStorage.removeItem("userPicture");
-    googleLogout();
-    navigate("/login");
-  };
+  const { startSession } = useStartSession();
+  const { courses, isLoading: isCoursesLoading } = useCourses();
+  const course = courses.find((c) => c.id === courseId);
 
-  const handleSubmitAnswer = () => {
-    if (currentQuestionIndex < totalQuestions - 1) {
-      setCurrentQuestionIndex((prev) => prev + 1);
-      setTypedAnswer("");
-    } else {
-      assessment.status = "Completed";
-      navigate(`/student/${courseId}`, { state: { studentName, courseId } });
+  useEffect(() => {
+    let cancelled = false;
+
+    async function init() {
+      try {
+        console.log(assessmentConfigId);
+        const Response = await startSession({ assessmentConfigId });
+        if (cancelled) return;
+
+        console.log(Response);
+
+        setSessionId(Response.session_id);
+        setAssessmentTitle(Response.assessment_title);
+        // setExpiresAt(new Date(Response.expires_at));
+        setExpiresAt(new Date(Date.now() + 60 * 1000 * 60));
+        setCurrentQuestion(Response.first_question);
+        setSessionStatus("in_progress");
+      } catch (err) {
+        if (cancelled) return;
+        setError(getErrorMessage(err, "Failed to start the assessment."));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
     }
-  };
 
-  function getSecondsFromDuration(durationText) {
-    const minutes = parseInt(durationText, 10);
-    return minutes * 60;
-  }
+    init();
+    return () => {
+      cancelled = true;
+    };
+  }, [assessmentConfigId, startSession]);
+
+  // useEffect(() => {
+  //   if (!expiresAt) return;
+
+  //   function tick() {
+  //     const remaining = Math.max(
+  //       0,
+  //       Math.floor((expiresAt.getTime() - Date.now()) / 1000),
+  //     );
+  //     setTimeLeft(remaining);
+  //   }
+
+  //   tick();
+  //   const id = setInterval(tick, 1000);
+  //   return () => clearInterval(id);
+  // }, [expiresAt]);
+
+  if (isLoading || isCoursesLoading) return <Loading />;
 
   function formatTime(seconds) {
+    if (seconds == null) return "--:--";
+
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
 
@@ -53,19 +90,35 @@ export default function StudentAssessment() {
     ).padStart(2, "0")}`;
   }
 
-  // const [timeLeft, setTimeLeft] = useState(() =>
-  //   getSecondsFromDuration(assessment.duration),
-  // );
+  const questionKindLabel =
+    currentQuestion?.question_kind === "followup"
+      ? "Follow-up Question"
+      : `Main Question ${currentQuestion?.main_group_no ?? ""}`;
 
-  // useEffect(() => {
-  //   if (timeLeft <= 0) return;
+  // const totalQuestions =
+  // const currentQuestion =
+  // const progressPercent = ((currentQuestionIndex + 1) / totalQuestions) * 100;
 
-  //   const timer = setInterval(() => {
-  //     setTimeLeft((prev) => prev - 1);
-  //   }, 1000);
+  console.log(courseId, assessmentConfigId);
+  console.log(expiresAt, timeLeft);
 
-  //   return () => clearInterval(timer);
-  // }, [timeLeft]);
+  // const handleLogout = () => {
+  //   localStorage.removeItem("role");
+  //   localStorage.removeItem("userName");
+  //   localStorage.removeItem("userPicture");
+  //   googleLogout();
+  //   navigate("/login");
+  // };
+
+  // const handleSubmitAnswer = () => {
+  //   if (currentQuestionIndex < totalQuestions - 1) {
+  //     setCurrentQuestionIndex((prev) => prev + 1);
+  //     setTypedAnswer("");
+  //   } else {
+  //     assessment.status = "Completed";
+  //     navigate(`/student/${courseId}`, { state: { studentName, courseId } });
+  //   }
+  // };
 
   return (
     <div className="font-body selection:bg-primary-container selection:text-on-primary-container">
@@ -78,8 +131,10 @@ export default function StudentAssessment() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 text-[#586064]">
             <span className="material-symbols-outlined">timer</span>
-            <span className="font-label text-sm font-medium">
-              {/* {formatTime(timeLeft)} remaining */}
+            <span
+              className={`font-label text-sm font-medium ${timeLeft != null && timeLeft < 60 ? "text-error" : ""}`}
+            >
+              {formatTime(timeLeft)}
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -91,7 +146,7 @@ export default function StudentAssessment() {
             </span>
             <button
               className="rounded-lg px-4 py-2 text-sm font-semibold text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"
-              onClick={() => handleLogout()}
+              // onClick={() => handleLogout()}
             >
               Logout
             </button>
@@ -101,31 +156,36 @@ export default function StudentAssessment() {
       <main className="flex min-h-screen flex-col items-center px-6 pb-12 pt-24">
         <div className="mb-12 w-full max-w-4xl">
           <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-            {/* {courseId} */}
+            {course
+              ? `${course.course_code} • ${course.course_name}`
+              : "Unknown Course"}
           </p>
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-primary">
-            {/* {assessmentId} */}
+            {assessmentTitle}
           </h1>
         </div>
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
           <div className="space-y-8 md:col-span-8">
-            <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-8 shadow-sm">
-              <div className="absolute left-0 top-0 h-full w-2 bg-primary"></div>
-              <div className="mb-6 flex items-center gap-3">
-                <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
-                  {/* Question {currentQuestionIndex + 1} of {totalQuestions} */}
-                </span>
-                <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-container">
-                  <div
-                    className="h-full bg-primary"
-                    // style={{ width: `${progressPercent}%` }}
-                  ></div>
+            {currentQuestion && (
+              <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-8 shadow-sm">
+                <div className="absolute left-0 top-0 h-full w-2 bg-primary"></div>
+                <div className="mb-6 flex items-center gap-3">
+                  <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
+                    {/* Question {currentQuestionIndex + 1} of {totalQuestions} */}
+                    {questionKindLabel}
+                  </span>
+                  <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-container">
+                    <div
+                      className="h-full bg-primary"
+                      // style={{ width: `${progressPercent}%` }}
+                    ></div>
+                  </div>
                 </div>
+                <h2 className="mb-4 font-headline text-2xl font-semibold leading-snug text-on-background">
+                  {currentQuestion?.asked_text}
+                </h2>
               </div>
-              <h2 className="mb-4 font-headline text-2xl font-semibold leading-snug text-on-background">
-                {/* {currentQuestion} */}
-              </h2>
-            </div>
+            )}
 
             <div className="space-y-6">
               <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low p-10">
@@ -233,7 +293,7 @@ export default function StudentAssessment() {
             <div className="flex flex-col gap-3">
               <button
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-sm transition-all hover:bg-primary-dim active:scale-[0.98]"
-                onClick={handleSubmitAnswer}
+                // onClick={handleSubmitAnswer}
               >
                 Submit Answer
                 <span className="material-symbols-outlined text-sm">send</span>
