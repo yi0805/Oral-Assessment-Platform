@@ -5,21 +5,21 @@ import { googleLogout } from "@react-oauth/google";
 import mockAssessments from "../../data/mockAssessments";
 
 export default function StudentAssessment() {
-  const navigate = useNavigate();
-  const { studentName, courseId, assessmentId } = useLocation().state || {};
+  // const navigate = useNavigate();
+  // const { studentName, courseId, assessmentId } = useLocation().state || {};
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [typedAnswer, setTypedAnswer] = useState("");
 
-  const assessment = mockAssessments.find(
-    (a) =>
-      a.studentName === studentName &&
-      a.courseId === courseId &&
-      a.assessment === assessmentId,
-  );
+  // const assessment = mockAssessments.find(
+  //   (a) =>
+  //     a.studentName === studentName &&
+  //     a.courseId === courseId &&
+  //     a.assessment === assessmentId,
+  // );
 
-  const totalQuestions = assessment.questions.length;
-  const currentQuestion = assessment.questions[currentQuestionIndex];
-  const progressPercent = ((currentQuestionIndex + 1) / totalQuestions) * 100;
+  // const totalQuestions = assessment.questions.length;
+  // const currentQuestion = assessment.questions[currentQuestionIndex];
+  // const progressPercent = ((currentQuestionIndex + 1) / totalQuestions) * 100;
 
   const handleLogout = () => {
     localStorage.removeItem("role");
@@ -53,19 +53,19 @@ export default function StudentAssessment() {
     ).padStart(2, "0")}`;
   }
 
-  const [timeLeft, setTimeLeft] = useState(() =>
-    getSecondsFromDuration(assessment.duration),
-  );
+  // const [timeLeft, setTimeLeft] = useState(() =>
+  //   getSecondsFromDuration(assessment.duration),
+  // );
 
-  useEffect(() => {
-    if (timeLeft <= 0) return;
+  // useEffect(() => {
+  //   if (timeLeft <= 0) return;
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
+  //   const timer = setInterval(() => {
+  //     setTimeLeft((prev) => prev - 1);
+  //   }, 1000);
 
-    return () => clearInterval(timer);
-  }, [timeLeft]);
+  //   return () => clearInterval(timer);
+  // }, [timeLeft]);
 
   return (
     <div className="font-body selection:bg-primary-container selection:text-on-primary-container">
@@ -79,7 +79,7 @@ export default function StudentAssessment() {
           <div className="flex items-center gap-2 text-[#586064]">
             <span className="material-symbols-outlined">timer</span>
             <span className="font-label text-sm font-medium">
-              {formatTime(timeLeft)} remaining
+              {/* {formatTime(timeLeft)} remaining */}
             </span>
           </div>
           <div className="flex items-center gap-4">
@@ -101,10 +101,10 @@ export default function StudentAssessment() {
       <main className="flex min-h-screen flex-col items-center px-6 pb-12 pt-24">
         <div className="mb-12 w-full max-w-4xl">
           <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
-            {courseId}
+            {/* {courseId} */}
           </p>
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-primary">
-            {assessmentId}
+            {/* {assessmentId} */}
           </h1>
         </div>
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
@@ -113,17 +113,17 @@ export default function StudentAssessment() {
               <div className="absolute left-0 top-0 h-full w-2 bg-primary"></div>
               <div className="mb-6 flex items-center gap-3">
                 <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
-                  Question {currentQuestionIndex + 1} of {totalQuestions}
+                  {/* Question {currentQuestionIndex + 1} of {totalQuestions} */}
                 </span>
                 <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-container">
                   <div
                     className="h-full bg-primary"
-                    style={{ width: `${progressPercent}%` }}
+                    // style={{ width: `${progressPercent}%` }}
                   ></div>
                 </div>
               </div>
               <h2 className="mb-4 font-headline text-2xl font-semibold leading-snug text-on-background">
-                {currentQuestion}
+                {/* {currentQuestion} */}
               </h2>
             </div>
 
@@ -189,7 +189,7 @@ export default function StudentAssessment() {
                 </h3>
 
                 <div className="space-y-3">
-                  {assessment.questions.map((question, index) => (
+                  {/* {assessment.questions.map((question, index) => (
                     <div
                       key={index}
                       className={`flex items-center justify-between text-sm ${
@@ -225,7 +225,7 @@ export default function StudentAssessment() {
                         </span>
                       )}
                     </div>
-                  ))}
+                  ))} */}
                 </div>
               </div>
             </div>

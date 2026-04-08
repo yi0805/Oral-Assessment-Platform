@@ -60,7 +60,7 @@ function App() {
             </Route>
 
             <Route
-              path="student/:courseId/:assessmentId"
+              path="student/:courseId/:assessmentConfigId"
               element={<StudentAssessment />}
             />
           </Route>

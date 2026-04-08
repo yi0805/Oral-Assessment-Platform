@@ -73,140 +73,140 @@ logger = logging.getLogger(__name__)
 # Start session
 # ---------------------------------------------------------------------------
 
-@router.post(
-    "/assessments/{assessment_id}/sessions/start",
-    response_model=SessionStartResponse,
-    status_code=status.HTTP_201_CREATED,
-    summary="Start an assessment session",
-    description=(
-        "Student-only. Creates a new session with a server-side expiry timer, "
-        "selects the first question from the approved pool, and records it in the transcript."
-    ),
-)
-def start_session(
-    assessment_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_student),
-):
-    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-    if config.status != "published":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="This assessment is not currently published.",
-        )
+# @router.post(
+#     "/assessments/{assessment_id}/sessions/start",
+#     response_model=SessionStartResponse,
+#     status_code=status.HTTP_201_CREATED,
+#     summary="Start an assessment session",
+#     description=(
+#         "Student-only. Creates a new session with a server-side expiry timer, "
+#         "selects the first question from the approved pool, and records it in the transcript."
+#     ),
+# )
+# def start_session(
+#     assessment_id: UUID,
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(require_student),
+# ):
+#     config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
+#     if not config:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+#     if config.status != "published":
+#         raise HTTPException(
+#             status_code=status.HTTP_409_CONFLICT,
+#             detail="This assessment is not currently published.",
+#         )
 
-    # Verify the student is enrolled in this course
-    enrollment = (
-        db.query(CourseEnrollment)
-        .filter(
-            CourseEnrollment.course_id == config.course_id,
-            CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.is_active.is_(True),
-        )
-        .first()
-    )
-    if not enrollment:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not enrolled in the course for this assessment.",
-        )
+#     # Verify the student is enrolled in this course
+#     enrollment = (
+#         db.query(CourseEnrollment)
+#         .filter(
+#             CourseEnrollment.course_id == config.course_id,
+#             CourseEnrollment.user_id == current_user.id,
+#             CourseEnrollment.is_active.is_(True),
+#         )
+#         .first()
+#     )
+#     if not enrollment:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="You are not enrolled in the course for this assessment.",
+#         )
 
-    now = datetime.now(timezone.utc)
-    if config.open_at and now < config.open_at:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Assessment opens at {config.open_at.isoformat()}.",
-        )
-    if config.close_at and now > config.close_at:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This assessment has closed.",
-        )
+#     now = datetime.now(timezone.utc)
+#     if config.open_at and now < config.open_at:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail=f"Assessment opens at {config.open_at.isoformat()}.",
+#         )
+#     if config.close_at and now > config.close_at:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="This assessment has closed.",
+#         )
 
-    # Prevent duplicate in-progress sessions
-    existing = (
-        db.query(AssessmentSession)
-        .filter(
-            AssessmentSession.assessment_config_id == assessment_id,
-            AssessmentSession.student_id == current_user.id,
-            AssessmentSession.status == "in_progress",
-        )
-        .first()
-    )
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="You already have an active session for this assessment.",
-        )
+#     # Prevent duplicate in-progress sessions
+#     existing = (
+#         db.query(AssessmentSession)
+#         .filter(
+#             AssessmentSession.assessment_config_id == assessment_id,
+#             AssessmentSession.student_id == current_user.id,
+#             AssessmentSession.status == "in_progress",
+#         )
+#         .first()
+#     )
+#     if existing:
+#         raise HTTPException(
+#             status_code=status.HTTP_409_CONFLICT,
+#             detail="You already have an active session for this assessment.",
+#         )
 
-    # Create session with server-side expiry timer
-    expires_at = now + timedelta(minutes=config.total_time_minutes)
-    session = AssessmentSession(
-        assessment_config_id=assessment_id,
-        course_id=config.course_id,
-        student_id=current_user.id,
-        status="in_progress",
-        started_at=now,
-        expires_at=expires_at,
-        current_main_index=1,
-        current_followup_index=0,
-    )
-    db.add(session)
-    db.flush()
+#     # Create session with server-side expiry timer
+#     expires_at = now + timedelta(minutes=config.total_time_minutes)
+#     session = AssessmentSession(
+#         assessment_config_id=assessment_id,
+#         course_id=config.course_id,
+#         student_id=current_user.id,
+#         status="in_progress",
+#         started_at=now,
+#         expires_at=expires_at,
+#         current_main_index=1,
+#         current_followup_index=0,
+#     )
+#     db.add(session)
+#     db.flush()
 
-    # Pull the first approved main question
-    first_question = (
-        db.query(Question)
-        .filter(
-            Question.question_pool_id == config.question_pool_id,
-            Question.question_kind == "main",
-            Question.is_active.is_(True),
-        )
-        .order_by(Question.display_order.asc())
-        .first()
-    )
-    if not first_question:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="No active main questions found in the approved pool.",
-        )
+#     # Pull the first approved main question
+#     first_question = (
+#         db.query(Question)
+#         .filter(
+#             Question.question_pool_id == config.question_pool_id,
+#             Question.question_kind == "main",
+#             Question.is_active.is_(True),
+#         )
+#         .order_by(Question.display_order.asc())
+#         .first()
+#     )
+#     if not first_question:
+#         raise HTTPException(
+#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+#             detail="No active main questions found in the approved pool.",
+#         )
 
-    # Record the question as a runtime item
-    item = SessionQuestionItem(
-        session_id=session.id,
-        source_question_id=first_question.id,
-        asked_text=first_question.question_text,
-        question_kind="main",
-        main_group_no=1,
-        followup_no=None,
-        generated_by="approved_pool",
-    )
-    db.add(item)
-    db.flush()
+#     # Record the question as a runtime item
+#     item = SessionQuestionItem(
+#         session_id=session.id,
+#         source_question_id=first_question.id,
+#         asked_text=first_question.question_text,
+#         question_kind="main",
+#         main_group_no=1,
+#         followup_no=None,
+#         generated_by="approved_pool",
+#     )
+#     db.add(item)
+#     db.flush()
 
-    # Write the first transcript message
-    msg = TranscriptMessage(
-        session_id=session.id,
-        session_question_item_id=item.id,
-        sender_role="assistant",
-        message_type="main_question",
-        sequence_no=1,
-        content=first_question.question_text,
-    )
-    db.add(msg)
-    db.commit()
-    db.refresh(session)
-    db.refresh(item)
+#     # Write the first transcript message
+#     msg = TranscriptMessage(
+#         session_id=session.id,
+#         session_question_item_id=item.id,
+#         sender_role="assistant",
+#         message_type="main_question",
+#         sequence_no=1,
+#         content=first_question.question_text,
+#     )
+#     db.add(msg)
+#     db.commit()
+#     db.refresh(session)
+#     db.refresh(item)
 
-    return SessionStartResponse(
-        session_id=session.id,
-        assessment_title=config.title,
-        total_time_minutes=config.total_time_minutes,
-        expires_at=expires_at,
-        first_question=SessionQuestionItemOut.model_validate(item),
-    )
+#     return SessionStartResponse(
+#         session_id=session.id,
+#         assessment_title=config.title,
+#         total_time_minutes=config.total_time_minutes,
+#         expires_at=expires_at,
+#         first_question=SessionQuestionItemOut.model_validate(item),
+#     )
 
 
 # ---------------------------------------------------------------------------
@@ -482,29 +482,29 @@ def complete_session(
 # so FastAPI matches the literal path "mine" before the UUID path parameter.
 # ---------------------------------------------------------------------------
 
-@router.get(
-    "/sessions/mine",
-    response_model=Page[SessionBrief],
-    summary="List my sessions",
-    description=(
-        "Student-only. Returns all sessions belonging to the authenticated student, "
-        "ordered most recent first (paginated)."
-    ),
-)
-def list_my_sessions(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_student),
-):
-    q = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.student_id == current_user.id)
-        .order_by(AssessmentSession.created_at.desc())
-    )
-    total = q.count()
-    items = q.offset((page - 1) * page_size).limit(page_size).all()
-    return Page.create(items, total, page, page_size)
+# @router.get(
+#     "/sessions/mine",
+#     response_model=Page[SessionBrief],
+#     summary="List my sessions",
+#     description=(
+#         "Student-only. Returns all sessions belonging to the authenticated student, "
+#         "ordered most recent first (paginated)."
+#     ),
+# )
+# def list_my_sessions(
+#     page: int = Query(1, ge=1),
+#     page_size: int = Query(20, ge=1, le=100),
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(require_student),
+# ):
+#     q = (
+#         db.query(AssessmentSession)
+#         .filter(AssessmentSession.student_id == current_user.id)
+#         .order_by(AssessmentSession.created_at.desc())
+#     )
+#     total = q.count()
+#     items = q.offset((page - 1) * page_size).limit(page_size).all()
+#     return Page.create(items, total, page, page_size)
 
 
 # ---------------------------------------------------------------------------
@@ -988,6 +988,7 @@ class StudentCourseAssessmentOut(BaseModel):
     instructions: str | None = None
     total_time_minutes: int
     max_main_questions: int | None = None
+    max_followups_per_main: int | None = None
     open_at: datetime | None = None
     close_at: datetime | None = None
 
@@ -1150,6 +1151,7 @@ def list_my_course_assessments(
             instructions=config.instructions,
             total_time_minutes=config.total_time_minutes,
             max_main_questions=config.max_main_questions,
+            max_followups_per_main=config.max_followups_per_main,
             open_at=config.open_at,
             close_at=config.close_at,
         )
@@ -1157,3 +1159,138 @@ def list_my_course_assessments(
     ]
 
     return items
+
+
+
+@router.post(
+    "/assessments/{assessment_id}/sessions/start",
+    response_model=SessionStartResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Start an assessment session",
+    description=(
+        "Student-only. Creates a new session with a server-side expiry timer, "
+        "selects the first question from the approved pool, and records it in the transcript."
+    ),
+)
+def start_session(
+    assessment_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+    if config.status != "published":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This assessment is not currently published.",
+        )
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == config.course_id,
+            CourseEnrollment.user_id == current_user.id,
+            CourseEnrollment.is_active.is_(True),
+        )
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not enrolled in the course for this assessment.",
+        )
+
+    now = datetime.now(timezone.utc)
+
+    if config.close_at and now > config.close_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This assessment has closed.",
+        )
+
+    session = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.assessment_config_id == assessment_id,
+            AssessmentSession.student_id == current_user.id,
+            AssessmentSession.status == "not_started",
+        )
+        .first()
+    )
+    if not session:
+        already_started = (
+            db.query(AssessmentSession)
+            .filter(
+                AssessmentSession.assessment_config_id == assessment_id,
+                AssessmentSession.student_id == current_user.id,
+            )
+            .first()
+        )
+        if already_started:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="You already have an active or completed session for this assessment.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No session found for this assessment. It may not have been released yet.",
+        )
+
+    expires_at = now + timedelta(minutes=config.total_time_minutes)
+    session.status = "in_progress"
+    session.started_at = now
+    session.started_by = current_user.id
+    session.expires_at = expires_at
+    db.flush()
+
+    first_question = (
+        db.query(Question)
+        .filter(
+            Question.question_pool_id == config.question_pool_id,
+            Question.question_kind == "main",
+            Question.is_active.is_(True),
+        )
+        .order_by(Question.display_order.asc())
+        .first()
+    )
+    if not first_question:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="No active main questions found in the approved pool.",
+        )
+
+    # Record the question as a runtime item
+    item = SessionQuestionItem(
+        session_id=session.id,
+        source_question_id=first_question.id,
+        asked_text=first_question.question_text,
+        question_kind="main",
+        main_group_no=1,
+        followup_no=None,
+        generated_by="approved_pool",
+    )
+    db.add(item)
+    db.flush()
+
+    # Write the first transcript message
+    msg = TranscriptMessage(
+        session_id=session.id,
+        session_question_item_id=item.id,
+        sender_role="assistant",
+        message_type="main_question",
+        sequence_no=1,
+        content=first_question.question_text,
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(session)
+    db.refresh(item)
+
+    return SessionStartResponse(
+        session_id=session.id,
+        assessment_title=config.title,
+        total_time_minutes=config.total_time_minutes,
+        expires_at=expires_at,
+        first_question=SessionQuestionItemOut.model_validate(item),
+    )

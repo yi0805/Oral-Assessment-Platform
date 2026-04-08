@@ -14,7 +14,7 @@ PUT    /questions/{question_id}                             Edit a question
 DELETE /questions/{question_id}                             Remove a question
 """
 from uuid import UUID
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
@@ -556,6 +556,8 @@ class UpdateNowRequest(BaseModel):
     total_time_minutes: int = 15
     max_followups_per_main: int = 3
     followup_enabled: bool = True
+    open_at: datetime | None = None
+    close_at: datetime | None = None
 
 class QuestionUpdate(BaseModel):
     question_text: str | None = None
@@ -659,6 +661,8 @@ async def update_now(
         max_main_questions=payload.num_main_questions,
         max_followups_per_main=payload.max_followups_per_main,
         followup_enabled=payload.followup_enabled,
+        open_at=now,
+        close_at=now + timedelta(days=10),
     )
     db.add(config)
 

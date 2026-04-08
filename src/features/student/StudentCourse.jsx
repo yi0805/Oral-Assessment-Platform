@@ -1,18 +1,16 @@
 import { useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 
-import getAssessmentByCourseAndStudent from "../../utils/getAssessmentByCourseAndStudent";
-import getEarliestAssessment from "../../utils/getEarliestAssessment";
-
 import { useCourseAssessments } from "./useCourseAssessments";
 import { useCourses } from "../../hooks/useCourses";
 import Spinner from "../../ui/Spinner";
+import { formatDeadline } from "../../utils/formatDeadline";
 
 export default function StudentCourse() {
   const navigate = useNavigate();
   const { courseId } = useParams();
   const [isOpen, setIsOpen] = useState(false);
-  const [assessmentId, setAssessmentId] = useState(null);
+  const [assessmentConfigId, setAssessmentConfigId] = useState(null);
   const { courses, isLoading } = useCourses();
   const { assessments, isLoading: isAssessmentsLoading } =
     useCourseAssessments(courseId);
@@ -23,17 +21,14 @@ export default function StudentCourse() {
     (course) => String(course.id) === String(courseId),
   );
 
-  console.log(assessments);
-  console.log(course);
-
   const sortedAssessments = [...assessments].sort(
     (a, b) => new Date(a.close_at || 0) - new Date(b.close_at || 0),
   );
 
-  // const earliestDeadline =
-  //   sortedAssessments.length > 0
-  //     ? formatDeadline(sortedAssessments[0].close_at)
-  //     : null;
+  const earliestDeadline =
+    sortedAssessments.length > 0
+      ? formatDeadline(sortedAssessments[0].close_at)
+      : null;
 
   console.log(assessments);
   console.log(course);
@@ -73,7 +68,8 @@ export default function StudentCourse() {
                 <p className="text-sm font-medium text-on-surface-variant">
                   Next Deadline:
                   <span className="font-bold text-error">
-                    {/* {earliestDeadline} */}
+                    {" "}
+                    {earliestDeadline}
                   </span>
                 </p>
               </div>
@@ -83,12 +79,12 @@ export default function StudentCourse() {
                 if (index === 0) {
                   return (
                     <div
-                      key={index}
+                      key={assessment.assessment_config_id}
                       className="group col-span-12 cursor-pointer lg:col-span-8"
-                      // onClick={() => {
-                      //   setIsOpen(true);
-                      //   setAssessmentId(assessment.assessment);
-                      // }}
+                      onClick={() => {
+                        setIsOpen(true);
+                        setAssessmentConfigId(assessment.assessment_config_id);
+                      }}
                     >
                       <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8 transition-all hover:shadow-2xl hover:shadow-primary/5">
                         <div className="absolute right-0 top-0 p-8">
@@ -108,7 +104,8 @@ export default function StudentCourse() {
                             {assessment.title}
                           </h2>
                           <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
-                            {assessment.instructions}
+                            {assessment.instructions ||
+                              "No instructions provided."}
                           </p>
                         </div>
                         <div className="mt-12 flex items-center justify-between">
@@ -123,10 +120,11 @@ export default function StudentCourse() {
                             </div>
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                                Main Questions
+                                Questions
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
-                                {assessment.max_main_questions}
+                                {assessment.max_main_questions} main •{" "}
+                                {assessment.max_followups_per_main} each
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -134,8 +132,7 @@ export default function StudentCourse() {
                                 Weight
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
-                                {/* {assessment.grade}  */}
-                                Final Grade
+                                10% Final Grade
                               </span>
                             </div>
                           </div>
@@ -160,12 +157,12 @@ export default function StudentCourse() {
                 if (index === 1) {
                   return (
                     <div
-                      key={index}
+                      key={assessment.assessment_config_id}
                       className="group col-span-12 cursor-pointer lg:col-span-4"
-                      // onClick={() => {
-                      //   setIsOpen(true);
-                      //   setAssessmentId(assessment.assessment);
-                      // }}
+                      onClick={() => {
+                        setIsOpen(true);
+                        setAssessmentConfigId(assessment.assessment_config_id);
+                      }}
                     >
                       <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
                         <div>
@@ -174,14 +171,15 @@ export default function StudentCourse() {
                               database
                             </span>
                             <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
-                              {/* {assessment.deadline} */}
+                              {formatDeadline(assessment.close_at)}
                             </span>
                           </div>
                           <h3 className="mb-2 text-lg font-bold text-on-surface">
                             {assessment.title}
                           </h3>
                           <p className="text-xs leading-relaxed text-on-surface-variant">
-                            {assessment.instructions}
+                            {assessment.instructions ||
+                              "No instructions provided."}
                           </p>
                         </div>
                         <div className="mt-8">
@@ -197,11 +195,11 @@ export default function StudentCourse() {
 
                 return (
                   <div
-                    key={index}
+                    key={assessment.assessment_config_id}
                     className="group col-span-12 cursor-pointer md:col-span-4 lg:col-span-3"
                     onClick={() => {
                       setIsOpen(true);
-                      setAssessmentId(assessment.assessment);
+                      setAssessmentConfigId(assessment.assessment_config_id);
                     }}
                   >
                     <div className="rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-lg">
@@ -212,7 +210,7 @@ export default function StudentCourse() {
                         {assessment.title}
                       </h3>
                       <p className="mb-6 text-xs text-on-surface-variant">
-                        {assessment.instructions}
+                        {assessment.instructions || "No instructions provided."}
                       </p>
                       <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
                         <span className="material-symbols-outlined text-sm">
@@ -304,15 +302,9 @@ export default function StudentCourse() {
             <div className="flex flex-col gap-3">
               <button
                 className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
-                // onClick={() =>
-                //   navigate(`/student/${courseId}/${assessmentId}`, {
-                //     state: {
-                //       studentName,
-                //       courseId,
-                //       assessmentId,
-                //     },
-                //   })
-                // }
+                onClick={() =>
+                  navigate(`/student/${courseId}/${assessmentConfigId}`)
+                }
               >
                 START ASSESSMENT
               </button>
