@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Routes, Route } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { Toaster } from "react-hot-toast";
 
 import AppLayout from "./ui/AppLayout";
 import Home from "./pages/Home";
@@ -69,6 +70,38 @@ function App() {
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </BrowserRouter>
+
+      <Toaster
+        position="top-center"
+        gutter={12}
+        containerStyle={{ margin: "8px" }}
+        toastOptions={{
+          style: {
+            fontSize: "14px",
+            maxWidth: "520px",
+            padding: "14px 18px",
+            borderRadius: "16px",
+            background: "var(--color-surface-container-lowest)",
+            color: "var(--color-on-surface)",
+            border: "1px solid var(--color-outline-variant)",
+            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.08)",
+          },
+          success: {
+            duration: 3000,
+            iconTheme: {
+              primary: "var(--color-primary)",
+              secondary: "var(--color-on-primary)",
+            },
+          },
+          error: {
+            duration: 5000,
+            iconTheme: {
+              primary: "var(--color-error)",
+              secondary: "var(--color-on-error)",
+            },
+          },
+        }}
+      />
     </QueryClientProvider>
   );
 }

@@ -23,6 +23,7 @@ function InstructorPendingGrades() {
     const courseCode = review.course.course_code;
     const title = review.assessment_config.title;
     const suggestedGrade = review.aisummary?.suggested_grade;
+    const instructorGrade = review.instructor_feedback?.final_grade;
 
     return {
       sessionId,
@@ -33,6 +34,7 @@ function InstructorPendingGrades() {
       courseCode,
       title,
       suggestedGrade,
+      instructorGrade,
     };
   });
 

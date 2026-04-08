@@ -960,6 +960,7 @@ class PendingReviewOut(BaseModel):
     user:  UserOut
     course: CourseOut 
     aisummary: AISummaryOut | None
+    instructor_feedback: InstructorFeedbackOut | None
 
 class StudentInfoOut(BaseModel):
     full_name: str
@@ -1062,7 +1063,7 @@ def pending_Reviews(
     current_user: User = Depends(get_current_user),
 ):
     pendingReviews = (
-        db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary)
+        db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary, InstructorFeedback)
         .join(
             CourseEnrollment,
             CourseEnrollment.course_id == AssessmentSession.course_id,
@@ -1083,6 +1084,7 @@ def pending_Reviews(
             AISummary,
             AISummary.session_id == AssessmentSession.id,
         )
+        .outerjoin(InstructorFeedback, InstructorFeedback.session_id == AssessmentSession.id)
         .filter(CourseEnrollment.user_id == current_user.id)
         .filter(CourseEnrollment.course_role == "instructor")
         .filter(CourseEnrollment.is_active == True)
@@ -1098,9 +1100,9 @@ def pending_Reviews(
             "user": user,
             "course": course,
             "aisummary": ai_summary,
-
+            "instructor_feedback": instructor_feedback,
         }
-        for session, assessment_config, user, course, ai_summary in pendingReviews
+        for session, assessment_config, user, course, ai_summary, instructor_feedback in pendingReviews
     ]
 
 @router.get("/transcript/{session_id}", response_model=TranscriptDetailOut, summary="Integration",)
@@ -1196,6 +1198,7 @@ def list_my_course_assessments(
         .filter(
             AssessmentSession.course_id == course_id,
             AssessmentSession.student_id == current_user.id,
+            AssessmentSession.status.in_(["not_started", "in_progress"]),
         )
         .order_by(AssessmentConfig.created_at.desc())
         .all()

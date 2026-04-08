@@ -615,6 +615,7 @@ def upsert_review(
         .first()
     )
 
+
     if not feedback:
         feedback = InstructorFeedback(
             session_id=session_id,
@@ -626,7 +627,15 @@ def upsert_review(
         feedback.final_grade = payload.final_grade
         feedback.comments = payload.comments
 
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+    session.status = "released"
+
     db.commit()
     db.refresh(feedback)
+    db.refresh(session)
 
     return {"message": f"Instructor review saved for session {session_id}."}
