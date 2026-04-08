@@ -44,3 +44,22 @@ export async function upsertReview(sessionId, finalGrade, comments) {
   });
   return response.data;
 }
+
+export async function startSession(assessmentConfigId) {
+  const response = await api.post(
+    `/assessments/${assessmentConfigId}/sessions/start`,
+  );
+  return response.data;
+}
+
+export async function respondSession(sessionId, answerText) {
+  const response = await api.post(`/sessions/${sessionId}/respond`, {
+    answer_text: answerText,
+  });
+  return response.data;
+}
+
+export async function completeSession(sessionId) {
+  const response = await api.post(`/sessions/${sessionId}/complete`);
+  return response.data;
+}

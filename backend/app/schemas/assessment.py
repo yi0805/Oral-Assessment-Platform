@@ -128,6 +128,9 @@ class SessionStartResponse(BaseModel):
     total_time_minutes: int
     expires_at: datetime
     first_question: "SessionQuestionItemOut"
+    max_main_questions: int
+    max_followups_per_main: int
+    
 
 
 class StudentResponseRequest(BaseModel):
@@ -140,7 +143,7 @@ class StudentResponseResponse(BaseModel):
     message_saved: "TranscriptMessageOut | None"
     next_question: "SessionQuestionItemOut | None"
     session_status: SessionStatus
-    time_remaining_seconds: int
+    # time_remaining_seconds: int
 
 
 class SessionOut(BaseModel):
