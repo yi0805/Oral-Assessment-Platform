@@ -8,7 +8,7 @@ function CourseSelector({ courses, selectedCourse, onChange }) {
       >
         {courses.map((course) => (
           <option key={course.id} value={course.id}>
-            {course.id} : {course.name}
+            {course.course_code} : {course.course_name}
           </option>
         ))}
       </select>

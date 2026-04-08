@@ -35,7 +35,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor, require_student
@@ -1040,6 +1040,26 @@ class SessionStartResponse(BaseModel):
     max_followups_per_main: int
 
 
+class AssessmentHistoryItemOut(BaseModel):
+    session_id: UUID
+    assessment_config_id: UUID
+    assessment_title: str
+    submitted_at: datetime | None = None
+    weight_percent: float | None = None
+    final_grade: int
+    instructor_name: str
+    instructor_image: str | None = None
+    instructor_department: str | None = None
+    comments: str | None = None
+
+
+class AssessmentHistoryOut(BaseModel):
+    course_code: str | None = None
+    course_name: str
+    class_average_grade: float | None = None
+    items: list[AssessmentHistoryItemOut]
+
+
 async def _run_ai_summary_background(session_id: UUID) -> None:
     """Run AI summary generation in a background task with its own DB session."""
     from app.core.database import SessionLocal
@@ -1223,6 +1243,87 @@ def list_my_course_assessments(
 
     return items
 
+
+@router.get(
+    "/courses/{course_id}/my-assessment-history",
+    response_model=AssessmentHistoryOut,
+    summary="Integration",
+)
+def get_my_assessment_history(
+    course_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+            CourseEnrollment.is_active.is_(True),
+        )
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not enrolled in this course.",
+        )
+
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found.",
+        )
+
+    rows = (
+        db.query(AssessmentSession, AssessmentConfig, InstructorFeedback, User)
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .join(InstructorFeedback, InstructorFeedback.session_id == AssessmentSession.id)
+        .join(User, User.id == InstructorFeedback.instructor_id)
+        .filter(
+            AssessmentSession.course_id == course_id,
+            AssessmentSession.student_id == current_user.id,
+            AssessmentSession.status == "released",
+            InstructorFeedback.final_grade.isnot(None),
+        )
+        .order_by(
+            func.coalesce(AssessmentSession.ended_at, InstructorFeedback.released_at).desc()
+        )
+        .all()
+    )
+
+    items = [
+        AssessmentHistoryItemOut(
+            session_id=session.id,
+            assessment_config_id=config.id,
+            assessment_title=config.title,
+            submitted_at=session.ended_at or feedback.released_at,
+            final_grade=feedback.final_grade,
+            instructor_name=instructor.full_name,
+            instructor_image=instructor.image,
+            comments=feedback.comments,
+        )
+        for session, config, feedback, instructor in rows
+    ]
+
+    class_avg = (
+        db.query(func.avg(InstructorFeedback.final_grade))
+        .join(AssessmentSession, InstructorFeedback.session_id == AssessmentSession.id)
+        .filter(
+            AssessmentSession.course_id == course_id,
+            AssessmentSession.status == "released",
+            InstructorFeedback.final_grade.isnot(None),
+        )
+        .scalar()
+    )
+
+    return AssessmentHistoryOut(
+        course_code=course.course_code,
+        course_name=course.course_name,
+        class_average_grade=round(float(class_avg), 2) if class_avg is not None else None,
+        items=items,
+    )
 
 
 @router.post(

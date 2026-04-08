@@ -579,22 +579,42 @@ def update_grade(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    feedback = db.query(InstructorFeedback).filter(
-        InstructorFeedback.session_id == session_id
-    ).first()
-    if not feedback:
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+        )
+   
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No feedback found. Submit instructor feedback updating the grade.",
+            detail="Session not found.",
         )
 
-    if feedback.released_to_student:
+    feedback = (
+        db.query(InstructorFeedback)
+        .filter(InstructorFeedback.session_id == session_id)
+        .first()
+        )
+
+    if feedback and feedback.released_to_student:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Results have already been released to this student.",
         )
 
-    feedback.final_grade = payload.grade
+    if not feedback:
+        feedback = InstructorFeedback(
+            session_id=session_id,
+            instructor_id=current_user.id,
+            final_grade=payload.grade,
+        )
+        db.add(feedback)
+    else:
+        feedback.instructor_id = current_user.id
+        feedback.final_grade = payload.grade
+
+    
 
 
     db.commit()
@@ -619,12 +639,14 @@ def upsert_review(
     if not feedback:
         feedback = InstructorFeedback(
             session_id=session_id,
+            instructor_id=current_user.id,
             final_grade=payload.final_grade,
             comments=payload.comments,
         )
         db.add(feedback)
     else:
         feedback.final_grade = payload.final_grade
+        feedback.instructor_id = current_user.id
         feedback.comments = payload.comments
 
     session = (
@@ -632,7 +654,13 @@ def upsert_review(
         .filter(AssessmentSession.id == session_id)
         .first()
     )
+
+    now = datetime.now(timezone.utc)
+    feedback.released_to_student = True
+    feedback.released_at = now
+
     session.status = "released"
+    session.released_at = now
 
     db.commit()
     db.refresh(feedback)

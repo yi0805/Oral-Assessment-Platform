@@ -148,7 +148,7 @@ function PendingStudentTable({
                       <input
                         className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
                         type="text"
-                        value={currentGrade || review.instructorGrade}
+                        value={currentGrade}
                         onChange={(e) =>
                           onGradeChange(review.sessionId, e.target.value)
                         }

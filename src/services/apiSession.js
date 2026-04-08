@@ -15,6 +15,11 @@ export async function getMyAssessmentSessions(courseId) {
   return response.data;
 }
 
+export async function getMyAssessmentHistory(courseId) {
+  const response = await api.get(`/courses/${courseId}/my-assessment-history`);
+  return response.data;
+}
+
 export async function updatePendingReview(sessionId, studentId) {
   const response = await api.put(
     `/sessions/${sessionId}/${studentId}/release/session`,
