@@ -212,7 +212,6 @@ def list_materials(
     q = (
         db.query(Material)
         .filter(Material.course_id == course_id)
-        .order_by(Material.uploaded_at.desc())
     )
     total = q.count()
     items = q.offset((page - 1) * page_size).limit(page_size).all()
@@ -348,7 +347,6 @@ async def upload_material(
                 CourseEnrollment.course_id == course_id,
                 CourseEnrollment.user_id == current_user.id,
                 CourseEnrollment.course_role.in_(["instructor", "ta"]),
-                CourseEnrollment.is_active.is_(True),
             )
             .first()
         )
@@ -369,7 +367,7 @@ async def upload_material(
         db.query(Material)
         .filter(
             Material.course_id == course_id,
-            Material.original_filename == filename,
+            Material.filename == filename,
         )
         .first()
     )
@@ -384,33 +382,18 @@ async def upload_material(
         # )
         return existing_material.id
 
-    if extension not in ALLOWED_FILE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"File type '{extension}' is not supported. Allowed types: {sorted(ALLOWED_FILE_TYPES)}",
-        )
-
-    file_bytes = await file.read()
-    if not file_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The uploaded file is empty.",
-        )
-
     material_id = uuid4()
     storage_key = s3_client.generate_key(course_id, material_id, filename)
     content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
 
     try:
         s3_client.upload_file(
-            file_bytes,
             storage_key,
             content_type=content_type,
             metadata={
                 "course_id": str(course_id),
                 "material_id": str(material_id),
-                "title": title,
-                "uploaded_by": str(current_user.id),
+                "title": filename,
             },
         )
     except RuntimeError as exc:
@@ -422,14 +405,9 @@ async def upload_material(
     material = Material(
         id=material_id,
         course_id=course_id,
-        uploaded_by=current_user.id,
-        title=title,
-        original_filename=filename,
-        file_type=extension,
+        filename=filename,
         mime_type=content_type,
         storage_key=storage_key,
-        file_size_bytes=len(file_bytes),
-        processing_status="uploaded",
     )
 
     try:

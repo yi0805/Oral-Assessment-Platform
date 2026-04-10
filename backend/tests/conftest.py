@@ -410,8 +410,8 @@ def full_assessment_setup(client: TestClient, db_session: Session) -> dict:
     config = AssessmentConfig(
         course_id=course.id, question_pool_id=pool.id,
         title="Test Assessment", assessment_mode="generic",
-        total_time_minutes=30, max_main_questions=2,
-        max_followups_per_main=1, followup_enabled=True,
+        total_time_minutes=30, main_question_num=2,
+        follow_up_num=1, followup_enabled=True,
         status="published",
         published_by=instructor.id,
         published_at=datetime.now(timezone.utc),

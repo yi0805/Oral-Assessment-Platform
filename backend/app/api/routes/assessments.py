@@ -21,7 +21,7 @@ from app.core.dependencies import get_current_user, require_instructor
 from app.models.assessment import AssessmentConfig,AssessmentSession
 from app.models.course import Course,CourseEnrollment
 from app.models.question import QuestionPool, Question
-from app.models.rubric import Rubric
+from app.models.material import Material, MaterialChunk
 from app.models.user import User
 from app.schemas.pagination import Page
 from app.schemas.assessment import (
@@ -45,7 +45,7 @@ router = APIRouter()
     summary="Create an assessment configuration",
     description=(
         "Instructor-only. The question pool must already be in 'approved' status. "
-        "The instructor sets max_main_questions and max_followups_per_main."
+        "The instructor sets main_question_num and follow_up_num."
     ),
 )
 def create_assessment(
@@ -67,12 +67,12 @@ def create_assessment(
             detail="The question pool must be approved before creating an assessment.",
         )
 
-    rubric = db.query(Rubric).filter(Rubric.id == payload.rubric_id).first()
+    rubric = db.query(Material).filter(Material.id == payload.material_r_id).first()
     if not rubric:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
 
     # Validate business rules
-    if payload.total_time_minutes < 10:
+    if payload.total_time_minute < 10:
         raise HTTPException(
             status_code=422,
             detail="total_time_minutes must be at least 10 minutes"
@@ -107,16 +107,14 @@ def create_assessment(
         course_id=course_id,
         question_pool_id=payload.question_pool_id,
         title=payload.title,
-        instructions=payload.instructions,
-        assessment_mode=payload.assessment_mode,
-        rubric_id=payload.rubric_id,
-        total_time_minutes=payload.total_time_minutes,
-        per_question_time_limit_minutes=payload.per_question_time_limit_minutes,
-        max_main_questions=payload.max_main_questions,
-        max_followups_per_main=payload.max_followups_per_main,
-        followup_enabled=payload.followup_enabled,
-        open_at=payload.open_at,
-        close_at=payload.close_at,
+        description=payload.description,
+        material_r_id=payload.material_r_id,
+        total_time_minute=payload.total_time_minute,
+        # per_question_time_limit_minutes=payload.per_question_time_limit_minutes,
+        main_question_num=payload.main_question_num,
+        follow_up_num=payload.follow_up_num,
+        release_time=payload.release_time,
+        due_time=payload.due_time,
     )
     db.add(config)
     db.commit()
@@ -203,7 +201,7 @@ def update_assessment(
     summary="Publish an assessment",
     description=(
         "Instructor-only. Makes the assessment available to enrolled students. "
-        "Validates that required fields (max_main_questions, etc.) are set before publishing."
+        "Validates that required fields (main_question_num, etc.) are set before publishing."
     ),
 )
 def publish_assessment(
@@ -220,10 +218,10 @@ def publish_assessment(
             detail="Assessment is already published or closed.",
         )
 
-    if config.max_main_questions is None:
+    if config.main_question_num is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="max_main_questions must be set before publishing.",
+            detail="main_question_num must be set before publishing.",
         )
     if config.followup_enabled and config.max_followups_per_main is None:
         raise HTTPException(
@@ -275,32 +273,16 @@ def release_assessment(
     if config.status != "draft":
         raise HTTPException(status_code=409, detail="Assessment is already published or closed.")
 
-    if config.max_main_questions is None:
-        raise HTTPException(status_code=422, detail="max_main_questions must be set before publishing.")
-
-    active_q_count = (
-        db.query(Question)
-        .filter(
-            Question.question_pool_id == config.question_pool_id,
-            Question.question_kind == "main",
-            Question.is_active.is_(True),
-        )
-        .count()
-    )
-    if active_q_count == 0:
-        raise HTTPException(status_code=422, detail="No active main questions in the pool.")
+    if config.main_question_num is None:
+        raise HTTPException(status_code=422, detail="main_question_num must be set before publishing.")
 
     now = datetime.now(timezone.utc)
     config.status = "published"
-    config.published_at = now
-    config.published_by = current_user.id
-
     student_enrollments = (
         db.query(CourseEnrollment)
         .filter(
             CourseEnrollment.course_id == course_id,
             CourseEnrollment.course_role == "student",
-            CourseEnrollment.is_active.is_(True),
         )
         .all()
     )
@@ -311,7 +293,7 @@ def release_assessment(
             db.query(AssessmentSession)
             .filter(
                 AssessmentSession.assessment_config_id == assessment_config_id,
-                AssessmentSession.student_id == enrollment.user_id,
+                AssessmentSession.user_s_id == enrollment.user_id,
             )
             .first()
         )
@@ -319,7 +301,7 @@ def release_assessment(
             db.add(AssessmentSession(
                 assessment_config_id=config.id,
                 course_id=course_id,
-                student_id=enrollment.user_id,
+                user_s_id=enrollment.user_id,
                 status="not_started",
             ))
             sessions_created += 1

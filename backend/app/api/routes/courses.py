@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 
-from app.models.feedback import AISummary, InstructorFeedback
+from app.models.feedback import AISummary, SessionFeedback
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 from app.models.course import Course, CourseEnrollment
@@ -158,7 +158,6 @@ def get_course(
             .filter(
                 CourseEnrollment.course_id == course_id,
                 CourseEnrollment.user_id == current_user.id,
-                CourseEnrollment.is_active.is_(True),
             )
             .first()
         )
@@ -465,7 +464,6 @@ def list_courses(
         db.query(Course)
         .join(CourseEnrollment, CourseEnrollment.course_id == Course.id)
         .filter(CourseEnrollment.user_id == current_user.id)
-        .filter(CourseEnrollment.is_active == True)
         .order_by(Course.course_code)
         .distinct()
         .all()
@@ -564,7 +562,7 @@ def get_instructor_dashboard(
             AssessmentConfig,
             User,
             AISummary,
-            InstructorFeedback,
+            SessionFeedback,
             
         )
         .join(
@@ -580,10 +578,10 @@ def get_instructor_dashboard(
             AISummary.session_id == AssessmentSession.id,
         )
         .outerjoin(
-            InstructorFeedback,
+            SessionFeedback,
             and_(
-                InstructorFeedback.session_id == AssessmentSession.id,
-                InstructorFeedback.instructor_id == current_user.id,
+                SessionFeedback.session_id == AssessmentSession.id,
+                SessionFeedback.user_i_id == current_user.id,
             ),
         )
         .filter(
