@@ -145,7 +145,6 @@ def require_enrollment(
         .filter(
             CourseEnrollment.course_id == course_id,
             CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.is_active.is_(True),
         )
         .first()
     )

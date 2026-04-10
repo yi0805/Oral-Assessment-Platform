@@ -2,7 +2,7 @@
 Pydantic schemas for assessment configuration, session lifecycle, and chat interaction.
 
 User flow alignment:
-- max_main_questions and max_followups_per_main are REQUIRED in ConfigCreate
+- main_question_num and follow_up_num are REQUIRED in ConfigCreate
   because the instructor must set these per the user flow (Phase 3: Configure Settings).
   There is no hardcoded default — the "e.g. 3 Main Questions" in the user flow
   is an example, not a fixed value.
@@ -25,25 +25,24 @@ class AssessmentConfigBase(BaseModel):
     title: str
     instructions: str | None = None
     assessment_mode: AssessmentMode = AssessmentMode.generic
-    rubric_id: UUID | None = None
-    total_time_minutes: int = 15
-    per_question_time_limit_minutes: int | None = None
-    max_main_questions: int = 3
-    max_followups_per_main: int = 1
-    followup_enabled: bool = True
+    material_r_id: UUID | None = None
+    total_time_minute: int = 15
+    # per_question_time_limit_minutes: int | None = None
+    main_questions_num: int = 3
+    follow_up_num: int = 1
     open_at: datetime | None = None
     close_at: datetime | None = None
 
     @model_validator(mode="after")
     def validate_assessment_logic(self):
-        if self.per_question_time_limit_minutes is None:
-            if self.max_main_questions > 0:
-                self.per_question_time_limit_minutes = max(
-                    3, # at least 3 minutes per question
-                    self.total_time_minutes // self.max_main_questions
-                )
-            else:
-                self.per_question_time_limit_minutes = self.total_time_minutes
+        # if self.per_question_time_limit_minutes is None:
+        #     if self.main_question_num > 0:
+        #         self.per_question_time_limit_minutes = max(
+        #             3, # at least 3 minutes per question
+        #             self.total_time_minutes // self.max_main_questions
+        #         )
+        #     else:
+        #         self.per_question_time_limit_minutes = self.total_time_minutes
 
         if self.open_at and self.close_at and self.close_at <= self.open_at:
             raise ValueError("close_at must be after open_at")
@@ -70,11 +69,11 @@ class AssessmentConfigUpdate(BaseModel):
     title: str | None = None
     instructions: str | None = None
     assessment_mode: AssessmentMode | None = None
-    rubric_id: UUID | None = None
+    material_r_id: UUID | None = None
     total_time_minutes: int | None = None
     per_question_time_limit_minutes: int | None = None
-    max_main_questions: int | None = None
-    max_followups_per_main: int | None = None
+    main_question_num: int | None = None
+    follow_up_num: int | None = None
     followup_enabled: bool | None = None
     open_at: datetime | None = None
     close_at: datetime | None = None
@@ -88,13 +87,13 @@ class AssessmentConfigOut(AssessmentConfigBase):
     course_id: UUID
     question_pool_id: UUID | None
     title: str
-    instructions: str | None
+    description: str | None
     assessment_mode: AssessmentMode
-    rubric_id: UUID | None
+    material_r_id: UUID | None
     total_time_minutes: int
     per_question_time_limit_minutes: int | None
-    max_main_questions: int | None
-    max_followups_per_main: int | None
+    main_question_num: int | None
+    follow_up_num: int | None
     followup_enabled: bool
     open_at: datetime | None
     close_at: datetime | None
@@ -114,7 +113,7 @@ class AssessmentConfigBrief(BaseModel):
     assessment_mode: AssessmentMode
     status: AssessmentStatus
     total_time_minutes: int
-    max_main_questions: int | None
+    main_question_num: int | None
     open_at: datetime | None
     close_at: datetime | None
 
@@ -128,8 +127,8 @@ class SessionStartResponse(BaseModel):
     total_time_minutes: int
     expires_at: datetime
     first_question: "SessionQuestionItemOut"
-    max_main_questions: int
-    max_followups_per_main: int
+    main_question_num: int
+    follow_up_num: int
     
 
 

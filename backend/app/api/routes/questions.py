@@ -25,7 +25,7 @@ from app.models.assessment import AssessmentConfig
 from app.models.course import Course, CourseEnrollment
 from app.models.question import Question, QuestionPool
 from app.models.user import User
-from app.models.rubric import Rubric
+from app.models.material import Material
 from app.core.limiter import limiter
 from app.core.config import settings
 from app.schemas.assessment import AssessmentConfigOut
@@ -299,7 +299,7 @@ def publish_pool_as_assessment(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
     
     # Validate business rules
-    if payload.total_time_minutes < 10:
+    if payload.total_time_minute < 10:
         raise HTTPException(
             status_code=422,
             detail="total_time_minutes must be at least 10 minutes"
@@ -323,16 +323,14 @@ def publish_pool_as_assessment(
         course_id=pool.course_id,
         question_pool_id=pool.id,
         title=payload.title,
-        instructions=payload.instructions,
-        assessment_mode="generic",
-        rubric_id=payload.rubric_id,
-        total_time_minutes=payload.total_time_minutes,
-        per_question_time_limit_minutes=payload.per_question_time_limit_minutes,
-        max_main_questions=payload.max_main_questions,
-        max_followups_per_main=payload.max_followups_per_main,
-        followup_enabled=payload.followup_enabled,
-        open_at=payload.open_at,
-        close_at=payload.close_at,
+        description=payload.description,
+        material_r_id=payload.material_r_id,
+        total_time_minute=payload.total_time_minute,
+        # per_question_time_limit_minutes=payload.per_question_time_limit_minutes,
+        main_question_num=payload.main_question_num,
+        follow_up_num=payload.follow_up_num,
+        release_time=payload.release_time,
+        due_time=payload.due_time,
     )
     db.add(config)
     db.flush()
@@ -340,8 +338,6 @@ def publish_pool_as_assessment(
     # Step 3: Publish immediately
     now = datetime.now(timezone.utc)
     config.status = "published"
-    config.published_at = now
-    config.published_by = current_user.id
 
     db.commit()
     db.refresh(config)
@@ -367,14 +363,8 @@ def add_question(
 
     question = Question(
         question_pool_id=pool_id,
-        parent_question_id=payload.parent_question_id,
         question_text=payload.question_text,
         question_kind=payload.question_kind,
-        answer_style=payload.answer_style,
-        difficulty=payload.difficulty,
-        learning_objective=payload.learning_objective,
-        display_order=payload.display_order,
-        created_by=current_user.id,
     )
     db.add(question)
     db.commit()
@@ -550,7 +540,7 @@ def add_question(
 
 class UpdateNowRequest(BaseModel):
     material_ids: list[UUID]
-    rubric_id: UUID
+    material_r_id: UUID
     assessment_title: str
     num_main_questions: int = 3
     total_time_minutes: int = 15
@@ -600,7 +590,7 @@ async def update_now(
     if not enrollment:
         raise HTTPException(status_code=403, detail="You are not an instructor in this course.")
 
-    rubric = db.query(Rubric).filter(Rubric.id == payload.rubric_id).first()
+    rubric = db.query(Material).filter(Material.id == payload.material_r_id).first()
     if not rubric:
         raise HTTPException(status_code=404, detail="Rubric not found")
 
@@ -637,8 +627,8 @@ async def update_now(
             db=db,
             pool_id=pool.id,
             material_ids=payload.material_ids,
-            rubric_id=payload.rubric_id,
-            num_main_questions=payload.num_main_questions,
+            material_r_id=payload.material_r_id,
+            main_question_num=payload.main_question_num,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -656,10 +646,10 @@ async def update_now(
         question_pool_id=pool.id,
         title=payload.assessment_title,
         assessment_mode="generic",
-        rubric_id=payload.rubric_id,
+        material_r_id=payload.material_r_id,
         total_time_minutes=payload.total_time_minutes,
-        max_main_questions=payload.num_main_questions,
-        max_followups_per_main=payload.max_followups_per_main,
+        main_question_num=payload.num_main_questions,
+        follow_up_num=payload.follow_up_num,
         followup_enabled=payload.followup_enabled,
         open_at=now,
         close_at=now + timedelta(days=10),

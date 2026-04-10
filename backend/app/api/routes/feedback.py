@@ -34,7 +34,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor, require_student, get_current_user
 from app.models.assessment import AssessmentSession
-from app.models.feedback import AISummary, InstructorFeedback
+from app.models.feedback import AISummary, SessionFeedback
 from app.models.session_runtime import TranscriptMessage
 from app.models.user import User
 from app.schemas.assessment import TranscriptMessageOut
@@ -125,7 +125,7 @@ async def generate_ai_summary(
 ):
     sess = _get_session_or_404(db, session_id)
 
-    if sess.status not in ("submitted", "under_review", "time_expired"):
+    if sess.status != "under_review":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -194,14 +194,14 @@ def create_feedback(
 ):
     sess = _get_session_or_404(db, session_id)
 
-    if sess.status not in ("under_review", "submitted"):
+    if sess.status != "under_review":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Feedback cannot be added to a session with status '{sess.status}'.",
         )
 
-    existing = db.query(InstructorFeedback).filter(
-        InstructorFeedback.session_id == session_id
+    existing = db.query(SessionFeedback).filter(
+        SessionFeedback.session_id == session_id
     ).first()
     if existing:
         raise HTTPException(
@@ -209,14 +209,11 @@ def create_feedback(
             detail="Feedback already exists for this session. Use PUT to update.",
         )
 
-    feedback = InstructorFeedback(
+    feedback = SessionFeedback(
         session_id=session_id,
-        instructor_id=current_user.id,
+        user_i_id=current_user.id,
         comments=payload.comments,
-        grading_rationale=payload.grading_rationale,
-        provisional_grade=payload.provisional_grade,
         final_grade=payload.final_grade,
-        student_visible_comments=payload.student_visible_comments,
     )
     db.add(feedback)
     db.commit()
@@ -241,8 +238,8 @@ def update_feedback(
 ):
     _get_session_or_404(db, session_id)
 
-    feedback = db.query(InstructorFeedback).filter(
-        InstructorFeedback.session_id == session_id
+    feedback = db.query(SessionFeedback).filter(
+        SessionFeedback.session_id == session_id
     ).first()
     if not feedback:
         raise HTTPException(
@@ -250,7 +247,7 @@ def update_feedback(
             detail="No feedback found for this session. Use POST to create it first.",
         )
 
-    if feedback.released_to_student:
+    if feedback.status != "published":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Feedback has already been released to the student and cannot be modified.",
@@ -276,7 +273,7 @@ def update_feedback(
     description=(
         "Instructor-only. Convenience endpoint: if the instructor is satisfied with the "
         "AI-generated advisory grade and summary, they can accept it in a single call. "
-        "This will: (1) create an InstructorFeedback record using the AI suggested_grade "
+        "This will: (1) create an SessionFeedback record using the AI suggested_grade "
         "as final_grade, (2) use the AI summary as the student-visible feedback, and (3) "
         "immediately release the results to the student. "
         "Requires an AI summary to have been generated first "
@@ -291,12 +288,12 @@ def accept_ai_and_release(
 ):
     sess = _get_session_or_404(db, session_id)
 
-    if sess.status not in ("under_review", "submitted"):
+    if sess.status != "under_review":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 f"Cannot accept AI grade for session with status '{sess.status}'. "
-                "Session must be in 'under_review', or 'submitted' state."
+                "Session must be in 'under_review' state."
             ),
         )
 
@@ -310,17 +307,17 @@ def accept_ai_and_release(
                 "Call POST /sessions/{id}/ai-summary/generate first."
             ),
         )
-    if ai_summary.status != "success" or ai_summary.suggested_grade is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "AI summary did not produce a valid suggested grade. "
-                "Please review the transcript manually and use POST /feedback instead."
-            ),
-        )
+    # if ai_summary.status != "success" or ai_summary.suggested_grade is None:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_409_CONFLICT,
+    #         detail=(
+    #             "AI summary did not produce a valid suggested grade. "
+    #             "Please review the transcript manually and use POST /feedback instead."
+    #         ),
+    #     )
 
-    existing = db.query(InstructorFeedback).filter(
-        InstructorFeedback.session_id == session_id
+    existing = db.query(SessionFeedback).filter(
+        SessionFeedback.session_id == session_id
     ).first()
     if existing:
         raise HTTPException(
@@ -330,20 +327,14 @@ def accept_ai_and_release(
 
     # Use AI suggested grade as the final grade
     final_grade = ai_summary.suggested_grade
-    student_visible_comments = format_for_student(ai_summary, final_grade)
-    grading_rationale = format_for_instructor(ai_summary)
+    comments = ai_summary.summary_text
 
     now = datetime.now(timezone.utc)
-    feedback = InstructorFeedback(
+    feedback = SessionFeedback(
         session_id=session_id,
-        instructor_id=current_user.id,
-        comments=f"[AI grade accepted by {current_user.full_name or current_user.email}]",
-        grading_rationale=grading_rationale,
-        provisional_grade=ai_summary.suggested_grade,
+        user_i_id=current_user.id,
+        comments=comments,
         final_grade=final_grade,
-        student_visible_comments=student_visible_comments,
-        released_to_student=True,
-        released_at=now,
     )
     db.add(feedback)
 
@@ -376,8 +367,8 @@ def accept_ai_and_release(
 # ):
 #     sess = _get_session_or_404(db, session_id)
 
-#     feedback = db.query(InstructorFeedback).filter(
-#         InstructorFeedback.session_id == session_id
+#     feedback = db.query(SessionFeedback).filter(
+#         SessionFeedback.session_id == session_id
 #     ).first()
 #     if not feedback:
 #         raise HTTPException(
@@ -431,17 +422,17 @@ def get_student_results(
     sess = _get_session_or_404(db, session_id)
 
     # Ownership check — students can only view their own sessions
-    if current_user.role == "student" and sess.student_id != current_user.id:
+    if current_user.role == "student" and sess.user_s_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this session.",
         )
 
-    feedback = db.query(InstructorFeedback).filter(
-        InstructorFeedback.session_id == session_id
+    feedback = db.query(SessionFeedback).filter(
+        SessionFeedback.session_id == session_id
     ).first()
 
-    if not feedback or not feedback.released_to_student:
+    if not feedback or not feedback.status=="publish":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your results have not been released yet. Please check back later.",
@@ -491,8 +482,8 @@ def _release_one_result(
 ):
     sess = _get_session_or_404(db, session_id, student_id)
 
-    feedback = db.query(InstructorFeedback).filter(
-        InstructorFeedback.session_id == session_id
+    feedback = db.query(SessionFeedback).filter(
+        SessionFeedback.session_id == session_id
     ).first()
 
     if not feedback:
@@ -501,7 +492,7 @@ def _release_one_result(
             detail="No feedback found. Submit instructor feedback before releasing.",
         )
 
-    if feedback.released_to_student:
+    if feedback.status =="published":
         raise HTTPException( 
             status_code=status.HTTP_409_CONFLICT,
             detail="Results have already been released to this student.",
@@ -514,8 +505,7 @@ def _release_one_result(
         )
 
     now = datetime.now(timezone.utc)
-    feedback.released_to_student = True
-    feedback.released_at = now
+    feedback.status = "published"
 
     sess.status = "released"
     sess.released_at = now
@@ -592,8 +582,8 @@ def update_grade(
         )
 
     feedback = (
-        db.query(InstructorFeedback)
-        .filter(InstructorFeedback.session_id == session_id)
+        db.query(SessionFeedback)
+        .filter(SessionFeedback.session_id == session_id)
         .first()
         )
 
@@ -604,18 +594,15 @@ def update_grade(
         )
 
     if not feedback:
-        feedback = InstructorFeedback(
+        feedback = SessionFeedback(
             session_id=session_id,
-            instructor_id=current_user.id,
+            user_i_id=current_user.id,
             final_grade=payload.grade,
         )
         db.add(feedback)
     else:
-        feedback.instructor_id = current_user.id
+        feedback.user_i_id = current_user.id
         feedback.final_grade = payload.grade
-
-    
-
 
     db.commit()
     db.refresh(feedback)
@@ -630,23 +617,23 @@ def upsert_review(
     current_user: User = Depends(require_instructor),
 ):
     feedback = (
-        db.query(InstructorFeedback)
-        .filter(InstructorFeedback.session_id == session_id)
+        db.query(SessionFeedback)
+        .filter(SessionFeedback.session_id == session_id)
         .first()
     )
 
 
     if not feedback:
-        feedback = InstructorFeedback(
+        feedback = SessionFeedback(
             session_id=session_id,
-            instructor_id=current_user.id,
+            user_i_id=current_user.id,
             final_grade=payload.final_grade,
             comments=payload.comments,
         )
         db.add(feedback)
     else:
         feedback.final_grade = payload.final_grade
-        feedback.instructor_id = current_user.id
+        feedback.user_i_id = current_user.id
         feedback.comments = payload.comments
 
     session = (
@@ -656,11 +643,10 @@ def upsert_review(
     )
 
     now = datetime.now(timezone.utc)
-    feedback.released_to_student = True
+    feedback.status = "published"
     feedback.released_at = now
 
     session.status = "released"
-    session.released_at = now
 
     db.commit()
     db.refresh(feedback)

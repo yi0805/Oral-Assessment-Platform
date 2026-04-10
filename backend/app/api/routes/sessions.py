@@ -42,7 +42,7 @@ from app.core.dependencies import get_current_user, require_instructor, require_
 from app.schemas.pagination import Page
 from app.models.assessment import AssessmentConfig, AssessmentSession
 from app.models.course import CourseEnrollment, Course
-from app.models.feedback import AISummary, InstructorFeedback
+from app.models.feedback import AISummary, SessionFeedback
 from app.models.question import Question
 from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
 from app.models.user import User
@@ -615,8 +615,8 @@ def list_sessions(
             brief.ai_suggested_grade = ai_summary.suggested_grade
 
         # Attach instructor final grade if already graded
-        feedback = db.query(InstructorFeedback).filter(
-            InstructorFeedback.session_id == sess.id
+        feedback = db.query(SessionFeedback).filter(
+            SessionFeedback.session_id == sess.id
         ).first()
         if feedback:
             brief.final_grade = feedback.final_grade
@@ -654,11 +654,11 @@ def get_assessment_stats(
 
     # Collect all numeric final grades for this assessment
     feedbacks = (
-        db.query(InstructorFeedback)
-        .join(AssessmentSession, InstructorFeedback.session_id == AssessmentSession.id)
+        db.query(SessionFeedback)
+        .join(AssessmentSession, SessionFeedback.session_id == AssessmentSession.id)
         .filter(
             AssessmentSession.assessment_config_id == assessment_id,
-            InstructorFeedback.final_grade.isnot(None),
+            SessionFeedback.final_grade.isnot(None),
         )
         .all()
     )
@@ -960,7 +960,7 @@ class PendingReviewOut(BaseModel):
     user:  UserOut
     course: CourseOut 
     aisummary: AISummaryOut | None
-    instructor_feedback: InstructorFeedbackOut | None
+    session_feedback: SessionFeedbackOut | None
 
 class StudentInfoOut(BaseModel):
     full_name: str
@@ -974,7 +974,7 @@ class AISummaryInfoOut(BaseModel):
     suggested_grade: int | None = None
     summary_text: str | None = None
 
-class InstructorFeedbackOut(BaseModel):
+class SessionFeedbackOut(BaseModel):
     final_grade: int | None = None
     comments: str | None = None
 
@@ -988,7 +988,7 @@ class TranscriptDetailOut(BaseModel):
     student: StudentInfoOut
     assessment: AssessmentInfoOut
     ai_summary: AISummaryInfoOut | None = None
-    instructor_feedback: InstructorFeedbackOut | None = None
+    session_feedback: SessionFeedbackOut | None = None
     transcript: list[TranscriptMessageOut]
 
 
@@ -999,12 +999,12 @@ class StudentCourseAssessmentOut(BaseModel):
     session_id: UUID
     session_status: SessionStatus
     title: str
-    instructions: str | None = None
+    description: str | None = None
     total_time_minutes: int
-    max_main_questions: int | None = None
-    max_followups_per_main: int | None = None
-    open_at: datetime | None = None
-    close_at: datetime | None = None
+    main_questions_num: int | None = None
+    follow_up_num: int | None = None
+    release_time: datetime | None = None
+    due_time: datetime | None = None
 
 class StudentSavedMessageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -1033,11 +1033,8 @@ class SessionStartResponse(BaseModel):
     session_id: UUID
     assessment_title: str
     total_time_minutes: int
-    expires_at: datetime | None
-    current_question: SessionQuestionItemOut | None
-    can_complete: bool = False
-    max_main_questions: int
-    max_followups_per_main: int
+    main_question_num: int
+    follow_up_num: int
 
 
 class AssessmentHistoryItemOut(BaseModel):
@@ -1083,14 +1080,14 @@ def pending_Reviews(
     current_user: User = Depends(get_current_user),
 ):
     pendingReviews = (
-        db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary, InstructorFeedback)
+        db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary, SessionFeedback)
         .join(
             CourseEnrollment,
             CourseEnrollment.course_id == AssessmentSession.course_id,
         )
         .join(
             User,
-            User.id == AssessmentSession.student_id,
+            User.id == AssessmentSession.user_s_id,
         )
         .join(
             Course,
@@ -1104,10 +1101,9 @@ def pending_Reviews(
             AISummary,
             AISummary.session_id == AssessmentSession.id,
         )
-        .outerjoin(InstructorFeedback, InstructorFeedback.session_id == AssessmentSession.id)
+        .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .filter(CourseEnrollment.user_id == current_user.id)
         .filter(CourseEnrollment.course_role == "instructor")
-        .filter(CourseEnrollment.is_active == True)
         .filter(AssessmentSession.status == "under_review")
         .distinct()
         .all()
@@ -1132,11 +1128,11 @@ def get_transcript_detail(
     current_user: User = Depends(get_current_user),
 ):
     generalInfo = (
-        db.query(AssessmentSession, User, AssessmentConfig, AISummary, InstructorFeedback)
+        db.query(AssessmentSession, User, AssessmentConfig, AISummary, SessionFeedback)
         .join(User, User.id == AssessmentSession.student_id)
         .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
         .outerjoin(AISummary, AISummary.session_id == AssessmentSession.id)
-        .outerjoin(InstructorFeedback, InstructorFeedback.session_id == AssessmentSession.id)
+        .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .filter(AssessmentSession.id == session_id)
         .first()
     )
@@ -1217,7 +1213,7 @@ def list_my_course_assessments(
         .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
         .filter(
             AssessmentSession.course_id == course_id,
-            AssessmentSession.student_id == current_user.id,
+            AssessmentSession.user_s_id == current_user.id,
             AssessmentSession.status.in_(["not_started", "in_progress"]),
         )
         .order_by(AssessmentConfig.created_at.desc())
@@ -1233,10 +1229,10 @@ def list_my_course_assessments(
             title=config.title,
             instructions=config.instructions,
             total_time_minutes=config.total_time_minutes,
-            max_main_questions=config.max_main_questions,
-            max_followups_per_main=config.max_followups_per_main,
-            open_at=config.open_at,
-            close_at=config.close_at,
+            main_question_num=config.main_question_num,
+            follow_up_num=config.follow_up_num,
+            release_time=config.release_time,
+            due_time=config.due_time,
         )
         for session, config in rows
     ]
@@ -1259,7 +1255,6 @@ def get_my_assessment_history(
         .filter(
             CourseEnrollment.course_id == course_id,
             CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.is_active.is_(True),
         )
         .first()
     )
@@ -1277,18 +1272,18 @@ def get_my_assessment_history(
         )
 
     rows = (
-        db.query(AssessmentSession, AssessmentConfig, InstructorFeedback, User)
+        db.query(AssessmentSession, AssessmentConfig, SessionFeedback, User)
         .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
-        .join(InstructorFeedback, InstructorFeedback.session_id == AssessmentSession.id)
-        .join(User, User.id == InstructorFeedback.instructor_id)
+        .join(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
+        .join(User, User.id == SessionFeedback.user_i_id)
         .filter(
             AssessmentSession.course_id == course_id,
             AssessmentSession.student_id == current_user.id,
             AssessmentSession.status == "released",
-            InstructorFeedback.final_grade.isnot(None),
+            SessionFeedback.final_grade.isnot(None),
         )
         .order_by(
-            func.coalesce(AssessmentSession.ended_at, InstructorFeedback.released_at).desc()
+            func.coalesce(AssessmentSession.ended_at, SessionFeedback.released_at).desc()
         )
         .all()
     )
@@ -1308,12 +1303,12 @@ def get_my_assessment_history(
     ]
 
     class_avg = (
-        db.query(func.avg(InstructorFeedback.final_grade))
-        .join(AssessmentSession, InstructorFeedback.session_id == AssessmentSession.id)
+        db.query(func.avg(SessionFeedback.final_grade))
+        .join(AssessmentSession, SessionFeedback.session_id == AssessmentSession.id)
         .filter(
             AssessmentSession.course_id == course_id,
             AssessmentSession.status == "released",
-            InstructorFeedback.final_grade.isnot(None),
+            SessionFeedback.final_grade.isnot(None),
         )
         .scalar()
     )
@@ -1392,19 +1387,16 @@ def start_session(
     
 
     if session.status == "not_started":
-        expires_at = now + timedelta(minutes=config.total_time_minutes)
+        # expires_at = now + timedelta(minutes=config.total_time_minutes)
         session.status = "in_progress"
-        session.started_at = now
-        session.started_by = current_user.id
-        session.expires_at = expires_at
+        # session.started_at = now
+        # session.expires_at = expires_at
         db.flush()
 
         first_question = (
             db.query(Question)
             .filter(
                 Question.question_pool_id == config.question_pool_id,
-                Question.question_kind == "main",
-                Question.is_active.is_(True),
             )
             .order_by(Question.display_order.asc())
             .first()
@@ -1446,8 +1438,8 @@ def start_session(
             total_time_minutes=config.total_time_minutes,
             expires_at=session.expires_at,
             first_question=SessionQuestionItemOut.model_validate(item),
-            max_main_questions=config.max_main_questions,
-            max_followups_per_main=config.max_followups_per_main,
+            main_question_num=config.main_question_num,
+            follow_up_num=config.follow_up_num,
         )
     
     if session.status == "in_progress":
@@ -1479,15 +1471,15 @@ def start_session(
             session_id=session.id,
             assessment_title=config.title,
             total_time_minutes=config.total_time_minutes,
-            expires_at=session.expires_at,
+            # expires_at=session.expires_at,
             current_question=(
                 SessionQuestionItemOut.model_validate(current_item)
                 if current_item
                 else None
             ),
             can_complete=current_item is None,
-            max_main_questions=config.max_main_questions,
-            max_followups_per_main=config.max_followups_per_main,
+            main_question_num=config.main_question_num,
+            follow_up_num=config.follow_up_num,
         )
     
     raise HTTPException(
@@ -1631,8 +1623,8 @@ async def submit_response(
         .first()
     )
 
-    max_main = config.max_main_questions if config else 0
-    max_followups = config.max_followups_per_main if config else 0
+    max_main = config.main_question_num if config else 0
+    max_followups = config.follow_up_num if config else 0
     followup_enabled = config.followup_enabled if config else False
 
     if not last_question_item:
