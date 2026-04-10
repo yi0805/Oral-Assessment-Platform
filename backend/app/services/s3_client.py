@@ -1,4 +1,3 @@
-"""Storage client wrapper with local filesystem fallback for development."""
 from __future__ import annotations
 
 import logging
@@ -22,25 +21,12 @@ def _use_local() -> bool:
 
 
 def _get_session() -> boto3.session.Session:
-    """Create a boto3 session that supports explicit creds, profile-based SSO, or the default chain."""
-    if settings.aws_profile_name:
-        logger.info("[S3] Using AWS profile '%s'", settings.aws_profile_name)
-        return boto3.Session(
-            profile_name=settings.aws_profile_name,
-            region_name=settings.aws_region,
-        )
 
-    if settings.aws_access_key_id and settings.aws_secret_access_key:
-        logger.info("[S3] Using explicit AWS credentials from settings")
-        return boto3.Session(
-            aws_access_key_id=settings.aws_access_key_id,
-            aws_secret_access_key=settings.aws_secret_access_key,
-            aws_session_token=settings.aws_session_token or None,
-            region_name=settings.aws_region,
-        )
-
-    logger.info("[S3] Using default AWS credential chain")
-    return boto3.Session(region_name=settings.aws_region)
+    logger.info("[S3] Using AWS profile '%s'", settings.aws_profile_name)
+    return boto3.Session(
+        profile_name=settings.aws_profile_name,
+        region_name=settings.aws_region,
+    )
 
 
 def _get_s3_client():
@@ -50,10 +36,7 @@ def _get_s3_client():
 
     try:
         session = _get_session()
-        kwargs = {"region_name": settings.aws_region}
-        if settings.s3_endpoint_url:
-            kwargs["endpoint_url"] = settings.s3_endpoint_url
-        return session.client("s3", **kwargs)
+        return session.client("s3", region_name=settings.aws_region)
     except ProfileNotFound as exc:
         raise RuntimeError(
             f"AWS profile '{settings.aws_profile_name}' was not found. Run aws configure sso or set AWS_PROFILE_NAME correctly."

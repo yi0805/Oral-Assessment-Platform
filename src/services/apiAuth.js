@@ -1,7 +1,7 @@
 import api from "./api";
 
 export async function loginWithGoogle({ accessToken }) {
-  const response = await api.get("/auth/google/login", {
+  const response = await api.post("/auth/google/login", {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },

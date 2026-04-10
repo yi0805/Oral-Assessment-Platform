@@ -1,27 +1,24 @@
-"""Database engine, session factory, and shared ORM base class."""
 from sqlalchemy import create_engine
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import settings
 
+# here we set up the database connection and db is a working instance of the database
 
 engine = create_engine(
     settings.database_url,
-    echo=settings.debug,
-    pool_size=5,
-    max_overflow=10,
+    echo=True,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy ORM models."""
+    pass
 
 
 
 def get_db():
-    """FastAPI dependency that yields a database session and closes it automatically."""
     db = SessionLocal()
     try:
         yield db

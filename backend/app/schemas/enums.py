@@ -1,11 +1,8 @@
-"""Shared enum definitions used across all Pydantic schemas and database validation."""
 from enum import Enum
-
 
 class UserRole(str, Enum):
     student = "student"
     instructor = "instructor"
-    admin = "admin"
 
 
 class CourseRole(str, Enum):

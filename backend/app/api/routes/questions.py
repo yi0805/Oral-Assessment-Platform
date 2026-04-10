@@ -135,7 +135,6 @@ def list_question_pools(
         "Replaces any previously generated questions in the pool."
     ),
 )
-@limiter.limit(f"{settings.rate_limit_ai}/minute")
 async def generate_questions(
     request: Request,
     pool_id: UUID,
