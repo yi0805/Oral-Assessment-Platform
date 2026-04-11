@@ -135,8 +135,6 @@ async def upload_material(
             detail="Material metadata could not be saved.",
         ) from exc
 
-    # Trigger the 4-stage processing pipeline as a background task:
-    # extracting → chunking → embedding (Gemini gemini-embedding-001) → ready
     background_tasks.add_task(material_pipeline.run_pipeline, material.id)
 
     return material.id

@@ -74,6 +74,7 @@ def download_file(storage_key: str) -> bytes:
 
     try:
         response = client.get_object(Bucket=settings.s3_bucket_name, Key=storage_key)
+        
         return response["Body"].read()
     
     except ClientError as exc:

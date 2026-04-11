@@ -13,7 +13,6 @@ from uuid import UUID
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
-from sqlalchemy import text as sa_text
 
 from app.models.material import MaterialChunk, Material
 from app.services.embedding_service import embed_text
@@ -33,8 +32,6 @@ class RAGResult:
     material_id: UUID
     chunk_text: str
     score: float
-    source_page_start: int | None
-    source_page_end: int | None
 
 
 async def search(
@@ -89,7 +86,6 @@ async def search(
         .join(Material, MaterialChunk.material_id == Material.id)
         .filter(
             Material.course_id == course_id,
-            Material.processing_status == "ready",
             MaterialChunk.embedding.isnot(None),
         )
     )
@@ -108,8 +104,6 @@ async def search(
                 material_id=chunk.material_id,
                 chunk_text=chunk.chunk_text,
                 score=score,
-                source_page_start=chunk.source_page_start,
-                source_page_end=chunk.source_page_end,
             ))
         if len(meaningful) >= top_k:
             break
@@ -141,11 +135,10 @@ def get_extracted_text_chunks(
         return []
 
     rows = (
-        db.query(Material.id, Material.original_filename, Material.extracted_text)
-        .filter(
-            Material.id.in_(material_ids),
-            Material.extracted_text.isnot(None),
-        )
+        db.query(Material.id, Material.filename, MaterialChunk.chunk_text)
+        .join(MaterialChunk, MaterialChunk.material_id == Material.id)
+        .filter(Material.id.in_(material_ids))
+        .order_by(Material.id, MaterialChunk.chunk_index)
         .all()
     )
 
