@@ -60,12 +60,6 @@ class MaterialChunk(Base):
         Vector(768), nullable=True, comment="Gemini gemini-embedding-001, 768-dim vector (outputDimensionality=768), HNSW indexed"
     )
 
-    material_category: Mapped[str] = mapped_column(
-        String, nullable=False, 
-        server_default="course_material",
-        comment="course_material | rubric"
-    )
-
     material = relationship("Material", back_populates="chunks")
 
     def __repr__(self) -> str:

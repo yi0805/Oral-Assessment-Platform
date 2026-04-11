@@ -1,52 +1,21 @@
-"""
-Question pool & question CRUD routes.
-
-Endpoints
----------
-POST   /courses/{course_id}/question-pools                  Create an empty question pool
-GET    /courses/{course_id}/question-pools                  List all pools for a course
-POST   /question-pools/{pool_id}/generate                   Trigger AI question generation
-GET    /question-pools/{pool_id}                            Get pool with all questions
-PUT    /question-pools/{pool_id}/approve                    Mark pool as approved
-POST   /question-pools/{pool_id}/publish-as-assessment      One-step: approve + create + publish assessment
-POST   /question-pools/{pool_id}/questions                  Add a custom question
-PUT    /questions/{question_id}                             Edit a question
-DELETE /questions/{question_id}                             Remove a question
-"""
 from uuid import UUID
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_instructor
-from app.models.assessment import AssessmentConfig
-from app.models.course import Course, CourseEnrollment
-from app.models.question import Question, QuestionPool
-from app.models.user import User
-from app.models.material import Material
-from app.core.limiter import limiter
-from app.core.config import settings
-from app.schemas.assessment import AssessmentConfigOut
-from app.schemas.pagination import Page
-from app.schemas.question import (
-    QuestionCreate,
-    QuestionOut,
-    QuestionPoolBrief,
-    QuestionPoolCreate,
-    QuestionPoolGenerateRequest,
-    QuestionPoolOut,
-    QuestionUpdate,
-    PublishAsAssessmentRequest
-)
+from app.core.dependencies import require_instructor
+from app.services.question_generator import generate_pool
 
+from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material
 from app.schemas import UpdateNowRequest
 
 
 from pydantic import BaseModel, ConfigDict
-from app.services.question_generator import generate_pool
-from sqlalchemy.exc import SQLAlchemyError
+
+from app.schemas.enums import AnswerStyle, Difficulty, QuestionKind
 
 router = APIRouter()
 
@@ -54,10 +23,29 @@ class QuestionUpdate(BaseModel):
     question_text: str | None = None
 
 
-class UpdateNowResponse(BaseModel):
+class QuestionOut(BaseModel):
+    """Individual question response shape."""
     model_config = ConfigDict(from_attributes=True)
-    assessment_config: AssessmentConfigOut
-    pool_id: UUID
+
+    id: UUID
+    question_pool_id: UUID
+    parent_question_id: UUID | None
+    question_text: str
+    question_kind: QuestionKind
+    answer_style: AnswerStyle
+    difficulty: Difficulty | None
+    learning_objective: str | None
+    source_chunk_refs: list | None
+    display_order: int | None
+    is_active: bool
+    created_by: UUID | None
+    created_at: datetime
+    updated_at: datetime
+
+
+
+class UpdateNowResponse(BaseModel):
+    assessment_config: UUID
     questions: list[QuestionOut]
 
 
@@ -92,7 +80,10 @@ async def update_now(
     if not enrollment:
         raise HTTPException(status_code=403, detail="You are not an instructor in this course.")
 
-    rubric = db.query(Material).filter(Material.id == payload.material_r_id).first()
+    rubric = db.query(Material).filter(
+        Material.id == payload.material_r_id,
+        Material.material_category == "rubric",
+    ).first()
 
     if not rubric:
         raise HTTPException(status_code=404, detail="Rubric not found")
@@ -147,6 +138,7 @@ async def update_now(
             material_ids=payload.material_id,
             rubric_id=payload.material_r_id,
             num_main_questions=payload.main_question_num,
+            course_id=course_id,
         )
 
     except ValueError as exc:
@@ -166,14 +158,13 @@ async def update_now(
 
     questions = (
         db.query(Question)
-        .filter(Question.question_pool_id == pool.id, Question.is_active.is_(True))
-        .order_by(Question.display_order.asc())
+        .filter(Question.question_pool_id == pool.id)
+        .order_by(Question.question_index.asc())
         .all()
     )
 
     return UpdateNowResponse(
-        assessment_config=AssessmentConfigOut.model_validate(config),
-        pool_id=pool.id,
+        assessment_config_id = config.id, 
         questions=[QuestionOut.model_validate(q) for q in questions],
     )
 
@@ -214,12 +205,6 @@ def update_question(
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    pool = db.query(QuestionPool).filter(QuestionPool.id == question.question_pool_id).first()
-    if pool and pool.status == "archived":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot modify questions in an archived question pool.",
-        )
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(question, field, value)

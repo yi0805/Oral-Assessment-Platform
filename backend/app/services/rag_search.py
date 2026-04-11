@@ -39,7 +39,8 @@ async def search(
     query_text: str,
     course_id: UUID,
     top_k: int = 5,
-    material_ids: list[UUID] | None = None,
+    material_id: UUID | None = None,
+    material_category: str | None = "course_material",
 ) -> list[RAGResult]:
     """
     Search for the most relevant chunks matching a query within a course.
@@ -90,8 +91,11 @@ async def search(
         )
     )
 
-    if material_ids:
-        q = q.filter(Material.id.in_(material_ids))
+    if material_id:
+        q = q.filter(Material.id == material_id)
+
+    if material_category:
+        q = q.filter(Material.material_category == material_category)
 
     results = q.order_by("distance").limit(top_k * 2).all()  # fetch extra, filter below
 
@@ -120,8 +124,9 @@ async def search(
 
 def get_extracted_text_chunks(
     db: Session,
-    material_ids: list[UUID],
+    material_id: UUID | None,
     max_chars: int = 12000,
+    material_category: str | None = "course_material",
 ) -> list[dict]:
     """
     Text-only fallback: directly read extracted_text from the materials table
@@ -131,24 +136,30 @@ def get_extracted_text_chunks(
     Returns a list of dicts: [{"material_id": UUID, "text": str}, ...]
     Total characters across all excerpts capped at max_chars.
     """
-    if not material_ids:
+    if not material_id:
         return []
 
-    rows = (
+    q = (
         db.query(Material.id, Material.filename, MaterialChunk.chunk_text)
         .join(MaterialChunk, MaterialChunk.material_id == Material.id)
-        .filter(Material.id.in_(material_ids))
-        .order_by(Material.id, MaterialChunk.chunk_index)
-        .all()
+        .filter(Material.id == material_id)
     )
+
+    if material_category:
+        q = q.filter(Material.material_category == material_category)
+
+    rows = q.order_by(Material.id, MaterialChunk.chunk_index).all()
 
     excerpts: list[dict] = []
     remaining = max_chars
+
     for mid, fname, text in rows:
         if remaining <= 0:
             break
+
         if not text or not text.strip():
             continue
+        
         chunk = text.strip()[:remaining]
         excerpts.append({
             "material_id": mid,
@@ -160,7 +171,7 @@ def get_extracted_text_chunks(
     logger.info(
         "[RAG text-fallback] Loaded %d excerpts from %d materials (%d chars total)",
         len(excerpts),
-        len(material_ids),
+        len(material_id),
         max_chars - remaining,
     )
     return excerpts

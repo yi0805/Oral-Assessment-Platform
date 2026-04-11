@@ -275,6 +275,7 @@ async def chat_complete(
             response.raise_for_status()
             # Explicitly decode as UTF-8 to avoid charset-detection failures when
             # response bodies contain Unicode math symbols or non-ASCII characters.
+
             data = __import__("json").loads(response.content.decode("utf-8"))
             choices = data.get("choices") or []
             if not choices:
@@ -302,6 +303,7 @@ async def chat_complete(
                 exc.response.text,
             )
             raise RuntimeError(f"OpenRouter chat failed: {exc.response.text}") from exc
+        
         except Exception as exc:
             logger.error("[AI Gateway] OpenRouter error: %s", exc)
             raise RuntimeError(f"OpenRouter chat error: {exc}") from exc
