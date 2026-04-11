@@ -1,15 +1,23 @@
 import { useMutation } from "@tanstack/react-query";
+import toast from "react-hot-toast";
+
 import { uploadMaterial as uploadMaterialApi } from "../../services/apiMaterial";
 
 export function useUploadMaterial() {
   const { mutateAsync: uploadMaterial, isPending } = useMutation({
-    mutationFn: ({ courseId, file, assessmentName }) =>
-      uploadMaterialApi(courseId, file, assessmentName),
+    mutationFn: ({ courseId, file }) => uploadMaterialApi(courseId, file),
 
-    onSuccess: () => {},
+    onSuccess: (data) => {
+      toast.success(data?.message || "Material uploaded successfully.");
+    },
 
     onError: (error) => {
-      console.error("Failed to upload material:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error.message ||
+        "Failed to upload material.";
+
+      toast.error(message);
     },
   });
 

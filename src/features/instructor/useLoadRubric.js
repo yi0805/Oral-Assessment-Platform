@@ -3,8 +3,7 @@ import { uploadRubric as uploadRubricApi } from "../../services/apiRubrics";
 
 export function useUploadRubric() {
   const { mutateAsync: uploadRubric, isPending } = useMutation({
-    mutationFn: ({ courseId, file, assessmentName }) =>
-      uploadRubricApi(courseId, file, assessmentName),
+    mutationFn: ({ courseId, file }) => uploadRubricApi(courseId, file),
 
     onSuccess: () => {},
 

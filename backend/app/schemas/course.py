@@ -46,6 +46,8 @@ class InstructorDashboardAssessmentOut(BaseModel):
     students: list[InstructorDashboardStudentRow]
 
 
+
+# delete 231`3`
 class CourseUpdate(BaseModel):
     """PUT /courses/:id — update course metadata."""
     course_code: str | None = None

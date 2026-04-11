@@ -28,7 +28,7 @@ def generate_term() -> str:
 def dashboard_status(session_status: str) -> str:
     if session_status == "released":
         return "published"
-    if session_status == "under_review" or session_status == "submitted" or session_status == "time_expired":
+    if session_status == "under_review":
         return "review"
     return "inprogress"
 
@@ -114,7 +114,7 @@ def create_course(
 @router.get(
     "/{course_id}/instructor/dashboard",
     response_model=list[InstructorDashboardAssessmentOut],
-    summary="Integration",
+    summary="Get Students in a course",
 )
 def get_instructor_dashboard(
     course_id: UUID,
@@ -128,7 +128,6 @@ def get_instructor_dashboard(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Course not found.",
         )
-
 
     total_students = (
         db.query(CourseEnrollment)
@@ -155,7 +154,7 @@ def get_instructor_dashboard(
         )
         .join(
             User,
-            User.id == AssessmentSession.student_id,
+            User.id == AssessmentSession.user_s_id,
         )
         .outerjoin(
             AISummary,
@@ -169,17 +168,16 @@ def get_instructor_dashboard(
             ),
         )
         .filter(
-            AssessmentSession.course_id == course_id,
             AssessmentConfig.course_id == course_id,
         )
-        .order_by(AssessmentConfig.created_at.asc(), User.full_name.asc())
+        .order_by(User.full_name.asc())
         .all()
     )
 
     assessment_configs = (
         db.query(AssessmentConfig)
         .filter(AssessmentConfig.course_id == course_id)
-        .order_by(AssessmentConfig.created_at.asc())
+        .order_by(AssessmentConfig.release_time.asc())
         .all()
     )
 
@@ -196,13 +194,11 @@ def get_instructor_dashboard(
             "submitted_count": 0,
             "students": [],
         }
-    print(f"Total assessment configs found: {len(assessment_configs)}")
-    print(f"Initial grouped dict keys (assessment config IDs): {list(grouped.keys())}")
 
     for session, assessment_config, student, ai_summary, instructor_feedback in rows:
         group = grouped[str(assessment_config.id)]
 
-        if session.status in {"submitted", "under_review", "released", "time_expired"}:
+        if session.status in {"under_review", "released"}:
             group["submitted_count"] += 1
 
         if ai_summary and ai_summary.suggested_grade is not None:
@@ -210,7 +206,7 @@ def get_instructor_dashboard(
 
         if (
             instructor_feedback
-            and instructor_feedback.released_to_student is True
+            and instructor_feedback.status == "published"
             and instructor_feedback.final_grade is not None
         ):
             group["published_scores"].append(instructor_feedback.final_grade)
@@ -242,8 +238,6 @@ def get_instructor_dashboard(
         )
 
         group["students"].append(student_row)
-
-    print(grouped)
 
     response = []
 

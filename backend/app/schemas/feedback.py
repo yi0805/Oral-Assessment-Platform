@@ -1,9 +1,27 @@
-"""Pydantic schemas for AI summary and instructor feedback API."""
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
+
+
+class ReleaseReview(BaseModel):
+    session_id: UUID
+    student_id: UUID
+
+class ReleaseAllReviews(BaseModel):
+    assessments: list[ReleaseReview]
+
+class GradeUpdate(BaseModel):
+    grade: int = Field(ge=0, le=100)
+
+class InstructorReviewUpdate(BaseModel):
+    final_grade: int = Field(ge=0, le=100)
+    comments: str | None = None
+
+
+
+# delete 123123
 # ---- AI Summary ----
 
 class AISummaryOut(BaseModel):

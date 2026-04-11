@@ -78,14 +78,12 @@ function UpdateMaterial() {
     const MaterialId = await uploadMaterial({
       courseId,
       file: materialFile,
-      assessmentName,
     });
 
     setStatusMessage("Uploading rubric...");
     const RubricId = await uploadRubric({
       courseId,
       file: rubricFile,
-      assessmentName,
     });
 
     // console.log(MaterialId);
