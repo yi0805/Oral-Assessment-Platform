@@ -1,11 +1,3 @@
-"""
-ORM model: rubrics table. [NEW in schema v5]
-ORM:rubrics.
-
-Owner: Bess
-One-sentence truth: Rubric content that guides AI generation and evaluation
-,AI
-"""
 import uuid
 from datetime import datetime
 
@@ -56,7 +48,6 @@ class Rubric(Base):
     course = relationship("Course", back_populates="rubrics")
     creator = relationship("User", foreign_keys=[created_by])
     assessment_configs = relationship("AssessmentConfig", back_populates="rubric")
-    material = relationship("Material", back_populates="rubric")
 
     def __repr__(self) -> str:
         return f"<Rubric {self.title}>"

@@ -4,13 +4,6 @@ class UserRole(str, Enum):
     student = "student"
     instructor = "instructor"
 
-
-class CourseRole(str, Enum):
-    student = "student"
-    instructor = "instructor"
-    ta = "ta"
-
-
 class ProcessingStatus(str, Enum):
     uploaded = "uploaded"
     extracting = "extracting"

@@ -61,7 +61,7 @@ from app.schemas.assessment import (
 
 from pydantic import BaseModel, ConfigDict
 from app.schemas.feedback import AISummaryOut
-from app.schemas.user import UserOut
+# from app.schemas.user import UserOut
 from app.schemas.course import CourseOut
 from app.schemas.enums import SessionStatus
 
@@ -957,7 +957,7 @@ async def _generate_ai_followup(
 class PendingReviewOut(BaseModel):
     session: SessionOut 
     assessment_config: AssessmentConfigOut
-    user:  UserOut
+    # user:  UserOut
     course: CourseOut 
     aisummary: AISummaryOut | None
     session_feedback: SessionFeedbackOut | None

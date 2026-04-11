@@ -20,11 +20,8 @@ class User(Base):
         String, nullable=False, comment="student | instructor"
     )
 
-    enrollments = relationship("CourseEnrollment", back_populates="user")
-    assessment_configs = relationship(
-        "AssessmentConfig",
-        back_populates="student"
-    )
+    sessions = relationship("AssessmentSession", back_populates="student", passive_deletes=True)
+    enrollments = relationship("CourseEnrollment", back_populates="user",  passive_deletes=True,)
 
     def __repr__(self) -> str:
         return f"<User {self.email} ({self.role})>"

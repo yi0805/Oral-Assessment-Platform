@@ -1,9 +1,18 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-
 from jose import JWTError, jwt
 
 from app.core.config import settings
+
+def _parse_list(raw: str) -> list[str]:
+
+    value = raw.strip().strip("[]")        
+    
+    return [
+        item.strip().strip("\"'").lower()
+        for item in value.split(",")
+        if item.strip().strip("\"'")
+    ]
 
 def create_access_token(user_id: str, role: str, email: str) -> str:
     now = datetime.now(timezone.utc)
@@ -35,17 +44,6 @@ def verify_token(token: str) -> Optional[dict]:
     except JWTError:
         
         return None
-
-def _parse_list(raw: str) -> list[str]:
-
-    value = raw.strip().strip("[]")        
-    
-    return [
-        item.strip().strip("\"'").lower()
-        for item in value.split(",")
-        if item.strip().strip("\"'")
-    ]
-
 
 def resolve_role_for_new_user(email: str) -> str:
 

@@ -1,8 +1,11 @@
 """Central schema registry. Import all Pydantic models for easy access."""
+
 from app.schemas.enums import *
-from app.schemas.user import UserCreate, UserUpdate, UserOut, UserBrief
-from app.schemas.course import (
-    CourseCreate, CourseUpdate, CourseOut, CourseBrief,
+from app.schemas.user import UserResponse, GoogleLoginResponse
+from app.schemas.course import (CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut
+)
+
+from app.schemas.course import ( CourseUpdate, CourseOut, CourseBrief,
     EnrollmentCreate, EnrollmentOut, StudentListItem,
 )
 from app.schemas.material import (

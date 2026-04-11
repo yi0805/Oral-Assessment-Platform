@@ -1,17 +1,49 @@
-"""Pydantic schemas for course management API."""
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from app.schemas.enums import CourseRole
-from app.schemas.user import UserBrief
 
+
+
+
+class CourseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_code: str
+    course_name: str 
+    term: str
+    description: str
 
 class CourseCreate(BaseModel):
-    """POST /courses — create a new course."""
-    course_code: str | None = None
+
+    course_code: str 
     course_name: str
-    term: str | None = None
-    description: str | None = None
+    description: str
+
+
+
+class InstructorDashboardStudentRow(BaseModel):
+    session_id: UUID
+    student_id: UUID
+    student_name: str
+    student_email: str
+    student_image: str | None = None
+    ai_suggested_score: int | None = None
+    ai_summary: str | None = None
+    final_grade: int | None = None
+    status: str
+
+
+class InstructorDashboardAssessmentOut(BaseModel):
+    course_code: str
+    course_name: str
+    assessment_config_id: UUID
+    assessment_title: str
+    published_average_score: float | None = None
+    ai_average_score: float | None = None
+    submitted_count: int
+    total_students: int
+    students: list[InstructorDashboardStudentRow]
 
 
 class CourseUpdate(BaseModel):
@@ -22,18 +54,6 @@ class CourseUpdate(BaseModel):
     description: str | None = None
 
 
-class CourseOut(BaseModel):
-    """Response shape for GET /courses and GET /courses/:id."""
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    course_code: str | None
-    course_name: str | None
-    term: str | None
-    description: str | None
-    created_by: UUID | None
-    created_at: datetime | None
-    updated_at: datetime | None
 
 
 class CourseBrief(BaseModel):
@@ -49,7 +69,7 @@ class CourseBrief(BaseModel):
 class EnrollmentCreate(BaseModel):
     """POST /courses/:id/enroll — enroll a user in a course."""
     user_id: UUID = Field(..., description="UUID of the user to enroll. Required.")
-    course_role: CourseRole
+    # course_role: CourseRole
 
     @field_validator("user_id", mode="before")
     @classmethod
@@ -66,7 +86,7 @@ class EnrollmentOut(BaseModel):
     id: UUID
     course_id: UUID
     user_id: UUID
-    course_role: CourseRole
+    # course_role: CourseRole
     is_active: bool
     enrolled_at: datetime
 
@@ -76,8 +96,8 @@ class StudentListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     enrollment_id: UUID
-    user: UserBrief
-    course_role: CourseRole
+    # user: UserBrief
+    # course_role: CourseRole
     is_active: bool
     enrolled_at: datetime
 
