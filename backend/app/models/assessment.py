@@ -45,14 +45,14 @@ class AssessmentConfig(Base):
         Integer, nullable=False, server_default="1"
     )
 
-    release_time: Mapped[datetime] = mapped_column(
+    release_time: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
-        nullable=False,
+        nullable=True,
         comment="When students can start the assessment.",
     )
-    due_time: Mapped[datetime] = mapped_column(
+    due_time: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
-        nullable=False,
+        nullable=True,
         comment="Hard deadline after which no new sessions should start.",
     )
 

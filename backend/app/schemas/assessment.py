@@ -1,19 +1,85 @@
-"""
-Pydantic schemas for assessment configuration, session lifecycle, and chat interaction.
-
-User flow alignment:
-- main_question_num and follow_up_num are REQUIRED in ConfigCreate
-  because the instructor must set these per the user flow (Phase 3: Configure Settings).
-  There is no hardcoded default — the "e.g. 3 Main Questions" in the user flow
-  is an example, not a fixed value.
-"""
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, model_validator
+
+
+
 from app.schemas.enums import (
     AssessmentMode, AssessmentStatus, SessionStatus,
     QuestionKind, GeneratedBy, SenderRole, MessageType,
 )
+
+class ReleaseResponse(BaseModel):
+    sessions_created: int
+
+
+
+
+class AssessmentConfigBase(BaseModel):
+    """
+    Base model for assessments containing core fields and automated validation logic.
+    
+    Subclasses (Request/Response models) should inherit from this class to reuse 
+    common fields and avoid code duplication.
+    """
+    title: str
+    instructions: str | None = None
+    assessment_mode: AssessmentMode = AssessmentMode.generic
+    material_r_id: UUID | None = None
+    total_time_minute: int = 15
+    # per_question_time_limit_minutes: int | None = None
+    main_questions_num: int = 3
+    follow_up_num: int = 1
+    open_at: datetime | None = None
+    close_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_assessment_logic(self):
+        # if self.per_question_time_limit_minutes is None:
+        #     if self.main_question_num > 0:
+        #         self.per_question_time_limit_minutes = max(
+        #             3, # at least 3 minutes per question
+        #             self.total_time_minutes // self.max_main_questions
+        #         )
+        #     else:
+        #         self.per_question_time_limit_minutes = self.total_time_minutes
+
+        if self.open_at and self.close_at and self.close_at <= self.open_at:
+            raise ValueError("close_at must be after open_at")
+
+        return self
+
+
+
+class AssessmentConfigOut(AssessmentConfigBase):
+    """Response shape for assessment configuration."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_id: UUID
+    question_pool_id: UUID | None
+    title: str
+    description: str | None
+    assessment_mode: AssessmentMode
+    material_r_id: UUID | None
+    total_time_minutes: int
+    per_question_time_limit_minutes: int | None
+    main_question_num: int | None
+    follow_up_num: int | None
+    followup_enabled: bool
+    open_at: datetime | None
+    close_at: datetime | None
+    status: AssessmentStatus
+    published_by: UUID | None
+    published_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+
+
+
+
     
 class AssessmentConfigBase(BaseModel):
     """
