@@ -52,7 +52,6 @@ async def upload_material(
         .filter(
             CourseEnrollment.course_id == course_id,
             CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.course_role.in_(["instructor"]),
         )
         .first()
     )

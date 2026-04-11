@@ -32,10 +32,9 @@ def release_assessment(
         .filter(
             CourseEnrollment.course_id == course_id,
             CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.course_role == "instructor",
         )
         .first()
-)
+    )
 
     if not enrollment:
         raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
@@ -59,6 +58,10 @@ def release_assessment(
         raise HTTPException(status_code=422, detail="main_question_num must be set before publishing.")
     
     question_pool = db.query(QuestionPool).filter(QuestionPool.assessment_config_id == config.id).first()
+
+    if not question_pool:
+        raise HTTPException(status_code=422, detail="No question pool found for this assessment.")
+
     question_pool.status = "published"
 
     now = datetime.now(timezone.utc)
@@ -70,20 +73,20 @@ def release_assessment(
 
     student_enrollments = (
         db.query(CourseEnrollment)
+        .join(User, CourseEnrollment.user_id == User.id)
         .filter(
             CourseEnrollment.course_id == course_id,
-            CourseEnrollment.course_role == "student",
+            User.role == "student",
         )
         .all()
     )
 
     sessions_created = 0
 
-    for enrollment in student_enrollments:
+    for enr in student_enrollments:
         db.add(AssessmentSession(
             assessment_config_id=config.id,
-            course_id=course_id,
-            user_s_id=enrollment.user_id,
+            user_s_id=enr.user_id,
             status="not_started",
         ))
         sessions_created += 1

@@ -1,5 +1,4 @@
 from uuid import UUID
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -15,8 +14,6 @@ from app.schemas import UpdateNowRequest
 
 from pydantic import BaseModel, ConfigDict
 
-from app.schemas.enums import AnswerStyle, Difficulty, QuestionKind
-
 router = APIRouter()
 
 class QuestionUpdate(BaseModel):
@@ -28,19 +25,8 @@ class QuestionOut(BaseModel):
 
     id: UUID
     question_pool_id: UUID
-    parent_question_id: UUID | None
     question_text: str
-    question_kind: QuestionKind
-    answer_style: AnswerStyle
-    difficulty: Difficulty | None
-    learning_objective: str | None
-    source_chunk_refs: list | None
-    display_order: int | None
-    is_active: bool
-    created_by: UUID | None
-    created_at: datetime
-    updated_at: datetime
-
+    question_index: int
 
 
 class UpdateNowResponse(BaseModel):
@@ -71,7 +57,6 @@ async def update_now(
         .filter(
             CourseEnrollment.course_id == course_id,
             CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.course_role.in_(["instructor"]),
         )
         .first()
     )
@@ -113,30 +98,30 @@ async def update_now(
         material_r_id=payload.material_r_id,
         total_time_minute=payload.total_time_minutes,
         main_question_num=payload.num_main_questions,
-        follow_up_num=payload.follow_up_num,
-        status = "draft",
+        follow_up_num=payload.max_followups_per_main,
+        status="draft",
     )
 
     db.add(config)
-    db.fresh(config)
+    db.flush()
 
 
     pool = QuestionPool(
-        assessment_config_id = config.id,
-        material_id = payload.material_id,
-        status = "draft",
-        )
+        assessment_config_id=config.id,
+        material_id=payload.material_id,
+        status="draft",
+    )
     
     db.add(pool)
-    db.flush(pool)
+    db.flush()
     
     try:
         pool = await generate_pool(
             db=db,
             pool_id=pool.id,
-            material_ids=payload.material_id,
+            material_id=payload.material_id,
             rubric_id=payload.material_r_id,
-            num_main_questions=payload.main_question_num,
+            num_main_questions=payload.num_main_questions,
             course_id=course_id,
         )
 
@@ -163,15 +148,15 @@ async def update_now(
     )
 
     return UpdateNowResponse(
-        assessment_config_id = config.id, 
+        assessment_config=config.id,
         questions=[QuestionOut.model_validate(q) for q in questions],
     )
 
 
 @router.delete(
     "/questions/{question_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Integration",
+    status_code=status.HTTP_200_OK,
+    summary="Delete a question",
 
 )
 def delete_question(
@@ -191,7 +176,7 @@ def delete_question(
 
 @router.put(
     "/questions/{question_id}",
-    summary="Integration",
+    summary="Update a question",
 
 )
 def update_question(

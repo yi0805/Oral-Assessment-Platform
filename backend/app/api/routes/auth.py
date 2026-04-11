@@ -28,9 +28,9 @@ def _fetch_google_userinfo(token: str) -> dict:
     return resp.json()
 
 
-def _upsert_user(db: Session, google_sub: str, email: str, full_name: str, image: str | None) -> User:
+def _upsert_user(db: Session, email: str, full_name: str, image: str | None) -> User:
 
-    user: User | None = db.query(User).filter(User.google_sub == google_sub).first()
+    user: User | None = db.query(User).filter(User.email == email).first()
 
     if user:
         user.full_name = full_name
@@ -43,7 +43,6 @@ def _upsert_user(db: Session, google_sub: str, email: str, full_name: str, image
 
     role = resolve_role_for_new_user(email)
     user = User(
-        google_sub=google_sub,
         email=email,
         full_name=full_name,
         role=role,
@@ -73,12 +72,11 @@ def login_with_google(
 
     userinfo = _fetch_google_userinfo(token)
 
-    google_sub = userinfo.get("sub")
     email = userinfo.get("email")
     full_name = userinfo.get("name")
     image = userinfo.get("picture")
 
-    if not google_sub or not email or not full_name:
+    if not email or not full_name:
         raise HTTPException(status_code=400, detail="Missing required Google user info")
 
     if not is_login_domain_allowed(email):
@@ -89,7 +87,7 @@ def login_with_google(
             ),
         )
 
-    user = _upsert_user(db, google_sub=google_sub, email=email, full_name=full_name, image=image)
+    user = _upsert_user(db, email=email, full_name=full_name, image=image)
 
     jwt_token = create_access_token(
         user_id=str(user.id),

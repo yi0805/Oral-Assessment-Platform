@@ -36,7 +36,7 @@ def require_instructor(
 ) -> User:
 
 
-    if current_user.role not in ("instructor"):
+    if current_user.role != "instructor":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Instructor access required.",

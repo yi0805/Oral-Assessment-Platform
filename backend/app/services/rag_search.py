@@ -169,9 +169,9 @@ def get_extracted_text_chunks(
         remaining -= len(chunk)
 
     logger.info(
-        "[RAG text-fallback] Loaded %d excerpts from %d materials (%d chars total)",
+        "[RAG text-fallback] Loaded %d excerpts for material %s (%d chars total)",
         len(excerpts),
-        len(material_id),
+        material_id,
         max_chars - remaining,
     )
     return excerpts

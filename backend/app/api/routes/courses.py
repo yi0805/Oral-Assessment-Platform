@@ -14,7 +14,7 @@ from app.models.user import User
 from app.models.assessment import AssessmentConfig, AssessmentSession
 
 from app.models import Course, CourseEnrollment
-from app.schemas import CourseOut, CourseCreate,InstructorDashboardStudentRow, InstructorDashboardAssessmentOut
+from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut
 
 
 router = APIRouter()
@@ -93,7 +93,6 @@ def create_course(
         course_name=payload.course_name,
         term=term,
         description=payload.description,
-        created_by=current_user.id,
     )
 
     db.add(course)
@@ -102,7 +101,6 @@ def create_course(
     enrollment = CourseEnrollment(
         course_id=course.id,
         user_id=current_user.id,
-        course_role="instructor",
     )
     db.add(enrollment)
 

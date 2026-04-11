@@ -165,7 +165,7 @@ async def generate_pool(
                 query_text=query,
                 course_id=course_id,
                 top_k=chunks_per_query,
-                material_ids=material_id,  # scoped to instructor-selected materials
+                material_id=material_id,
             )
             all_chunks.extend(hits)
 
@@ -188,10 +188,10 @@ async def generate_pool(
     )[:25]
 
     logger.info(
-        "generate_pool %s: %d unique RAG vector chunks from %d materials%s",
+        "generate_pool %s: %d unique RAG vector chunks for material %s%s",
         pool_id,
         len(unique_chunks),
-        len(material_id),
+        material_id,
         f" (RAG error: {rag_error})" if rag_error else "",
     )
 
@@ -209,15 +209,15 @@ async def generate_pool(
         )
         text_fallback_excerpts = rag_search.get_extracted_text_chunks(
             db=db,
-            material_ids=material_id,
+            material_id=material_id,
             max_chars=12000,
         )
 
         if not text_fallback_excerpts:
             logger.error(
-                "generate_pool %s: No extracted_text found for any of the %d selected "
-                "materials. Materials may not have completed the Extract pipeline stage.",
-                pool_id, len(material_id),
+                "generate_pool %s: No extracted_text found for material %s. "
+                "Material may not have completed the Extract pipeline stage.",
+                pool_id, material_id,
             )
 
     # ------------------------------------------------------------------

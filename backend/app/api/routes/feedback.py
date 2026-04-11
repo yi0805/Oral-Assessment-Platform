@@ -12,7 +12,10 @@ from app.schemas  import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate
 router = APIRouter()
 
 def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> AssessmentSession:
-    q = db.query(AssessmentSession).filter(AssessmentSession.id == session_id and AssessmentSession.user_s_id == student_id)
+    q = db.query(AssessmentSession).filter(
+        AssessmentSession.id == session_id,
+        AssessmentSession.user_s_id == student_id,
+    )
 
     sess = q.first()
     if not sess:
