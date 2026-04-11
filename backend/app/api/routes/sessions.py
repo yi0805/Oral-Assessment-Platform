@@ -1,208 +1,177 @@
-"""
-Assessment session routes (student-facing + instructor review).
-
-Endpoints
----------
-POST   /assessments/{assessment_id}/sessions/start   Start a student session
-POST   /sessions/{session_id}/respond                Submit a student answer + get next question
-POST   /sessions/{session_id}/complete               End a session (student or auto-timeout)
-GET    /sessions/{session_id}                        Full transcript (instructor review)
-GET    /assessments/{assessment_id}/sessions         List all sessions (instructor dashboard)
-
-Server-side timer enforcement
-------------------------------
-  start   → expires_at = now() + total_time_minutes
-  respond → if now() > expires_at: auto-finalize with status='time_expired' and return next_question=None
-
-AI follow-up generation (respond endpoint)
-------------------------------------------
-After saving a student's answer, the system decides the next step:
-  1. If follow-ups are enabled AND current follow-up count < max_followups_per_main:
-       → Generate an AI follow-up question via the AI Gateway (OpenRouter free)
-       → Append to transcript as (assistant, followup_question)
-  2. Else if more main questions remain:
-       → Advance to next main question from the approved pool
-       → Append to transcript as (assistant, main_question)
-  3. Else:
-       → Mark the session status as 'all_questions_complete' (still in_progress, timer running)
-       → next_question = None signals to the frontend that the student can submit
-"""
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_instructor, require_student
-from app.schemas.pagination import Page
+from app.core.dependencies import get_current_user, require_student
 from app.models.assessment import AssessmentConfig, AssessmentSession
 from app.models.course import CourseEnrollment, Course
 from app.models.feedback import AISummary, SessionFeedback
 from app.models.question import Question
 from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
 from app.models.user import User
-from app.schemas.assessment import (
-    AssessmentStatsOut,
-    FullTranscriptOut,
-    SessionBrief,
-    SessionBriefWithAIGrades, 
-    SessionOut,
-    SessionQuestionItemOut,
-    SessionStartResponse,
-    StudentResponseRequest,
-    StudentResponseResponse,
-    AssessmentConfigOut
-)
+# from app.schemas.assessment import (
+#     SessionOut,
+#     SessionQuestionItemOut,
+#     SessionStartResponse,
+#     StudentResponseRequest,
+#     StudentResponseResponse,
+#     AssessmentConfigOut
+# )
+from app.schemas import *
 
-from pydantic import BaseModel, ConfigDict
-from app.schemas.feedback import AISummaryOut
+from pydantic import BaseModel, ConfigDict, model_validator
+# from app.schemas.feedback import AISummaryOut
 # from app.schemas.user import UserOut
-from app.schemas.course import CourseOut
+# from app.schemas.course import CourseOut
 from app.schemas.enums import SessionStatus
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-@router.get(
-    "/assessments/{assessment_id}/sessions",
-    response_model=Page[SessionBriefWithAIGrades],
-    summary="List student sessions for an assessment",
-    description=(
-        "Instructor-only. Returns brief summaries of all student sessions (paginated). "
-        "Each item is enriched with student name, email, AI-suggested grade, and final grade "
-        "for the instructor grading dashboard transcript list view."
-    ),
-)
-def list_sessions(
-    assessment_id: UUID,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-
-    q = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.assessment_config_id == assessment_id)
-        .order_by(AssessmentSession.created_at.desc())
-    )
-    total = q.count()
-    sessions = q.offset((page - 1) * page_size).limit(page_size).all()
-
-    # Enrich each session brief with student info, AI suggested grade, and final grade
-    enriched: list[SessionBriefWithAIGrades] = []
-    for sess in sessions:
-        brief = SessionBriefWithAIGrades.model_validate(sess)
-
-        # Attach student name and email
-        student = db.query(User).filter(User.id == sess.student_id).first()
-        if student:
-            brief.student_name = student.full_name
-            brief.student_email = student.email
-
-        # Attach AI suggested grade (advisory)
-        ai_summary = db.query(AISummary).filter(
-            AISummary.session_id == sess.id,
-            AISummary.status == "success",
-        ).first()
-        if ai_summary:
-            brief.ai_suggested_grade = ai_summary.suggested_grade
-
-        # Attach instructor final grade if already graded
-        feedback = db.query(SessionFeedback).filter(
-            SessionFeedback.session_id == sess.id
-        ).first()
-        if feedback:
-            brief.final_grade = feedback.final_grade
-
-        enriched.append(brief)
-
-    return Page.create(enriched, total, page, page_size)
-
-
-@router.get(
-    "/assessments/{assessment_id}/sessions/stats",
-    response_model=AssessmentStatsOut,
-    summary="Get class grade statistics",
-    description=(
-        "Instructor-only. Returns median, average, highest, and lowest final grades "
-        "across all instructor-graded sessions for this assessment. "
-        "Only sessions with a numeric final_grade are included in calculations. "
-        "Matches the statistics panel shown on the instructor grading dashboard."
-    ),
-)
-def get_assessment_stats(
-    assessment_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-
-    total_sessions = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.assessment_config_id == assessment_id)
-        .count()
-    )
-
-    # Collect all numeric final grades for this assessment
-    feedbacks = (
-        db.query(SessionFeedback)
-        .join(AssessmentSession, SessionFeedback.session_id == AssessmentSession.id)
-        .filter(
-            AssessmentSession.assessment_config_id == assessment_id,
-            SessionFeedback.final_grade.isnot(None),
-        )
-        .all()
-    )
-
-    # Parse final_grade values to floats
-    numeric_grades: list[float] = [float(fb.final_grade) for fb in feedbacks]
-
-    graded_count = len(numeric_grades)
-
-    if graded_count == 0:
-        return AssessmentStatsOut(
-            assessment_id=assessment_id,
-            total_sessions=total_sessions,
-            graded_count=0,
-            average_grade=None,
-            median_grade=None,
-            highest_grade=None,
-            lowest_grade=None,
-        )
-
-    numeric_grades.sort()
-    average = sum(numeric_grades) / graded_count
-    n = graded_count
-    if n % 2 == 1:
-        median = numeric_grades[n // 2]
-    else:
-        median = (numeric_grades[n // 2 - 1] + numeric_grades[n // 2]) / 2.0
-
-    return AssessmentStatsOut(
-        assessment_id=assessment_id,
-        total_sessions=total_sessions,
-        graded_count=graded_count,
-        average_grade=round(average, 2),
-        median_grade=round(median, 2),
-        highest_grade=max(numeric_grades),
-        lowest_grade=min(numeric_grades),
-    )
-
-
 # ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
+
+
+class CourseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_code: str
+    course_name: str 
+    term: str
+    description: str
+
+class AISummaryOut(BaseModel):
+    """
+    AI-generated advisory analysis returned by GET /sessions/:id/ai-summary.
+    Per the user flow (Phase 5), the summary must be:
+    - Evidence-based (short quotes from transcript)
+    - Rubric-linked (evaluates against the rubric)
+    - Strengths and gaps clearly identified
+    - Advisory only (suggested numeric score, never auto-assigned)
+    """
+    model_config = ConfigDict(from_attributes=True, protected_namespaces=())
+
+    id: UUID
+    session_id: UUID
+    summary_text: str
+    strengths: str | None
+    gaps: str | None
+    evidence_refs: list | None
+    suggested_grade: int | None
+    model_name: str
+    advisory_only: bool
+    status: str
+    error_message: str | None
+    generated_at: datetime
+
+
+class AssessmentConfigBase(BaseModel):
+    """
+    Base model for assessments containing core fields and automated validation logic.
+    
+    Subclasses (Request/Response models) should inherit from this class to reuse 
+    common fields and avoid code duplication.
+    """
+    title: str
+    instructions: str | None = None
+    assessment_mode: AssessmentMode = AssessmentMode.generic
+    material_r_id: UUID | None = None
+    total_time_minute: int = 15
+    # per_question_time_limit_minutes: int | None = None
+    main_questions_num: int = 3
+    follow_up_num: int = 1
+    open_at: datetime | None = None
+    close_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_assessment_logic(self):
+        # if self.per_question_time_limit_minutes is None:
+        #     if self.main_question_num > 0:
+        #         self.per_question_time_limit_minutes = max(
+        #             3, # at least 3 minutes per question
+        #             self.total_time_minutes // self.max_main_questions
+        #         )
+        #     else:
+        #         self.per_question_time_limit_minutes = self.total_time_minutes
+
+        if self.open_at and self.close_at and self.close_at <= self.open_at:
+            raise ValueError("close_at must be after open_at")
+
+        return self
+
+
+class SessionOut(BaseModel):
+    """Full session details for GET /sessions/:id (instructor review)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    assessment_config_id: UUID
+    course_id: UUID
+    student_id: UUID
+    status: SessionStatus
+    started_at: datetime | None
+    expires_at: datetime | None
+    ended_at: datetime | None
+    total_messages: int | None
+    current_main_index: int | None
+    current_followup_index: int | None
+    transcript_locked: bool
+    released_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+class SessionQuestionItemOut(BaseModel):
+    """A question that was actually asked during a live session."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    session_id: UUID
+    source_question_id: UUID | None
+    parent_item_id: UUID | None
+    asked_text: str
+    question_kind: QuestionKind
+    main_group_no: int | None
+    followup_no: int | None
+    generated_by: GeneratedBy
+    asked_at: datetime
+    is_answered: bool
+
+class StudentResponseRequest(BaseModel):
+    """POST /sessions/:id/respond — student submits their answer."""
+    answer_text: str
+
+class AssessmentConfigOut(AssessmentConfigBase):
+    """Response shape for assessment configuration."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_id: UUID
+    question_pool_id: UUID | None
+    title: str
+    description: str | None
+    assessment_mode: AssessmentMode
+    material_r_id: UUID | None
+    total_time_minutes: int
+    per_question_time_limit_minutes: int | None
+    main_question_num: int | None
+    follow_up_num: int | None
+    followup_enabled: bool
+    open_at: datetime | None
+    close_at: datetime | None
+    status: AssessmentStatus
+    published_by: UUID | None
+    published_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
 
 import re
 
@@ -380,45 +349,6 @@ async def _generate_ai_followup(
         ]
         return fallback_probes[current_followup % len(fallback_probes)]
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# integration
 
 class PendingReviewOut(BaseModel):
     session: SessionOut 

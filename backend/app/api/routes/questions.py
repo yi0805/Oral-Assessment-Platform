@@ -24,7 +24,6 @@ class QuestionUpdate(BaseModel):
 
 
 class QuestionOut(BaseModel):
-    """Individual question response shape."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID

@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
+from datetime import datetime
+
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 
@@ -14,8 +16,6 @@ from app.models.assessment import AssessmentConfig, AssessmentSession
 from app.models import Course, CourseEnrollment
 from app.schemas import CourseOut, CourseCreate,InstructorDashboardStudentRow, InstructorDashboardAssessmentOut
 
-from datetime import datetime
-from pydantic import BaseModel
 
 router = APIRouter()
 
