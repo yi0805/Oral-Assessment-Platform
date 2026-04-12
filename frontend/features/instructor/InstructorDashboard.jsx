@@ -138,18 +138,35 @@ export default function InstructorDashboard() {
               <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
                 Average Score
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="font-headline text-5xl font-extrabold text-primary">
-                  {aiAverageScore}
-                </span>
-                <span className="text-lg font-bold text-outline">/ 10</span>
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-headline text-5xl font-extrabold text-primary">
+                    {aiAverageScore}
+                  </span>
+                  <span className="text-lg font-bold text-outline">/ 10</span>
+                </div>
+
+                <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-tertiary-container px-2 py-1 text-xs font-semibold text-on-tertiary-container">
+                  <span className="material-symbols-outlined text-xs">
+                    auto_awesome
+                  </span>
+                  Calculated by AI
+                </div>
               </div>
 
-              <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-tertiary-container px-2 py-1 text-xs font-semibold text-on-tertiary-container">
-                <span className="material-symbols-outlined text-xs">
-                  auto_awesome
-                </span>
-                Calculated by AI
+              <div>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-headline text-5xl font-extrabold text-secondary">
+                    {publishedAverageScore}
+                  </span>
+                  <span className="text-lg font-bold text-outline">/ 10</span>
+                </div>
+                <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">
+                  <span className="material-symbols-outlined text-xs">
+                    verified
+                  </span>
+                  Finalized Score
+                </div>
               </div>
             </div>
             <div className="absolute -bottom-4 -right-4 opacity-5">
@@ -179,31 +196,6 @@ export default function InstructorDashboard() {
             <p className="mt-2 text-[10px] font-medium text-on-surface-variant">
               {completionRate}% Completion rate
             </p>
-          </div>
-
-          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
-            <div className="relative z-10">
-              <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
-                Publication Avg. Score
-              </p>
-              <div className="flex items-baseline gap-2">
-                <span className="font-headline text-5xl font-extrabold text-secondary">
-                  {publishedAverageScore}
-                </span>
-                <span className="text-lg font-bold text-outline">/ 10</span>
-              </div>
-              <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">
-                <span className="material-symbols-outlined text-xs">
-                  verified
-                </span>
-                Finalized Score
-              </div>
-            </div>
-            <div className="absolute -bottom-4 -right-4 opacity-5">
-              <span className="material-symbols-outlined text-[120px]">
-                check_circle
-              </span>
-            </div>
           </div>
 
           <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">

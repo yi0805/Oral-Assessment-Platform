@@ -226,6 +226,73 @@ function InstructorHome() {
                   </p>
                 )}
               </div>
+              {/* <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
+                  <span
+                    className="material-symbols-outlined text-2xl text-primary"
+                    data-icon="upload_file"
+                    style={{ verticalAlign: "middle" }}
+                  >
+                    upload_file
+                  </span>
+                </div>
+                <h3 className="mb-1 text-base font-bold">Enrolled Students PDF</h3>
+                <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
+                  Upload students that are enrolled to this course 
+                </p>
+
+                <div className="w-full space-y-3">
+                  {materialFile && (
+                    <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-error/10 text-error">
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          data-icon="picture_as_pdf"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          picture_as_pdf
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold">
+                          {materialFile.name}
+                        </p>
+                        <p className="text-[9px] text-outline">
+                          {(materialFile.size / 1024 / 1024).toFixed(1)} MB
+                        </p>
+                      </div>
+
+                      <button
+                        className="text-on-surface-variant transition-colors hover:text-error"
+                        onClick={() => setMaterialFile(null)}
+                      >
+                        <span
+                          className="material-symbols-outlined text-lg"
+                          data-icon="close"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          close
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  <label className="block cursor-pointer">
+                    <input
+                      className="hidden"
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) =>
+                        setMaterialFile(e.target.files[0] || null)
+                      }
+                    />
+                    <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
+                      Browse Files
+                    </div>
+                  </label>
+                </div>
+              </section> */}
             </div>
             <div className="flex justify-end gap-3 border-t border-outline-variant/10 bg-surface-container-low p-6">
               <button

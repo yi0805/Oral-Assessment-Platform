@@ -600,7 +600,7 @@ function UpdateMaterial() {
                 />
                 <div className="flex-1">
                   <h4 className="text-sm font-bold text-on-surface">
-                    Curator's Tip
+                    WRU's Tip
                   </h4>
                   <p className="text-xs leading-relaxed text-on-surface-variant">
                     Ensure clear headings and objectives to improve AI results

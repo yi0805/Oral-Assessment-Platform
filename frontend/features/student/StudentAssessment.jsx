@@ -475,7 +475,7 @@ export default function StudentAssessment() {
               <div className="mb-2 flex items-center gap-2 text-on-tertiary-container">
                 <span className="material-symbols-outlined text-sm">info</span>
                 <span className="text-xs font-bold uppercase tracking-wider">
-                  Curator's Tip
+                  WRU's Tip
                 </span>
               </div>
               <p className="text-xs leading-relaxed text-on-tertiary-container/80">

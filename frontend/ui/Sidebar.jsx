@@ -19,7 +19,7 @@ function Sidebar() {
           {user.role === "instructor" ? (
             <div>
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
-                Curator Portal
+                WRU Portal
               </h2>
               <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                 Academic Management

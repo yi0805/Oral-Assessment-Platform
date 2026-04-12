@@ -78,7 +78,7 @@ function LoginButton({ role, login }) {
           </li>
         </ul>
         <div className="flex items-center justify-center gap-2 font-semibold text-secondary transition-all duration-300 group-hover:gap-4">
-          <span>Curator Portal</span>
+          <span>WRU Portal</span>
           <span className="material-symbols-outlined text-lg">
             arrow_forward
           </span>
