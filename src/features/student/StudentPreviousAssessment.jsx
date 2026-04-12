@@ -19,7 +19,8 @@ function StudentPreviousAssessment() {
 
   const { history, isLoading } = useAssessmentHistory(selectedCourse);
 
-  if (coursesLoading || isLoading) return <Spinner />;
+  if (coursesLoading) return <Spinner />;
+  if (selectedCourse && isLoading) return <Spinner />;
 
   const items = history?.items ?? [];
 

@@ -144,7 +144,7 @@ function UpdateMaterial() {
         <div className="mx-auto max-w-6xl px-8 py-12">
           <div className="mb-10">
             <h1 className="text-4xl font-extrabold tracking-tight text-on-background">
-              Update Material
+              New Assessment Setup
             </h1>
           </div>
 
@@ -458,7 +458,7 @@ function UpdateMaterial() {
                     disabled={!isValid || loading}
                     onClick={handleSubmit}
                   >
-                    {loading ? "Processing..." : "Update Now"}
+                    {loading ? "Processing..." : "Generate Questions"}
                   </button>
                 </div>
               </div>

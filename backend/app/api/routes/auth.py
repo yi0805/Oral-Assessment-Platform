@@ -28,12 +28,13 @@ def _fetch_google_userinfo(token: str) -> dict:
     return resp.json()
 
 
-def _upsert_user(db: Session, email: str, full_name: str, image: str | None) -> User:
+def _upsert_user(db: Session, email: str, full_name: str, upi: str, image: str | None) -> User:
 
     user: User | None = db.query(User).filter(User.email == email).first()
 
     if user:
         user.full_name = full_name
+        user.upi = upi
         user.image = image
 
         db.commit()
@@ -45,6 +46,7 @@ def _upsert_user(db: Session, email: str, full_name: str, image: str | None) -> 
     user = User(
         email=email,
         full_name=full_name,
+        upi=upi,
         role=role,
         image=image,
     )
@@ -79,6 +81,12 @@ def login_with_google(
     if not email or not full_name:
         raise HTTPException(status_code=400, detail="Missing required Google user info")
 
+    # Fetch upi from student email
+    upi = email.split("@")[0] 
+
+    if not upi:
+        raise HTTPException(status_code=400, detail="Invalid UPI format.")
+
     if not is_login_domain_allowed(email):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -87,7 +95,7 @@ def login_with_google(
             ),
         )
 
-    user = _upsert_user(db, email=email, full_name=full_name, image=image)
+    user = _upsert_user(db, email=email, full_name=full_name, upi=upi, image=image)
 
     jwt_token = create_access_token(
         user_id=str(user.id),

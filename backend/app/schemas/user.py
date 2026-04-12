@@ -9,6 +9,7 @@ class UserResponse(BaseModel):
     id: UUID
     email: str
     full_name: str
+    upi: str
     role: UserRole
     image: str | None = None
 

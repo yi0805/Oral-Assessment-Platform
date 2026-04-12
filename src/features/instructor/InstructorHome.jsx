@@ -141,7 +141,7 @@ function InstructorHome() {
             <div className="flex items-center justify-between border-b border-outline-variant/10 p-8">
               <div>
                 <h2 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-                  Initialize New Course
+                  Add New Course
                 </h2>
               </div>
               <button
@@ -236,7 +236,7 @@ function InstructorHome() {
                 onClick={handleSubmit}
                 disabled={isPending}
               >
-                {isPending ? "Creating..." : "Create Course"}
+                {isPending ? "Creating..." : "Confirm"}
               </button>
             </div>
           </div>

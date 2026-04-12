@@ -332,6 +332,14 @@ def get_my_assessment_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found.",
+        )
+    
     enrollment = (
         db.query(CourseEnrollment)
         .filter(
@@ -344,13 +352,6 @@ def get_my_assessment_history(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not enrolled in this course.",
-        )
-
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found.",
         )
 
     rows = (
