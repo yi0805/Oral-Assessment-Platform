@@ -22,12 +22,12 @@ export default function StudentCourse() {
   );
 
   const sortedAssessments = [...assessments].sort(
-    (a, b) => new Date(a.close_at || 0) - new Date(b.close_at || 0),
+    (a, b) => new Date(a.due_time || 0) - new Date(b.due_time || 0),
   );
 
   const earliestDeadline =
     sortedAssessments.length > 0
-      ? formatDeadline(sortedAssessments[0].close_at)
+      ? formatDeadline(sortedAssessments[0].due_time)
       : null;
 
   console.log(assessments);
@@ -104,7 +104,7 @@ export default function StudentCourse() {
                             {assessment.title}
                           </h2>
                           <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
-                            {assessment.instructions ||
+                            {assessment.description ||
                               "No instructions provided."}
                           </p>
                         </div>
@@ -115,7 +115,7 @@ export default function StudentCourse() {
                                 Duration
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
-                                {assessment.total_time_minutes} mins
+                                {assessment.total_time_minute} mins
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -123,8 +123,8 @@ export default function StudentCourse() {
                                 Questions
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
-                                {assessment.max_main_questions} main •{" "}
-                                {assessment.max_followups_per_main} each
+                                {assessment.main_question_num} main •{" "}
+                                {assessment.follow_up_num} each
                               </span>
                             </div>
                             <div className="flex flex-col">
@@ -171,14 +171,14 @@ export default function StudentCourse() {
                               database
                             </span>
                             <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
-                              {formatDeadline(assessment.close_at)}
+                              {formatDeadline(assessment.due_time)}
                             </span>
                           </div>
                           <h3 className="mb-2 text-lg font-bold text-on-surface">
                             {assessment.title}
                           </h3>
                           <p className="text-xs leading-relaxed text-on-surface-variant">
-                            {assessment.instructions ||
+                            {assessment.description ||
                               "No instructions provided."}
                           </p>
                         </div>
@@ -210,13 +210,13 @@ export default function StudentCourse() {
                         {assessment.title}
                       </h3>
                       <p className="mb-6 text-xs text-on-surface-variant">
-                        {assessment.instructions || "No instructions provided."}
+                        {assessment.description || "No instructions provided."}
                       </p>
                       <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
                         <span className="material-symbols-outlined text-sm">
                           schedule
                         </span>
-                        {assessment.total_time_minutes} mins
+                        {assessment.total_time_minute} mins
                       </div>
                     </div>
                   </div>

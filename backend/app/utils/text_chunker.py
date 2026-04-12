@@ -44,8 +44,6 @@ def chunk_text(
     chunks = []
     current_chunk_parts = []
     current_token_count = 0
-    max_words = int(max_tokens * APPROX_WORDS_PER_TOKEN)
-    overlap_words = int(overlap_tokens * APPROX_WORDS_PER_TOKEN)
 
     for para in paragraphs:
         para_words = len(para.split())
@@ -62,9 +60,11 @@ def chunk_text(
 
             # Keep overlap: take the last part(s) as seed for next chunk
             overlap_text = current_chunk_parts[-1] if current_chunk_parts else ""
+
             if estimate_tokens(overlap_text) <= overlap_tokens:
                 current_chunk_parts = [overlap_text]
                 current_token_count = estimate_tokens(overlap_text)
+                
             else:
                 current_chunk_parts = []
                 current_token_count = 0

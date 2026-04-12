@@ -9,14 +9,21 @@ export function useUpdateReview() {
   const { mutate: updateReview, isPending } = useMutation({
     mutationFn: ({ sessionId, finalGrade, comments }) =>
       upsertReview(sessionId, finalGrade, comments),
-    onSuccess: () => {
+    onSuccess: (data) => {
+      toast.success(data?.message || "Review updated successfully.");
+
       queryClient.invalidateQueries({ queryKey: ["transcript"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["pendingReviews"] });
       toast.success("Review updated successfully!");
     },
     onError: (error) => {
-      console.error("Failed to update review:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error.message ||
+        "Failed to update review.";
+
+      toast.error(message);
     },
   });
 

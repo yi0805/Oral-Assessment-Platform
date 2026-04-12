@@ -1,41 +1,44 @@
-# Python
+# Python cache / compiled files
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+
+# Virtual environments
 venv/
 .venv/
-*.egg-info/
-dist/
-build/
 
-# Environment
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# Environment files
 .env
 
-# IDE
+# Editor / IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
-# Testing
+# Testing / coverage
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Database
+# Local databases
 *.sqlite3
-venv/
 
 # Node
 node_modules/
 
-# local uploads
+# App local storage
 local_uploads/
 
-# AWS cert
+# Certificates / secrets
 global-bundle.pem

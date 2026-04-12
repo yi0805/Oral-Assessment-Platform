@@ -5,17 +5,15 @@ export async function updateNow(
   materialId,
   rubricId,
   assessmentName,
-  numQuestions,
   totalTime,
+  numQuestions,
 ) {
   const response = await api.post(`/courses/${courseId}/update-now`, {
-    material_ids: [materialId],
-    rubric_id: rubricId,
+    material_id: materialId,
+    material_r_id: rubricId,
     assessment_title: assessmentName,
-    num_main_questions: numQuestions,
     total_time_minutes: totalTime,
-    max_followups_per_main: 3,
-    followup_enabled: true,
+    num_main_questions: numQuestions,
   });
   return response.data;
 }

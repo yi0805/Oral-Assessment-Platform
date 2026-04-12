@@ -1,9 +1,8 @@
 import api from "./api";
 
-export async function uploadMaterial(courseId, file, assessmentName) {
+export async function uploadMaterial(courseId, file) {
   const matForm = new FormData();
   matForm.append("file", file);
-  matForm.append("title", `${assessmentName} - Material`);
 
   const response = await api.post(
     `/courses/${courseId}/materials/upload`,

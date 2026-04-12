@@ -1,25 +1,10 @@
-"""
-ORM models: materials + material_chunks tables.
-ORM:materials + material_chunks.
-
-Owner: Bess (PRIMARY — this is your signature domain)
-One-sentence truth (materials): What files were uploaded + processing state
-One-sentence truth (chunks): RAG-ready text segments with vector embeddings
-
-ARCHITECTURE NOTE:
-  material_chunks.embedding uses pgvector's Vector(1536) type.
-  This is "course memory" in the dual-memory architecture.
-  embeddingpgvectorVector(1536).
-  "".
-"""
 import uuid
-from datetime import datetime
 
 from sqlalchemy import (
-    String, Text, Integer, BigInteger, DateTime, ForeignKey,
-    UniqueConstraint, func,
+    String, Text, Integer, ForeignKey,
+    UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from pgvector.sqlalchemy import Vector
 
@@ -36,7 +21,7 @@ class Material(Base):
         UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
     )
     filename: Mapped[str] = mapped_column(String, nullable=False)
-    mime_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    mime_type: Mapped[str] = mapped_column(String, nullable=False)
     storage_key: Mapped[str] = mapped_column(
         String, unique=True, nullable=False,
         comment="S3 key: courses/{course_id}/materials/{material_id}/{filename}"
@@ -47,31 +32,14 @@ class Material(Base):
         comment="course_material | rubric"
     )
 
-    # Extraction fields (merged into materials for MVP simplicity)
-    # (MVPmaterials)
-    # extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # extraction_method: Mapped[str | None] = mapped_column(
-    #     String, nullable=True, comment="pypdf | python-pptx | docx-parser | tika"
-    # )
-    
-    # --- Relationships ---
     course = relationship("Course", back_populates="materials")
-    chunks = relationship("MaterialChunk", back_populates="material", cascade="all, delete-orphan")
-    assessment_configs = relationship("AssessmentConfig", back_populates="rubric_material")
+    chunks = relationship("MaterialChunk", back_populates="material", passive_deletes=True)
 
     def __repr__(self) -> str:
         return f"<Material {self.filename} [{self.material_category}]>"
 
 
 class MaterialChunk(Base):
-    """
-    RAG course memory: chunked text with vector embeddings.
-    RAG:.
-
-    Each chunk is ~500 tokens of text from a parent material,
-    with a vector(1536) embedding for cosine similarity search via pgvector HNSW.
-    """
     __tablename__ = "material_chunks"
     __table_args__ = (
         UniqueConstraint("material_id", "chunk_index", name="uq_chunk_material_index"),
@@ -87,17 +55,11 @@ class MaterialChunk(Base):
         Integer, nullable=False, comment="0-based position within material"
     )
     chunk_text: Mapped[str] = mapped_column(Text, nullable=False)
-    # gemini-embedding-001 with outputDimensionality=768 (pgvector HNSW index limit is 2000)
+
     embedding = mapped_column(
-        Vector(768), nullable=True, comment="Gemini gemini-embedding-001 768-dim vector (outputDimensionality=768), HNSW indexed"
-    )
-    material_category: Mapped[str] = mapped_column(
-        String, nullable=False, 
-        server_default="course_material",
-        comment="course_material | rubric"
+        Vector(768), nullable=True, comment="Gemini gemini-embedding-001, 768-dim vector (outputDimensionality=768), HNSW indexed"
     )
 
-    # --- Relationships ---
     material = relationship("Material", back_populates="chunks")
 
     def __repr__(self) -> str:

@@ -10,18 +10,22 @@ import { courseCodeRegex } from "../../utils/constants";
 
 function InstructorHome() {
   const navigate = useNavigate();
+
   const [showCourseModal, setShowCourseModal] = useState(false);
+
   const [courseCode, setCourseCode] = useState("");
   const [courseName, setCourseName] = useState("");
   const [description, setDescription] = useState("");
+
   const [courseCodeError, setCourseCodeError] = useState("");
   const [courseNameError, setCourseNameError] = useState("");
   const [courseDescriptionError, setCourseDescriptionError] = useState("");
 
   const { courses, isLoading } = useCourses();
+  const { createCourse, isPending } = useCreateCourse();
+
   const { pendingReviews, isLoading: isPendingReviewsLoading } =
     usePendingReviews();
-  const { createCourse, isPending } = useCreateCourse();
 
   if (isLoading || isPendingReviewsLoading) return <Spinner />;
 
@@ -141,7 +145,7 @@ function InstructorHome() {
             <div className="flex items-center justify-between border-b border-outline-variant/10 p-8">
               <div>
                 <h2 className="font-headline text-2xl font-extrabold tracking-tight text-on-surface">
-                  Initialize New Course
+                  Add New Course
                 </h2>
               </div>
               <button
@@ -236,7 +240,7 @@ function InstructorHome() {
                 onClick={handleSubmit}
                 disabled={isPending}
               >
-                {isPending ? "Creating..." : "Create Course"}
+                {isPending ? "Creating..." : "Confirm"}
               </button>
             </div>
           </div>

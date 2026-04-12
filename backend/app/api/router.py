@@ -1,15 +1,3 @@
-"""
-Central API router — aggregates all route modules under /api/v1.
-
-Route prefixes
---------------
-/auth         Authentication (Google OAuth, JWT, user profile)
-/courses      Course management and enrollment
-(none)        Materials, rubrics, questions, assessments, sessions, feedback
-              — these route files declare their own full paths because they
-                span multiple resource prefixes (e.g. /courses/:id/materials
-                and /materials/:id in the same file).
-"""
 from fastapi import APIRouter
 
 from app.api.routes import (
@@ -22,6 +10,8 @@ from app.api.routes import (
     rubrics,
     sessions,
 )
+
+# swagger ui display and url prefix for each router
 
 api_router = APIRouter()
 

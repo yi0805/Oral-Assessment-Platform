@@ -13,7 +13,6 @@ from uuid import UUID
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
-from sqlalchemy import text as sa_text
 
 from app.models.material import MaterialChunk, Material
 from app.services.embedding_service import embed_text
@@ -33,8 +32,6 @@ class RAGResult:
     material_id: UUID
     chunk_text: str
     score: float
-    source_page_start: int | None
-    source_page_end: int | None
 
 
 async def search(
@@ -42,7 +39,8 @@ async def search(
     query_text: str,
     course_id: UUID,
     top_k: int = 5,
-    material_ids: list[UUID] | None = None,
+    material_id: UUID | None = None,
+    material_category: str | None = "course_material",
 ) -> list[RAGResult]:
     """
     Search for the most relevant chunks matching a query within a course.
@@ -89,13 +87,15 @@ async def search(
         .join(Material, MaterialChunk.material_id == Material.id)
         .filter(
             Material.course_id == course_id,
-            Material.processing_status == "ready",
             MaterialChunk.embedding.isnot(None),
         )
     )
 
-    if material_ids:
-        q = q.filter(Material.id.in_(material_ids))
+    if material_id:
+        q = q.filter(Material.id == material_id)
+
+    if material_category:
+        q = q.filter(Material.material_category == material_category)
 
     results = q.order_by("distance").limit(top_k * 2).all()  # fetch extra, filter below
 
@@ -108,8 +108,6 @@ async def search(
                 material_id=chunk.material_id,
                 chunk_text=chunk.chunk_text,
                 score=score,
-                source_page_start=chunk.source_page_start,
-                source_page_end=chunk.source_page_end,
             ))
         if len(meaningful) >= top_k:
             break
@@ -126,8 +124,9 @@ async def search(
 
 def get_extracted_text_chunks(
     db: Session,
-    material_ids: list[UUID],
+    material_id: UUID | None,
     max_chars: int = 12000,
+    material_category: str | None = "course_material",
 ) -> list[dict]:
     """
     Text-only fallback: directly read extracted_text from the materials table
@@ -137,25 +136,30 @@ def get_extracted_text_chunks(
     Returns a list of dicts: [{"material_id": UUID, "text": str}, ...]
     Total characters across all excerpts capped at max_chars.
     """
-    if not material_ids:
+    if not material_id:
         return []
 
-    rows = (
-        db.query(Material.id, Material.original_filename, Material.extracted_text)
-        .filter(
-            Material.id.in_(material_ids),
-            Material.extracted_text.isnot(None),
-        )
-        .all()
+    q = (
+        db.query(Material.id, Material.filename, MaterialChunk.chunk_text)
+        .join(MaterialChunk, MaterialChunk.material_id == Material.id)
+        .filter(Material.id == material_id)
     )
+
+    if material_category:
+        q = q.filter(Material.material_category == material_category)
+
+    rows = q.order_by(Material.id, MaterialChunk.chunk_index).all()
 
     excerpts: list[dict] = []
     remaining = max_chars
+
     for mid, fname, text in rows:
         if remaining <= 0:
             break
+
         if not text or not text.strip():
             continue
+        
         chunk = text.strip()[:remaining]
         excerpts.append({
             "material_id": mid,
@@ -165,9 +169,10 @@ def get_extracted_text_chunks(
         remaining -= len(chunk)
 
     logger.info(
-        "[RAG text-fallback] Loaded %d excerpts from %d materials (%d chars total)",
+        "[RAG text-fallback] Loaded %d excerpts for material %s (%d chars total)",
         len(excerpts),
-        len(material_ids),
+        material_id,
         max_chars - remaining,
     )
+    
     return excerpts

@@ -16,14 +16,14 @@ function InstructorPendingGrades() {
 
   const extractedReviews = pendingReviews.map((review) => {
     const sessionId = review.session.id;
-    const studentId = review.session.student_id;
+    const studentId = review.session.user_s_id;
     const email = review.user.email;
     const fullName = review.user.full_name;
     const image = review.user.image;
     const courseCode = review.course.course_code;
     const title = review.assessment_config.title;
     const suggestedGrade = review.aisummary?.suggested_grade;
-    const instructorGrade = review.instructor_feedback?.final_grade;
+    const instructorGrade = review.session_feedback?.final_grade;
 
     return {
       sessionId,

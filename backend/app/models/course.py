@@ -1,11 +1,3 @@
-"""
-ORM models: courses + course_enrollments tables.
-ORM:courses + course_enrollments.
-
-Owner: Bess
-One-sentence truth (courses): What courses exist
-One-sentence truth (enrollments): Who belongs to which course
-"""
 import uuid
 
 from sqlalchemy import String, Text, ForeignKey, UniqueConstraint
@@ -21,20 +13,18 @@ class Course(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    course_code: Mapped[str | None] = mapped_column(
-        String, nullable=True, comment="e.g. COMPSCI399"
+    course_code: Mapped[str] = mapped_column(
+        String, nullable=False, comment="e.g. COMPSCI 399"
     )
     course_name: Mapped[str] = mapped_column(String, nullable=False)
-    term: Mapped[str | None] = mapped_column(
-        String, nullable=True, comment="e.g. 2026-S1"
+    term: Mapped[str] = mapped_column(
+        String, nullable=False, comment="e.g. 26S1"
     )
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # --- Relationships ---
-    enrollments = relationship("CourseEnrollment", back_populates="course", cascade="all, delete-orphan")
-    materials = relationship("Material", back_populates="course", cascade="all, delete-orphan")
-    # rubrics = relationship("Rubric", back_populates="course", cascade="all, delete-orphan")
-    assessment_configs = relationship("AssessmentConfig", back_populates="course", cascade="all, delete-orphan")
+    enrollments = relationship("CourseEnrollment", back_populates="course", passive_deletes=True,)
+    materials = relationship("Material", back_populates="course", passive_deletes=True,)
+    assessment_configs = relationship("AssessmentConfig", back_populates="course", passive_deletes=True)
 
     def __repr__(self) -> str:
         return f"<Course {self.course_code}: {self.course_name}>"
@@ -42,6 +32,7 @@ class Course(Base):
 
 class CourseEnrollment(Base):
     __tablename__ = "course_enrollments"
+
     __table_args__ = (
         UniqueConstraint("course_id", "user_id", name="uq_enrollment_course_user"),
     )
@@ -55,8 +46,8 @@ class CourseEnrollment(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    upi: Mapped[str] = mapped_column(String, unique=True, nullable=False)
 
-    # --- Relationships ---
     course = relationship("Course", back_populates="enrollments")
     user = relationship("User", back_populates="enrollments")
 

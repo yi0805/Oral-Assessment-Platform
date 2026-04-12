@@ -26,10 +26,11 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models.question import Question, QuestionPool
-from app.models.rubric import Rubric
 from app.services import rag_search
 from app.services.ai_gateway import chat_complete
+
+
+from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk
 
 logger = logging.getLogger(__name__)
 
@@ -85,9 +86,11 @@ Example (do not copy verbatim):
 async def generate_pool(
     db: Session,
     pool_id: UUID,
-    material_ids: list[UUID],
+    course_id: UUID,
+    material_id: UUID,
     rubric_id: UUID | None = None,
     num_main_questions: int = 3,
+    config_id: UUID | None = None,
 ) -> QuestionPool:
     """
     Generate MAIN questions only for a pool using RAG-grounded LLM prompting.
@@ -114,10 +117,22 @@ async def generate_pool(
     # 1. Get rubric text
     # ------------------------------------------------------------------
     rubric_text = ""
+
     if rubric_id:
-        rubric = db.query(Rubric).filter(Rubric.id == rubric_id).first()
-        if rubric:
-            rubric_text = rubric.rubric_text
+        rubric_material = db.query(Material).filter(
+            Material.id == rubric_id,
+            Material.material_category == "rubric",
+        ).first()
+
+        if rubric_material:
+            rubric_chunks = (
+                db.query(MaterialChunk)
+                .filter(MaterialChunk.material_id == rubric_id)
+                .order_by(MaterialChunk.chunk_index)
+                .all()
+            )
+
+            rubric_text = "\n\n".join(c.chunk_text for c in rubric_chunks)
 
     # ------------------------------------------------------------------
     # 2. RAG: retrieve relevant chunks from the selected materials only
@@ -143,17 +158,19 @@ async def generate_pool(
 
     all_chunks: list[rag_search.RAGResult] = []
     rag_error: str | None = None
+
     try:
         chunks_per_query = max(6, (20 // len(_COVERAGE_QUERIES)) + 2)
         for query in _COVERAGE_QUERIES:
             hits = await rag_search.search(
                 db=db,
                 query_text=query,
-                course_id=pool.course_id,
+                course_id=course_id,
                 top_k=chunks_per_query,
-                material_ids=material_ids,  # scoped to instructor-selected materials
+                material_id=material_id,
             )
             all_chunks.extend(hits)
+
     except Exception as exc:  # noqa: BLE001
         rag_error = f"{type(exc).__name__}: {exc}"
         logger.warning(
@@ -167,15 +184,16 @@ async def generate_pool(
     for c in all_chunks:
         if c.chunk_id not in seen or c.score > seen[c.chunk_id].score:
             seen[c.chunk_id] = c
+
     unique_chunks: list[rag_search.RAGResult] = sorted(
         seen.values(), key=lambda x: -x.score
     )[:25]
 
     logger.info(
-        "generate_pool %s: %d unique RAG vector chunks from %d materials%s",
+        "generate_pool %s: %d unique RAG vector chunks for material %s%s",
         pool_id,
         len(unique_chunks),
-        len(material_ids),
+        material_id,
         f" (RAG error: {rag_error})" if rag_error else "",
     )
 
@@ -183,6 +201,7 @@ async def generate_pool(
     # 2b. Text fallback — load extracted_text when RAG returned nothing
     # ------------------------------------------------------------------
     text_fallback_excerpts: list[dict] = []
+
     if not unique_chunks:
         logger.warning(
             "generate_pool %s: RAG returned 0 usable chunks. "
@@ -192,14 +211,15 @@ async def generate_pool(
         )
         text_fallback_excerpts = rag_search.get_extracted_text_chunks(
             db=db,
-            material_ids=material_ids,
+            material_id=material_id,
             max_chars=12000,
         )
+
         if not text_fallback_excerpts:
             logger.error(
-                "generate_pool %s: No extracted_text found for any of the %d selected "
-                "materials. Materials may not have completed the Extract pipeline stage.",
-                pool_id, len(material_ids),
+                "generate_pool %s: No extracted_text found for material %s. "
+                "Material may not have completed the Extract pipeline stage.",
+                pool_id, material_id,
             )
 
     # ------------------------------------------------------------------
@@ -214,6 +234,7 @@ async def generate_pool(
             for i, c in enumerate(unique_chunks)
         )
         context_source = f"vector RAG ({len(unique_chunks)} chunks)"
+
     elif text_fallback_excerpts:
         # Text fallback path — raw extracted text
         chunks_section = "\n\n---\n\n".join(
@@ -221,6 +242,7 @@ async def generate_pool(
             for ex in text_fallback_excerpts
         )
         context_source = f"extracted_text fallback ({len(text_fallback_excerpts)} materials)"
+
     else:
         chunks_section = (
             "No course material context available. "
@@ -247,6 +269,7 @@ async def generate_pool(
             max_tokens=2000,
         )
         questions_data = _parse_llm_response(raw_response, num_main_questions)
+
     except (RuntimeError, ValueError) as exc:
         logger.error("Question generation LLM call failed: %s", exc)
         # Fall back to clearly labelled placeholder questions
@@ -258,20 +281,19 @@ async def generate_pool(
     # Clear existing questions (idempotent retry)
     db.query(Question).filter(Question.question_pool_id == pool_id).delete()
 
+    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == config_id).first()
+
+    if config:
+        config.description = await _generate_description(questions_data, rubric_section)
+
     for order, qdata in enumerate(questions_data, start=1):
         main_q = Question(
             question_pool_id=pool_id,
             question_text=qdata["main_question"],
-            question_kind="main",
-            answer_style=qdata.get("answer_style", "long"),
-            difficulty=qdata.get("difficulty", "medium"),
-            learning_objective=qdata.get("learning_objective"),
-            display_order=order,
+            question_index = order,
         )
         db.add(main_q)
 
-    pool.generated_from_materials = [str(mid) for mid in material_ids]
-    pool.generation_method = "ai_generated"
     db.commit()
     db.refresh(pool)
 
@@ -286,6 +308,41 @@ async def generate_pool(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+async def _generate_description(
+    questions_data: list[dict],
+    rubric_section: str,
+) -> str:
+    questions_summary = "\n".join(
+        f"  {i}. {q['main_question']} (difficulty: {q.get('difficulty', 'N/A')}, "
+        f"objective: {q.get('learning_objective', 'N/A')})"
+        for i, q in enumerate(questions_data, start=1)
+    )
+
+    prompt = (
+        "Based on the following oral assessment questions and rubric, write a "
+        "concise 2-3 sentence description of this assessment. The description "
+        "should tell students what topics are covered and what skills will be "
+        "evaluated. Do NOT include any JSON formatting — return plain text only.\n\n"
+        f"=== RUBRIC ===\n{rubric_section}\n\n"
+        f"=== QUESTIONS ===\n{questions_summary}"
+    )
+
+    try:
+        return await chat_complete(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt=(
+                "You are a university educator. Write a brief, clear assessment "
+                "description in plain text (no markdown, no JSON)."
+            ),
+            temperature=0.5,
+            max_tokens=300,
+        )
+    
+    except (RuntimeError, ValueError) as exc:
+        logger.warning("Description generation failed: %s — using fallback", exc)
+        return "AI oral assessment covering key course topics."
+
 
 def _parse_llm_response(
     raw: str,
@@ -306,6 +363,7 @@ def _parse_llm_response(
 
     try:
         data = json.loads(cleaned)
+
     except json.JSONDecodeError as exc:
         logger.error("LLM response JSON parse failed: %s\nRaw: %.500s", exc, raw)
         return _fallback_questions(expected_main)
@@ -319,6 +377,7 @@ def _parse_llm_response(
     for item in data[:expected_main]:
         if not isinstance(item, dict) or "main_question" not in item:
             continue
+
         validated.append({
             "main_question": str(item["main_question"]),
             "learning_objective": str(item.get("learning_objective", "")),

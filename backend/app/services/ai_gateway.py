@@ -40,12 +40,11 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-GEMINI_EMBED_MODEL = "models/gemini-embedding-001"
-EMBEDDING_DIMENSIONS = 768                  # gemini-embedding-001 with outputDimensionality=768 (pgvector HNSW max is 2000)
-
 OPENROUTER_MODEL = "openrouter/free"
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
+
+GEMINI_EMBED_MODEL = "models/gemini-embedding-001"
 GEMINI_EMBED_URL = (
     "https://generativelanguage.googleapis.com/v1beta/"
     "models/gemini-embedding-001:embedContent"
@@ -55,7 +54,8 @@ GEMINI_BATCH_EMBED_URL = (
     "models/gemini-embedding-001:batchEmbedContents"
 )
 
-_ZERO_VECTOR: list[float] = [0.0] * EMBEDDING_DIMENSIONS  # 768 zeros
+EMBEDDING_DIMENSIONS = 768    #(pgvector HNSW max is 2000)
+_ZERO_VECTOR: list[float] = [0.0] * EMBEDDING_DIMENSIONS  # 768 zeros 
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +81,7 @@ async def get_embedding(
     """
     if not settings.gemini_api_key:
         logger.warning("[AI Gateway] GEMINI_API_KEY not set — returning zero vector (dev mode)")
+
         return list(_ZERO_VECTOR)
 
     payload: dict[str, Any] = {
@@ -100,14 +101,20 @@ async def get_embedding(
                 },
                 json=payload,
             )
+
             response.raise_for_status()
+
             data = response.json()
             values: list[float] = data["embedding"]["values"]
+
             logger.debug("[AI Gateway] Gemini embed: %d dims for %d chars", len(values), len(text))
+
             return values
+        
         except httpx.HTTPStatusError as exc:
             logger.error("[AI Gateway] Gemini embed HTTP %s: %s", exc.response.status_code, exc.response.text)
             raise RuntimeError(f"Gemini embedding failed: {exc.response.text}") from exc
+        
         except Exception as exc:
             logger.error("[AI Gateway] Gemini embed error: %s", exc)
             raise RuntimeError(f"Gemini embedding error: {exc}") from exc
@@ -164,12 +171,15 @@ async def get_embeddings_batch(
                     },
                     json={"requests": requests_payload},
                 )
+
                 response.raise_for_status()
                 data = response.json()
+
                 batch_embeddings: list[list[float]] = [
                     item["values"] for item in data["embeddings"]
                 ]
                 all_embeddings.extend(batch_embeddings)
+
                 logger.info(
                     "[AI Gateway] Gemini batch embed %d/%d: %d texts embedded",
                     batch_no, total_batches, len(batch_embeddings),
@@ -180,12 +190,15 @@ async def get_embeddings_batch(
                     "[AI Gateway] Gemini batch embed %d/%d HTTP %s: %s — falling back to sequential",
                     batch_no, total_batches, exc.response.status_code, exc.response.text,
                 )
+
                 # Graceful fallback: embed one by one for this sub-batch
                 for text in batch:
                     try:
                         vec = await get_embedding(text, task_type=task_type)
+
                     except Exception:  # noqa: BLE001
                         vec = list(_ZERO_VECTOR)
+
                     all_embeddings.append(vec)
 
             except Exception as exc:
@@ -196,6 +209,7 @@ async def get_embeddings_batch(
                 raise RuntimeError(f"Gemini batch embedding error: {exc}") from exc
 
     logger.info("[AI Gateway] Gemini batch embed complete: %d total vectors", len(all_embeddings))
+
     return all_embeddings
 
 
@@ -261,6 +275,7 @@ async def chat_complete(
             response.raise_for_status()
             # Explicitly decode as UTF-8 to avoid charset-detection failures when
             # response bodies contain Unicode math symbols or non-ASCII characters.
+
             data = __import__("json").loads(response.content.decode("utf-8"))
             choices = data.get("choices") or []
             if not choices:
@@ -288,6 +303,7 @@ async def chat_complete(
                 exc.response.text,
             )
             raise RuntimeError(f"OpenRouter chat failed: {exc.response.text}") from exc
+        
         except Exception as exc:
             logger.error("[AI Gateway] OpenRouter error: %s", exc)
             raise RuntimeError(f"OpenRouter chat error: {exc}") from exc

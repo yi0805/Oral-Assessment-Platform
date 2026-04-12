@@ -55,11 +55,10 @@ export default function StudentAssessment() {
         setSessionId(Response.session_id);
         setAssessmentTitle(Response.assessment_title);
         setExpiresAt(new Date(Response.expires_at));
-        // setExpiresAt(new Date(Date.now() + 60 * 1000 * 60));
         setCurrentQuestion(Response.current_question);
         setCanComplete(Response.can_complete ?? false);
-        setMaxMainQuestions(Response.max_main_questions ?? 0);
-        setMaxFollowupsPerMain(Response.max_followups_per_main ?? 0);
+        setMaxMainQuestions(Response.main_question_num ?? 0);
+        setMaxFollowupsPerMain(Response.follow_up_num ?? 0);
       } catch (err) {
         if (cancelled) return;
         setError(getErrorMessage(err, "Failed to start the assessment."));
@@ -288,7 +287,7 @@ export default function StudentAssessment() {
                   </span>
                 </div>
                 <h2 className="mb-4 font-headline text-2xl font-semibold leading-snug text-on-background">
-                  {currentQuestion?.asked_text}
+                  {currentQuestion?.question_text}
                 </h2>
               </div>
             )}

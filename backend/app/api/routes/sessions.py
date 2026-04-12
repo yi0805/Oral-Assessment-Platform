@@ -1,810 +1,83 @@
-"""
-Assessment session routes (student-facing + instructor review).
-
-Endpoints
----------
-POST   /assessments/{assessment_id}/sessions/start   Start a student session
-POST   /sessions/{session_id}/respond                Submit a student answer + get next question
-POST   /sessions/{session_id}/complete               End a session (student or auto-timeout)
-GET    /sessions/{session_id}                        Full transcript (instructor review)
-GET    /assessments/{assessment_id}/sessions         List all sessions (instructor dashboard)
-
-Server-side timer enforcement
-------------------------------
-  start   → expires_at = now() + total_time_minutes
-  respond → if now() > expires_at: auto-finalize with status='time_expired' and return next_question=None
-
-AI follow-up generation (respond endpoint)
-------------------------------------------
-After saving a student's answer, the system decides the next step:
-  1. If follow-ups are enabled AND current follow-up count < max_followups_per_main:
-       → Generate an AI follow-up question via the AI Gateway (OpenRouter free)
-       → Append to transcript as (assistant, followup_question)
-  2. Else if more main questions remain:
-       → Advance to next main question from the approved pool
-       → Append to transcript as (assistant, main_question)
-  3. Else:
-       → Mark the session status as 'all_questions_complete' (still in_progress, timer running)
-       → next_question = None signals to the frontend that the student can submit
-"""
 from __future__ import annotations
 
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import func
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_instructor, require_student
-from app.schemas.pagination import Page
-from app.models.assessment import AssessmentConfig, AssessmentSession
-from app.models.course import CourseEnrollment, Course
-from app.models.feedback import AISummary, SessionFeedback
-from app.models.question import Question
-from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
-from app.models.user import User
-from app.schemas.assessment import (
-    AssessmentStatsOut,
-    FullTranscriptOut,
-    SessionBrief,
-    SessionBriefWithAIGrades, 
-    SessionOut,
-    SessionQuestionItemOut,
-    SessionStartResponse,
-    StudentResponseRequest,
-    StudentResponseResponse,
-    AssessmentConfigOut
+from app.core.dependencies import get_current_user, require_student
+from app.models import (
+    User, 
+    AssessmentConfig, AssessmentSession, 
+    CourseEnrollment, Course, AISummary, Question, 
+    SessionQuestionItem, TranscriptMessage, SessionFeedback
 )
 
-from pydantic import BaseModel, ConfigDict
-from app.schemas.feedback import AISummaryOut
-from app.schemas.user import UserOut
-from app.schemas.course import CourseOut
-from app.schemas.enums import SessionStatus
+from app.schemas import (
+    AssessmentHistoryItemOut, AssessmentHistoryOut, 
+    PendingReviewOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Start session
-# ---------------------------------------------------------------------------
-
-# @router.post(
-#     "/assessments/{assessment_id}/sessions/start",
-#     response_model=SessionStartResponse,
-#     status_code=status.HTTP_201_CREATED,
-#     summary="Start an assessment session",
-#     description=(
-#         "Student-only. Creates a new session with a server-side expiry timer, "
-#         "selects the first question from the approved pool, and records it in the transcript."
-#     ),
-# )
-# def start_session(
-#     assessment_id: UUID,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(require_student),
-# ):
-#     config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
-#     if not config:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-#     if config.status != "published":
-#         raise HTTPException(
-#             status_code=status.HTTP_409_CONFLICT,
-#             detail="This assessment is not currently published.",
-#         )
-
-#     # Verify the student is enrolled in this course
-#     enrollment = (
-#         db.query(CourseEnrollment)
-#         .filter(
-#             CourseEnrollment.course_id == config.course_id,
-#             CourseEnrollment.user_id == current_user.id,
-#             CourseEnrollment.is_active.is_(True),
-#         )
-#         .first()
-#     )
-#     if not enrollment:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="You are not enrolled in the course for this assessment.",
-#         )
-
-#     now = datetime.now(timezone.utc)
-#     if config.open_at and now < config.open_at:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail=f"Assessment opens at {config.open_at.isoformat()}.",
-#         )
-#     if config.close_at and now > config.close_at:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="This assessment has closed.",
-#         )
-
-#     # Prevent duplicate in-progress sessions
-#     existing = (
-#         db.query(AssessmentSession)
-#         .filter(
-#             AssessmentSession.assessment_config_id == assessment_id,
-#             AssessmentSession.student_id == current_user.id,
-#             AssessmentSession.status == "in_progress",
-#         )
-#         .first()
-#     )
-#     if existing:
-#         raise HTTPException(
-#             status_code=status.HTTP_409_CONFLICT,
-#             detail="You already have an active session for this assessment.",
-#         )
-
-#     # Create session with server-side expiry timer
-#     expires_at = now + timedelta(minutes=config.total_time_minutes)
-#     session = AssessmentSession(
-#         assessment_config_id=assessment_id,
-#         course_id=config.course_id,
-#         student_id=current_user.id,
-#         status="in_progress",
-#         started_at=now,
-#         expires_at=expires_at,
-#         current_main_index=1,
-#         current_followup_index=0,
-#     )
-#     db.add(session)
-#     db.flush()
-
-#     # Pull the first approved main question
-#     first_question = (
-#         db.query(Question)
-#         .filter(
-#             Question.question_pool_id == config.question_pool_id,
-#             Question.question_kind == "main",
-#             Question.is_active.is_(True),
-#         )
-#         .order_by(Question.display_order.asc())
-#         .first()
-#     )
-#     if not first_question:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail="No active main questions found in the approved pool.",
-#         )
-
-#     # Record the question as a runtime item
-#     item = SessionQuestionItem(
-#         session_id=session.id,
-#         source_question_id=first_question.id,
-#         asked_text=first_question.question_text,
-#         question_kind="main",
-#         main_group_no=1,
-#         followup_no=None,
-#         generated_by="approved_pool",
-#     )
-#     db.add(item)
-#     db.flush()
-
-#     # Write the first transcript message
-#     msg = TranscriptMessage(
-#         session_id=session.id,
-#         session_question_item_id=item.id,
-#         sender_role="assistant",
-#         message_type="main_question",
-#         sequence_no=1,
-#         content=first_question.question_text,
-#     )
-#     db.add(msg)
-#     db.commit()
-#     db.refresh(session)
-#     db.refresh(item)
-
-#     return SessionStartResponse(
-#         session_id=session.id,
-#         assessment_title=config.title,
-#         total_time_minutes=config.total_time_minutes,
-#         expires_at=expires_at,
-#         first_question=SessionQuestionItemOut.model_validate(item),
-#     )
-
-
-# ---------------------------------------------------------------------------
-# Submit response (+ AI follow-up generation)
-# ---------------------------------------------------------------------------
-
-# @router.post(
-#     "/sessions/{session_id}/respond",
-#     response_model=StudentResponseResponse,
-#     summary="Submit a student answer",
-#     description=(
-#         "Student-only. Saves the answer, enforces the timer, then uses the AI "
-#         "Gateway to decide the next question: AI follow-up → next main → complete."
-#     ),
-# )
-# async def submit_response(
-#     session_id: UUID,
-#     payload: StudentResponseRequest,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(require_student),
-# ):
-#     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
-#     if not session:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
-#     if session.student_id != current_user.id:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="You do not have access to this session.",
-#         )
-
-#     if session.status != "in_progress":
-#         raise HTTPException(
-#             status_code=status.HTTP_409_CONFLICT,
-#             detail=f"Session is not in progress (current status: {session.status}).",
-#         )
-
-#     if session.transcript_locked:
-#         raise HTTPException(
-#             status_code=status.HTTP_409_CONFLICT,
-#             detail="Transcript is locked — the session has ended.",
-#         )
-
-#     # Server-side timer enforcement — total session timer
-#     now = datetime.now(timezone.utc)
-#     if session.expires_at and now > session.expires_at:
-#         # If expired now, auto-submit/finalize
-#         session.status = "time_expired"
-#         session.ended_at = now
-#         session.transcript_locked = True
-#         session.total_messages = (
-#             db.query(TranscriptMessage)
-#             .filter(TranscriptMessage.session_id == session_id)
-#             .count()
-#         )
-#         db.commit()
-#         db.refresh(session)
-
-#         return StudentResponseResponse(
-#             message_saved=None,
-#             next_question=None,
-#             session_status="time_expired",
-#             time_remaining_seconds=0,
-#         )
-
-#     config = (
-#         db.query(AssessmentConfig)
-#         .filter(AssessmentConfig.id == session.assessment_config_id)
-#         .first()
-#     )
-
-#     # Per-question time limit enforcement
-#     # If per_question_time_limit_minutes is configured, check the time elapsed
-#     # since the most recent assistant question was asked.
-#     if config and config.per_question_time_limit_minutes:
-#         time_limit_seconds = config.per_question_time_limit_minutes * 60
-
-#         last_question_msg = (
-#             db.query(TranscriptMessage)
-#             .filter(
-#                 TranscriptMessage.session_id == session_id,
-#                 TranscriptMessage.sender_role == "assistant",
-#             )
-#             .order_by(TranscriptMessage.sequence_no.desc())
-#             .first()
-#         )
-
-#         if last_question_msg:
-#             elapsed = (now - last_question_msg.created_at.replace(tzinfo=timezone.utc)).total_seconds()
-#             if elapsed > time_limit_seconds:
-#                 raise HTTPException(
-#                     status_code=status.HTTP_403_FORBIDDEN,
-#                     detail=(
-#                         f"Per-question time limit of {config.per_question_time_limit_minutes} minutes exceeded "
-#                         f"({int(elapsed)} seconds elapsed). The question has been skipped."
-#                     ),
-#                 )
-
-#     # Determine next sequence number
-#     last_msg = (
-#         db.query(TranscriptMessage)
-#         .filter(TranscriptMessage.session_id == session_id)
-#         .order_by(TranscriptMessage.sequence_no.desc())
-#         .first()
-#     )
-#     next_seq = (last_msg.sequence_no + 1) if last_msg else 1
-
-#     # Find the question item this answer responds to
-#     last_question_item = (
-#         db.query(SessionQuestionItem)
-#         .filter(SessionQuestionItem.session_id == session_id)
-#         .order_by(SessionQuestionItem.asked_at.desc())
-#         .first()
-#     )
-
-#     # Persist the student's answer
-#     answer_msg = TranscriptMessage(
-#         session_id=session_id,
-#         session_question_item_id=last_question_item.id if last_question_item else None,
-#         sender_role="student",
-#         message_type="student_answer",
-#         sequence_no=next_seq,
-#         content=payload.answer_text,
-#     )
-#     db.add(answer_msg)
-#     db.flush()
-#     next_seq += 1
-
-#     # ------------------------------------------------------------------
-#     # Decide next question
-#     # ------------------------------------------------------------------
-#     next_question_item: SessionQuestionItem | None = None
-#     current_followup = session.current_followup_index or 0
-#     current_main = session.current_main_index or 1
-#     max_main = config.max_main_questions if config else None
-#     max_followups = config.max_followups_per_main if config else 0
-#     followup_enabled = config.followup_enabled if config else False
-
-#     if followup_enabled and current_followup < max_followups:
-#         # Generate an AI follow-up question for the current main question
-#         followup_text = await _generate_ai_followup(
-#             db=db,
-#             session=session,
-#             current_followup=current_followup,
-#         )
-
-#         item = SessionQuestionItem(
-#             session_id=session_id,
-#             source_question_id=None,          # fully AI-generated
-#             asked_text=followup_text,
-#             question_kind="followup",
-#             main_group_no=current_main,
-#             followup_no=current_followup + 1,
-#             generated_by="adaptive_ai",
-#         )
-#         db.add(item)
-#         db.flush()
-
-#         followup_msg = TranscriptMessage(
-#             session_id=session_id,
-#             session_question_item_id=item.id,
-#             sender_role="assistant",
-#             message_type="followup_question",
-#             sequence_no=next_seq,
-#             content=followup_text,
-#         )
-#         db.add(followup_msg)
-
-#         session.current_followup_index = current_followup + 1
-#         next_question_item = item
-
-#     elif max_main is None or current_main < max_main:
-#         # Advance to the next main question from the approved pool
-#         next_main_no = current_main + 1
-#         next_q = _get_main_question_by_order(db, config, next_main_no)
-
-#         if next_q:
-#             item = SessionQuestionItem(
-#                 session_id=session_id,
-#                 source_question_id=next_q.id,
-#                 asked_text=next_q.question_text,
-#                 question_kind="main",
-#                 main_group_no=next_main_no,
-#                 followup_no=None,
-#                 generated_by="approved_pool",
-#             )
-#             db.add(item)
-#             db.flush()
-
-#             main_msg = TranscriptMessage(
-#                 session_id=session_id,
-#                 session_question_item_id=item.id,
-#                 sender_role="assistant",
-#                 message_type="main_question",
-#                 sequence_no=next_seq,
-#                 content=next_q.question_text,
-#             )
-#             db.add(main_msg)
-
-#             session.current_main_index = next_main_no
-#             session.current_followup_index = 0
-#             next_question_item = item
-#         else:
-#             # Pool exhausted — let the student submit
-#             logger.info("Session %s: question pool exhausted at main %d", session_id, next_main_no)
-#     else:
-#         # All required main questions answered — student can submit
-#         logger.info("Session %s: all %d main questions answered", session_id, max_main)
-
-#     db.commit()
-#     db.refresh(answer_msg)
-#     db.refresh(session)
-#     if next_question_item:
-#         db.refresh(next_question_item)
-
-#     time_remaining = (
-#         max(0, int((session.expires_at - now).total_seconds()))
-#         if session.expires_at else 0
-#     )
-
-#     return StudentResponseResponse(
-#         message_saved=TranscriptMessageOut.model_validate(answer_msg),
-#         next_question=(
-#             SessionQuestionItemOut.model_validate(next_question_item)
-#             if next_question_item else None
-#         ),
-#         session_status=session.status,
-#         time_remaining_seconds=time_remaining,
-#     )
-
-
-# ---------------------------------------------------------------------------
-# Complete session
-# ---------------------------------------------------------------------------
-
-# @router.post(
-#     "/sessions/{session_id}/complete",
-#     response_model=SessionOut,
-#     summary="Complete a session",
-#     description=(
-#         "Student-only. Ends the session, locks the transcript, and records the "
-#         "total message count. Can also be called automatically on timer expiry."
-#     ),
-# )
-# def complete_session(
-#     session_id: UUID,
-#     background_tasks: BackgroundTasks,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(require_student),
-# ):
-#     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
-#     if not session:
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
-#     if session.student_id != current_user.id:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="You do not have access to this session.",
-#         )
-
-#     if session.status != "in_progress":
-#         raise HTTPException(
-#             status_code=status.HTTP_409_CONFLICT,
-#             detail=f"Session cannot be completed from status '{session.status}'.",
-#         )
-
-#     now = datetime.now(timezone.utc)
-#     session.status = "submitted"
-#     session.ended_at = now
-#     session.transcript_locked = True
-#     session.total_messages = (
-#         db.query(TranscriptMessage)
-#         .filter(TranscriptMessage.session_id == session_id)
-#         .count()
-#     )
-#     db.commit()
-#     db.refresh(session)
-
-#     background_tasks.add_task(_run_ai_summary_background, session_id)
-
-#     return session
-
-
-# ---------------------------------------------------------------------------
-# List my sessions (student) — MUST be defined before /sessions/{session_id}
-# so FastAPI matches the literal path "mine" before the UUID path parameter.
-# ---------------------------------------------------------------------------
-
-# @router.get(
-#     "/sessions/mine",
-#     response_model=Page[SessionBrief],
-#     summary="List my sessions",
-#     description=(
-#         "Student-only. Returns all sessions belonging to the authenticated student, "
-#         "ordered most recent first (paginated)."
-#     ),
-# )
-# def list_my_sessions(
-#     page: int = Query(1, ge=1),
-#     page_size: int = Query(20, ge=1, le=100),
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(require_student),
-# ):
-#     q = (
-#         db.query(AssessmentSession)
-#         .filter(AssessmentSession.student_id == current_user.id)
-#         .order_by(AssessmentSession.created_at.desc())
-#     )
-#     total = q.count()
-#     items = q.offset((page - 1) * page_size).limit(page_size).all()
-#     return Page.create(items, total, page, page_size)
-
-
-# ---------------------------------------------------------------------------
-# Transcript view (instructor)
-# ---------------------------------------------------------------------------
-
-@router.get(
-    "/sessions/{session_id}",
-    response_model=FullTranscriptOut,
-    summary="Get full session transcript",
-    description=(
-        "Instructor-only. Returns the complete session including all transcript "
-        "messages and runtime question items, for grading review."
-    ),
-)
-def get_session_transcript(
-    session_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
-    question_items = (
-        db.query(SessionQuestionItem)
-        .filter(SessionQuestionItem.session_id == session_id)
-        .order_by(SessionQuestionItem.asked_at.asc())
-        .all()
-    )
-    messages = (
-        db.query(TranscriptMessage)
-        .filter(TranscriptMessage.session_id == session_id)
-        .order_by(TranscriptMessage.sequence_no.asc())
-        .all()
-    )
-
-    return FullTranscriptOut(
-        session=SessionOut.model_validate(session),
-        question_items=[SessionQuestionItemOut.model_validate(qi) for qi in question_items],
-        messages=[TranscriptMessageOut.model_validate(m) for m in messages],
-    )
-
-
-# ---------------------------------------------------------------------------
-# List sessions (instructor dashboard)
-# ---------------------------------------------------------------------------
-
-@router.get(
-    "/assessments/{assessment_id}/sessions",
-    response_model=Page[SessionBriefWithAIGrades],
-    summary="List student sessions for an assessment",
-    description=(
-        "Instructor-only. Returns brief summaries of all student sessions (paginated). "
-        "Each item is enriched with student name, email, AI-suggested grade, and final grade "
-        "for the instructor grading dashboard transcript list view."
-    ),
-)
-def list_sessions(
-    assessment_id: UUID,
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-
-    q = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.assessment_config_id == assessment_id)
-        .order_by(AssessmentSession.created_at.desc())
-    )
-    total = q.count()
-    sessions = q.offset((page - 1) * page_size).limit(page_size).all()
-
-    # Enrich each session brief with student info, AI suggested grade, and final grade
-    enriched: list[SessionBriefWithAIGrades] = []
-    for sess in sessions:
-        brief = SessionBriefWithAIGrades.model_validate(sess)
-
-        # Attach student name and email
-        student = db.query(User).filter(User.id == sess.student_id).first()
-        if student:
-            brief.student_name = student.full_name
-            brief.student_email = student.email
-
-        # Attach AI suggested grade (advisory)
-        ai_summary = db.query(AISummary).filter(
-            AISummary.session_id == sess.id,
-            AISummary.status == "success",
-        ).first()
-        if ai_summary:
-            brief.ai_suggested_grade = ai_summary.suggested_grade
-
-        # Attach instructor final grade if already graded
-        feedback = db.query(SessionFeedback).filter(
-            SessionFeedback.session_id == sess.id
-        ).first()
-        if feedback:
-            brief.final_grade = feedback.final_grade
-
-        enriched.append(brief)
-
-    return Page.create(enriched, total, page, page_size)
-
-
-@router.get(
-    "/assessments/{assessment_id}/sessions/stats",
-    response_model=AssessmentStatsOut,
-    summary="Get class grade statistics",
-    description=(
-        "Instructor-only. Returns median, average, highest, and lowest final grades "
-        "across all instructor-graded sessions for this assessment. "
-        "Only sessions with a numeric final_grade are included in calculations. "
-        "Matches the statistics panel shown on the instructor grading dashboard."
-    ),
-)
-def get_assessment_stats(
-    assessment_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_id).first()
-    if not config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-
-    total_sessions = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.assessment_config_id == assessment_id)
-        .count()
-    )
-
-    # Collect all numeric final grades for this assessment
-    feedbacks = (
-        db.query(SessionFeedback)
-        .join(AssessmentSession, SessionFeedback.session_id == AssessmentSession.id)
-        .filter(
-            AssessmentSession.assessment_config_id == assessment_id,
-            SessionFeedback.final_grade.isnot(None),
-        )
-        .all()
-    )
-
-    # Parse final_grade values to floats
-    numeric_grades: list[float] = [float(fb.final_grade) for fb in feedbacks]
-
-    graded_count = len(numeric_grades)
-
-    if graded_count == 0:
-        return AssessmentStatsOut(
-            assessment_id=assessment_id,
-            total_sessions=total_sessions,
-            graded_count=0,
-            average_grade=None,
-            median_grade=None,
-            highest_grade=None,
-            lowest_grade=None,
-        )
-
-    numeric_grades.sort()
-    average = sum(numeric_grades) / graded_count
-    n = graded_count
-    if n % 2 == 1:
-        median = numeric_grades[n // 2]
-    else:
-        median = (numeric_grades[n // 2 - 1] + numeric_grades[n // 2]) / 2.0
-
-    return AssessmentStatsOut(
-        assessment_id=assessment_id,
-        total_sessions=total_sessions,
-        graded_count=graded_count,
-        average_grade=round(average, 2),
-        median_grade=round(median, 2),
-        highest_grade=max(numeric_grades),
-        lowest_grade=min(numeric_grades),
-    )
-
-
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
-import re
-
 def _normalize_followup(text: str) -> str:
     text = " ".join(text.strip().split())
     text = re.sub(r"^['\"`\-\*\d\.\)\s]+", "", text)
 
-    # only retrive the first question
     m = re.search(r".*?\?", text)
     if m:
         text = m.group(0)
 
-    # only keep 25 words if question is too long
     words = text.split()
     if len(words) > 25:
         text = " ".join(words[:25]).rstrip(",.;:") + "?"
 
     return text
 
+
 def _get_main_question_by_order(
     db: Session,
     config: AssessmentConfig | None,
     order: int,
 ) -> Question | None:
-    """Return the main question at the given display_order from the pool."""
-    if not config or not config.question_pool_id:
+    
+    if not config or not config.question_pool:
         return None
+
+    pool_id = config.question_pool.id
 
     questions = (
         db.query(Question)
-        .filter(
-            Question.question_pool_id == config.question_pool_id,
-            Question.question_kind == "main",
-            Question.is_active.is_(True),
-        )
-        .order_by(Question.display_order.asc())
+        .filter(Question.question_pool_id == pool_id)
+        .order_by(Question.question_index.asc())
         .all()
     )
 
-    idx = order - 1   # order is 1-based
+    idx = order - 1
     return questions[idx] if 0 <= idx < len(questions) else None
 
 
 async def _generate_ai_followup(
     db: Session,
     session: AssessmentSession,
+    main_question_text: str | None,
     current_followup: int,
 ) -> str:
-    """
-    Generate a context-aware follow-up question using the AI Gateway.
 
-    Builds a compact conversation history from recent transcript messages,
-    explicitly anchoring to the current main question so follow-ups stay
-    on-topic (fixes: follow-up not relevant to the main question).
-
-    Falls back to a generic probing question on any AI error.
-    """
     from app.services.ai_gateway import chat_complete
 
-    # Identify the current main question from session_question_items so the
-    # follow-up is explicitly grounded in that question (not just recent chat).
-    main_question_text: str | None = None
-    current_main = session.current_main_index or 1
-    main_item = (
-        db.query(SessionQuestionItem)
-        .filter(
-            SessionQuestionItem.session_id == session.id,
-            SessionQuestionItem.question_kind == "main",
-            SessionQuestionItem.main_group_no == current_main,
-        )
-        .first()
-    )
-    if main_item:
-        main_question_text = main_item.asked_text
-
-    # Build recent conversation context (last 8 turns for breadth).
-    # Limit to the current main question block by filtering on main_group_no
-    # so follow-ups don't bleed context from previous main questions.
-    # recent_msgs = (
-    #     db.query(TranscriptMessage)
-    #     .filter(TranscriptMessage.session_id == session.id)
-    #     .order_by(TranscriptMessage.sequence_no.desc())
-    #     .limit(8)
-    #     .all()
-    # )
-    # recent_msgs.reverse()
-
-    # history_lines = []
-    # for m in recent_msgs:
-    #     prefix = "Assessor" if m.sender_role == "assistant" else "Student"
-    #     history_lines.append(f"{prefix}: {m.content}")
-    # history = "\n".join(history_lines)
-
-    # main_context = (
-    #     f"\n\nThe main question being assessed is:\n\"{main_question_text}\"\n"
-    #     if main_question_text else ""
-    # )
-
-    # Retrieve student's latest answer
     latest_student_msg = (
         db.query(TranscriptMessage)
         .filter(
             TranscriptMessage.session_id == session.id,
-            TranscriptMessage.sender_role == "student",
             TranscriptMessage.message_type == "student_answer",
         )
         .order_by(TranscriptMessage.sequence_no.desc())
@@ -812,20 +85,6 @@ async def _generate_ai_followup(
     )
 
     student_answer = latest_student_msg.content if latest_student_msg else ""
-
-    # FOLLOWUP_SYSTEM_PROMPT = """\
-    #     You generate exactly one oral-assessment follow-up question.
-
-    #     Rules:
-    #     - Output exactly one single question.
-    #     - No explanation.
-    #     - No reasoning.
-    #     - No preamble.
-    #     - No quotes.
-    #     - No JSON.
-    #     - Maximum 25 words.
-    #     - Must reference a specific idea from the student's most recent answer.
-    #     """
 
     FOLLOWUP_SYSTEM_PROMPT = """
         You are an expert academic assessor conducting an oral exam.
@@ -837,15 +96,6 @@ async def _generate_ai_followup(
         OUTPUT FORMAT: Output ONLY the question text. Strictly NO quotes, NO JSON, NO preamble and NO explanations.
         CONSTRAINT: The question must be under 25 words.
         """
-    
-    # user_prompt = (
-    #     f"{main_question_text}"
-    #     f"Conversation so far:\n{history}\n\n"
-    #     f"This is follow-up #{current_followup + 1}. "
-    #     "It must reference a specific part of the student's answer and must not be generic."
-    #     "Generate a follow-up question that is directly related to the main question above "
-    #     "and probes what the student just said more deeply:"
-    # )
 
     user_prompt = f"""
         Main question:
@@ -861,14 +111,13 @@ async def _generate_ai_followup(
         result = await chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
             system_prompt=FOLLOWUP_SYSTEM_PROMPT,
-            temperature=0.2,  # Slightly lower temperature for more focused, on-topic questions
+            temperature=0.2,
             max_tokens=1800,
         )
 
         followup_text = _normalize_followup(result)
-        # Clean any accidental quotation wrapping
         return followup_text.strip().strip('"').strip("'")
-    
+
     except RuntimeError as exc:
         logger.warning("Follow-up AI generation failed: %s — using fallback", exc)
         fallback_probes = [
@@ -879,186 +128,7 @@ async def _generate_ai_followup(
         return fallback_probes[current_followup % len(fallback_probes)]
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# integration
-
-class PendingReviewOut(BaseModel):
-    session: SessionOut 
-    assessment_config: AssessmentConfigOut
-    user:  UserOut
-    course: CourseOut 
-    aisummary: AISummaryOut | None
-    session_feedback: SessionFeedbackOut | None
-
-class StudentInfoOut(BaseModel):
-    full_name: str
-    email: str | None = None
-    image: str | None = None
-
-class AssessmentInfoOut(BaseModel):
-    title: str
-
-class AISummaryInfoOut(BaseModel):
-    suggested_grade: int | None = None
-    summary_text: str | None = None
-
-class SessionFeedbackOut(BaseModel):
-    final_grade: int | None = None
-    comments: str | None = None
-
-class TranscriptMessageOut(BaseModel):
-    sequence_no: int
-    message_type: str
-    content: str
-
-class TranscriptDetailOut(BaseModel):
-    session_id: UUID
-    student: StudentInfoOut
-    assessment: AssessmentInfoOut
-    ai_summary: AISummaryInfoOut | None = None
-    session_feedback: SessionFeedbackOut | None = None
-    transcript: list[TranscriptMessageOut]
-
-
-class StudentCourseAssessmentOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    assessment_config_id: UUID
-    session_id: UUID
-    session_status: SessionStatus
-    title: str
-    description: str | None = None
-    total_time_minutes: int
-    main_questions_num: int | None = None
-    follow_up_num: int | None = None
-    release_time: datetime | None = None
-    due_time: datetime | None = None
-
-class StudentSavedMessageOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    sequence_no: int
-    message_type: str
-    content: str
-
-
-class StudentNextQuestionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    asked_text: str
-    question_kind: str
-    main_group_no: int
-    followup_no: int | None = None
-
-
-class StudentResponseResponse(BaseModel):
-    message_saved: StudentSavedMessageOut
-    next_question: StudentNextQuestionOut | None = None
-    session_status: str
-
-class SessionStartResponse(BaseModel):
-    session_id: UUID
-    assessment_title: str
-    total_time_minutes: int
-    main_question_num: int
-    follow_up_num: int
-
-
-class AssessmentHistoryItemOut(BaseModel):
-    session_id: UUID
-    assessment_config_id: UUID
-    assessment_title: str
-    submitted_at: datetime | None = None
-    weight_percent: float | None = None
-    final_grade: int
-    instructor_name: str
-    instructor_image: str | None = None
-    instructor_department: str | None = None
-    comments: str | None = None
-
-
-class AssessmentHistoryOut(BaseModel):
-    course_code: str | None = None
-    course_name: str
-    class_average_grade: float | None = None
-    items: list[AssessmentHistoryItemOut]
-
-
 async def _run_ai_summary_background(session_id: UUID) -> None:
-    """Run AI summary generation in a background task with its own DB session."""
     from app.core.database import SessionLocal
     from app.services.ai_summary_service import generate_summary
 
@@ -1070,6 +140,12 @@ async def _run_ai_summary_background(session_id: UUID) -> None:
     finally:
         db.close()
 
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
 @router.get(
     "/pendingReviews",
     response_model=list[PendingReviewOut],
@@ -1079,11 +155,15 @@ def pending_Reviews(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    pendingReviews = (
+    rows = (
         db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary, SessionFeedback)
         .join(
+            AssessmentConfig,
+            AssessmentConfig.id == AssessmentSession.assessment_config_id,
+        )
+        .join(
             CourseEnrollment,
-            CourseEnrollment.course_id == AssessmentSession.course_id,
+            CourseEnrollment.course_id == AssessmentConfig.course_id,
         )
         .join(
             User,
@@ -1091,11 +171,7 @@ def pending_Reviews(
         )
         .join(
             Course,
-            Course.id == AssessmentSession.course_id,
-        )
-        .join(
-            AssessmentConfig,
-            AssessmentConfig.id == AssessmentSession.assessment_config_id,
+            Course.id == AssessmentConfig.course_id,
         )
         .outerjoin(
             AISummary,
@@ -1103,7 +179,6 @@ def pending_Reviews(
         )
         .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .filter(CourseEnrollment.user_id == current_user.id)
-        .filter(CourseEnrollment.course_role == "instructor")
         .filter(AssessmentSession.status == "under_review")
         .distinct()
         .all()
@@ -1112,24 +187,35 @@ def pending_Reviews(
     return [
         {
             "session": session,
+            "user": StudentInfoOut(
+                full_name=user.full_name,
+                email=user.email,
+                image=user.image,
+            ),
             "assessment_config": assessment_config,
-            "user": user,
             "course": course,
-            "aisummary": ai_summary,
-            "instructor_feedback": instructor_feedback,
+            "aisummary": {
+                "suggested_grade": ai_summary.suggested_grade,
+                "summary_text": ai_summary.summary_text,
+            } if ai_summary else None,
+            "session_feedback": {
+                "final_grade": feedback.final_grade,
+                "comments": feedback.comments,
+            } if feedback else None,
         }
-        for session, assessment_config, user, course, ai_summary, instructor_feedback in pendingReviews
+        for session, assessment_config, user, course, ai_summary, feedback in rows
     ]
 
-@router.get("/transcript/{session_id}", response_model=TranscriptDetailOut, summary="Integration",)
+
+@router.get("/transcript/{session_id}", response_model=TranscriptDetailOut, summary="Integration")
 def get_transcript_detail(
     session_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    generalInfo = (
+    general_info = (
         db.query(AssessmentSession, User, AssessmentConfig, AISummary, SessionFeedback)
-        .join(User, User.id == AssessmentSession.student_id)
+        .join(User, User.id == AssessmentSession.user_s_id)
         .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
         .outerjoin(AISummary, AISummary.session_id == AssessmentSession.id)
         .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
@@ -1137,10 +223,10 @@ def get_transcript_detail(
         .first()
     )
 
-    if not generalInfo:
+    if not general_info:
         raise HTTPException(status_code=404, detail="Transcript not found")
 
-    session_obj, user_obj, assessment_obj, ai_obj, feedback_obj = generalInfo
+    session_obj, user_obj, assessment_obj, ai_obj, feedback_obj = general_info
 
     transcripts = (
         db.query(TranscriptMessage)
@@ -1163,7 +249,7 @@ def get_transcript_detail(
             "suggested_grade": ai_obj.suggested_grade,
             "summary_text": ai_obj.summary_text,
         },
-        "instructor_feedback": None if not feedback_obj else {
+        "session_feedback": None if not feedback_obj else {
             "final_grade": feedback_obj.final_grade,
             "comments": feedback_obj.comments,
         },
@@ -1178,15 +264,10 @@ def get_transcript_detail(
     }
 
 
-
-
-
-
 @router.get(
     "/courses/{course_id}/my-assessment-sessions",
     response_model=list[StudentCourseAssessmentOut],
     summary="Integration",
-
 )
 def list_my_course_assessments(
     course_id: UUID,
@@ -1198,7 +279,6 @@ def list_my_course_assessments(
         .filter(
             CourseEnrollment.course_id == course_id,
             CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.is_active.is_(True),
         )
         .first()
     )
@@ -1212,14 +292,13 @@ def list_my_course_assessments(
         db.query(AssessmentSession, AssessmentConfig)
         .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
         .filter(
-            AssessmentSession.course_id == course_id,
+            AssessmentConfig.course_id == course_id,
             AssessmentSession.user_s_id == current_user.id,
             AssessmentSession.status.in_(["not_started", "in_progress"]),
         )
-        .order_by(AssessmentConfig.created_at.desc())
+        .order_by(AssessmentConfig.release_time.desc())
         .all()
     )
-
 
     items = [
         StudentCourseAssessmentOut(
@@ -1227,8 +306,8 @@ def list_my_course_assessments(
             session_id=session.id,
             session_status=session.status,
             title=config.title,
-            instructions=config.instructions,
-            total_time_minutes=config.total_time_minutes,
+            description=config.description,
+            total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
             release_time=config.release_time,
@@ -1243,13 +322,22 @@ def list_my_course_assessments(
 @router.get(
     "/courses/{course_id}/my-assessment-history",
     response_model=AssessmentHistoryOut,
-    summary="Integration",
+    summary="Get Assessment History for a Course",
 )
 def get_my_assessment_history(
     course_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    
+    course = db.query(Course).filter(Course.id == course_id).first()
+
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found.",
+        )
+    
     enrollment = (
         db.query(CourseEnrollment)
         .filter(
@@ -1258,17 +346,11 @@ def get_my_assessment_history(
         )
         .first()
     )
+
     if not enrollment:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not enrolled in this course.",
-        )
-
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found.",
         )
 
     rows = (
@@ -1277,13 +359,10 @@ def get_my_assessment_history(
         .join(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .join(User, User.id == SessionFeedback.user_i_id)
         .filter(
-            AssessmentSession.course_id == course_id,
-            AssessmentSession.student_id == current_user.id,
+            AssessmentConfig.course_id == course_id,
+            AssessmentSession.user_s_id == current_user.id,
             AssessmentSession.status == "released",
             SessionFeedback.final_grade.isnot(None),
-        )
-        .order_by(
-            func.coalesce(AssessmentSession.ended_at, SessionFeedback.released_at).desc()
         )
         .all()
     )
@@ -1293,11 +372,11 @@ def get_my_assessment_history(
             session_id=session.id,
             assessment_config_id=config.id,
             assessment_title=config.title,
-            submitted_at=session.ended_at or feedback.released_at,
+            comments=feedback.comments,
             final_grade=feedback.final_grade,
             instructor_name=instructor.full_name,
             instructor_image=instructor.image,
-            comments=feedback.comments,
+            submitted_at=session.completed_at,
         )
         for session, config, feedback, instructor in rows
     ]
@@ -1305,8 +384,9 @@ def get_my_assessment_history(
     class_avg = (
         db.query(func.avg(SessionFeedback.final_grade))
         .join(AssessmentSession, SessionFeedback.session_id == AssessmentSession.id)
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
         .filter(
-            AssessmentSession.course_id == course_id,
+            AssessmentConfig.course_id == course_id,
             AssessmentSession.status == "released",
             SessionFeedback.final_grade.isnot(None),
         )
@@ -1346,7 +426,6 @@ def start_session(
         .filter(
             CourseEnrollment.course_id == config.course_id,
             CourseEnrollment.user_id == current_user.id,
-            CourseEnrollment.is_active.is_(True),
         )
         .first()
     )
@@ -1358,13 +437,13 @@ def start_session(
 
     now = datetime.now(timezone.utc)
 
-    if config.open_at and now < config.open_at:
+    if config.release_time and now < config.release_time:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=f"Assessment opens at {config.open_at.isoformat()}.",
+            detail=f"Assessment opens at {config.release_time.isoformat()}.",
         )
 
-    if config.close_at and now > config.close_at:
+    if config.due_time and now > config.due_time:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This assessment has closed.",
@@ -1374,7 +453,7 @@ def start_session(
         db.query(AssessmentSession)
         .filter(
             AssessmentSession.assessment_config_id == assessment_config_id,
-            AssessmentSession.student_id == current_user.id,
+            AssessmentSession.user_s_id == current_user.id,
         )
         .first()
     )
@@ -1384,23 +463,23 @@ def start_session(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No session found for this assessment. It may not have been released yet.",
         )
-    
+
+    pool = config.question_pool
 
     if session.status == "not_started":
-        # expires_at = now + timedelta(minutes=config.total_time_minutes)
         session.status = "in_progress"
-        # session.started_at = now
-        # session.expires_at = expires_at
+        session.started_at = now
         db.flush()
 
-        first_question = (
-            db.query(Question)
-            .filter(
-                Question.question_pool_id == config.question_pool_id,
+        first_question = None
+        if pool:
+            first_question = (
+                db.query(Question)
+                .filter(Question.question_pool_id == pool.id)
+                .order_by(Question.question_index.asc())
+                .first()
             )
-            .order_by(Question.display_order.asc())
-            .first()
-        )
+
         if not first_question:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -1410,11 +489,9 @@ def start_session(
         item = SessionQuestionItem(
             session_id=session.id,
             source_question_id=first_question.id,
-            asked_text=first_question.question_text,
             question_kind="main",
             main_group_no=1,
-            followup_no=None,
-            generated_by="approved_pool",
+            followup_no=0,
         )
         db.add(item)
         db.flush()
@@ -1422,75 +499,93 @@ def start_session(
         msg = TranscriptMessage(
             session_id=session.id,
             session_question_item_id=item.id,
-            sender_role="assistant",
             message_type="main_question",
             sequence_no=1,
             content=first_question.question_text,
         )
         db.add(msg)
         db.commit()
-        db.refresh(session)
-        db.refresh(item)
+
+        expires_at = now + timedelta(minutes=config.total_time_minute)
 
         return SessionStartResponse(
             session_id=session.id,
             assessment_title=config.title,
-            total_time_minutes=config.total_time_minutes,
-            expires_at=session.expires_at,
-            first_question=SessionQuestionItemOut.model_validate(item),
+            total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
+            expires_at=expires_at,
+            current_question=StudentNextQuestionOut(
+                id=item.id,
+                question_text=first_question.question_text,
+                question_kind="main",
+                main_group_no=1,
+                followup_no=0,
+            ),
+            can_complete=False,
         )
-    
-    if session.status == "in_progress":
-        # if session.expires_at and now > session.expires_at:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Your session has expired.",
-        #     )
 
-        current_item = (
+    if session.status == "in_progress":
+        last_item = (
             db.query(SessionQuestionItem)
-            .outerjoin(
-                TranscriptMessage,
-                and_(
-                    TranscriptMessage.session_question_item_id == SessionQuestionItem.id,
-                    TranscriptMessage.sender_role == "student",
-                ),
-            )
             .filter(SessionQuestionItem.session_id == session.id)
-            .filter(TranscriptMessage.id.is_(None))
-            .order_by(
-                SessionQuestionItem.main_group_no.asc(),
-                SessionQuestionItem.followup_no.asc().nullsfirst(),
-            )
+            .order_by(SessionQuestionItem.main_group_no.desc(), SessionQuestionItem.followup_no.desc())
             .first()
         )
 
+        current_question = None
+        if last_item:
+            last_answer = (
+                db.query(TranscriptMessage)
+                .filter(
+                    TranscriptMessage.session_question_item_id == last_item.id,
+                    TranscriptMessage.message_type == "student_answer",
+                )
+                .first()
+            )
+            if not last_answer:
+                source_q = db.query(Question).filter(Question.id == last_item.source_question_id).first()
+                q_text = source_q.question_text if source_q else ""
+                if last_item.question_kind == "followup":
+                    followup_msg = (
+                        db.query(TranscriptMessage)
+                        .filter(
+                            TranscriptMessage.session_question_item_id == last_item.id,
+                            TranscriptMessage.message_type == "followup_question",
+                        )
+                        .first()
+                    )
+                    if followup_msg:
+                        q_text = followup_msg.content
+                current_question = StudentNextQuestionOut(
+                    id=last_item.id,
+                    question_text=q_text,
+                    question_kind=last_item.question_kind,
+                    main_group_no=last_item.main_group_no,
+                    followup_no=last_item.followup_no or 0,
+                )
+
+        started_at = getattr(session, "started_at", None) or now
+        expires_at = started_at + timedelta(minutes=config.total_time_minute)
+
+        max_main = config.main_question_num or 0
+        all_answered = current_question is None and last_item is not None
+
         return SessionStartResponse(
             session_id=session.id,
             assessment_title=config.title,
-            total_time_minutes=config.total_time_minutes,
-            # expires_at=session.expires_at,
-            current_question=(
-                SessionQuestionItemOut.model_validate(current_item)
-                if current_item
-                else None
-            ),
-            can_complete=current_item is None,
+            total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
+            expires_at=expires_at,
+            current_question=current_question,
+            can_complete=all_answered,
         )
-    
+
     raise HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail="This session has already been submitted or completed.",
     )
-
-
-   
-
-
 
 
 @router.post(
@@ -1508,7 +603,7 @@ async def submit_response(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    if session.student_id != current_user.id:
+    if session.user_s_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this session.",
@@ -1520,68 +615,12 @@ async def submit_response(
             detail=f"Session is not in progress (current status: {session.status}).",
         )
 
-    if session.transcript_locked:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Transcript is locked — the session has ended.",
-        )
-
-    # Server-side timer enforcement — total session timer
-    # now = datetime.now(timezone.utc)
-    # if session.expires_at and now > session.expires_at:
-    #     # If expired now, auto-submit/finalize
-    #     session.status = "time_expired"
-    #     session.ended_at = now
-    #     session.transcript_locked = True
-    #     session.total_messages = (
-    #         db.query(TranscriptMessage)
-    #         .filter(TranscriptMessage.session_id == session_id)
-    #         .count()
-    #     )
-    #     db.commit()
-    #     db.refresh(session)
-
-    #     return StudentResponseResponse(
-    #         message_saved=None,
-    #         next_question=None,
-    #         session_status="time_expired",
-    #         time_remaining_seconds=0,
-    #     )
-
     config = (
         db.query(AssessmentConfig)
         .filter(AssessmentConfig.id == session.assessment_config_id)
         .first()
     )
 
-    # Per-question time limit enforcement
-    # If per_question_time_limit_minutes is configured, check the time elapsed
-    # since the most recent assistant question was asked.
-    # if config and config.per_question_time_limit_minutes:
-    #     time_limit_seconds = config.per_question_time_limit_minutes * 60
-
-    #     last_question_msg = (
-    #         db.query(TranscriptMessage)
-    #         .filter(
-    #             TranscriptMessage.session_id == session_id,
-    #             TranscriptMessage.sender_role == "assistant",
-    #         )
-    #         .order_by(TranscriptMessage.sequence_no.desc())
-    #         .first()
-    #     )
-
-    #     if last_question_msg:
-    #         elapsed = (now - last_question_msg.created_at.replace(tzinfo=timezone.utc)).total_seconds()
-    #         if elapsed > time_limit_seconds:
-    #             raise HTTPException(
-    #                 status_code=status.HTTP_403_FORBIDDEN,
-    #                 detail=(
-    #                     f"Per-question time limit of {config.per_question_time_limit_minutes} minutes exceeded "
-    #                     f"({int(elapsed)} seconds elapsed). The question has been skipped."
-    #                 ),
-    #             )
-
-    # Determine next sequence number
     last_msg = (
         db.query(TranscriptMessage)
         .filter(TranscriptMessage.session_id == session_id)
@@ -1590,19 +629,16 @@ async def submit_response(
     )
     next_seq = (last_msg.sequence_no + 1) if last_msg else 1
 
-    # Find the question item this answer responds to
     last_question_item = (
         db.query(SessionQuestionItem)
         .filter(SessionQuestionItem.session_id == session_id)
-        .order_by(SessionQuestionItem.asked_at.desc())
+        .order_by(SessionQuestionItem.main_group_no.desc(), SessionQuestionItem.followup_no.desc())
         .first()
     )
 
-    # Persist the student's answer
     answer_msg = TranscriptMessage(
         session_id=session_id,
         session_question_item_id=last_question_item.id if last_question_item else None,
-        sender_role="student",
         message_type="student_answer",
         sequence_no=next_seq,
         content=payload.answer_text,
@@ -1615,17 +651,11 @@ async def submit_response(
     # Decide next question
     # ------------------------------------------------------------------
     next_question_item: SessionQuestionItem | None = None
-
-    last_question_item = (
-        db.query(SessionQuestionItem)
-        .filter(SessionQuestionItem.session_id == session_id)
-        .order_by(SessionQuestionItem.asked_at.desc())
-        .first()
-    )
+    next_question_text: str | None = None
 
     max_main = config.main_question_num if config else 0
     max_followups = config.follow_up_num if config else 0
-    followup_enabled = config.followup_enabled if config else False
+    followup_enabled = max_followups > 0
 
     if not last_question_item:
         current_main = 1
@@ -1638,21 +668,36 @@ async def submit_response(
             else 0
         )
 
+    # Get the current main question text for follow-up context
+    main_item = (
+        db.query(SessionQuestionItem)
+        .filter(
+            SessionQuestionItem.session_id == session_id,
+            SessionQuestionItem.question_kind == "main",
+            SessionQuestionItem.main_group_no == current_main,
+        )
+        .first()
+    )
+    main_question_text: str | None = None
+    if main_item:
+        source_q = db.query(Question).filter(Question.id == main_item.source_question_id).first()
+        if source_q:
+            main_question_text = source_q.question_text
+
     if followup_enabled and current_followup < max_followups:
         followup_text = await _generate_ai_followup(
             db=db,
             session=session,
+            main_question_text=main_question_text,
             current_followup=current_followup,
         )
 
         item = SessionQuestionItem(
             session_id=session_id,
-            source_question_id=None,
-            asked_text=followup_text,
+            source_question_id=main_item.source_question_id if main_item else last_question_item.source_question_id,
             question_kind="followup",
             main_group_no=current_main,
             followup_no=current_followup + 1,
-            generated_by="adaptive_ai",
         )
         db.add(item)
         db.flush()
@@ -1660,7 +705,6 @@ async def submit_response(
         followup_msg = TranscriptMessage(
             session_id=session_id,
             session_question_item_id=item.id,
-            sender_role="assistant",
             message_type="followup_question",
             sequence_no=next_seq,
             content=followup_text,
@@ -1668,6 +712,7 @@ async def submit_response(
         db.add(followup_msg)
 
         next_question_item = item
+        next_question_text = followup_text
 
     elif current_main < max_main:
         next_main_no = current_main + 1
@@ -1677,11 +722,9 @@ async def submit_response(
             item = SessionQuestionItem(
                 session_id=session_id,
                 source_question_id=next_q.id,
-                asked_text=next_q.question_text,
                 question_kind="main",
                 main_group_no=next_main_no,
-                followup_no=None,
-                generated_by="approved_pool",
+                followup_no=0,
             )
             db.add(item)
             db.flush()
@@ -1689,7 +732,6 @@ async def submit_response(
             main_msg = TranscriptMessage(
                 session_id=session_id,
                 session_question_item_id=item.id,
-                sender_role="assistant",
                 message_type="main_question",
                 sequence_no=next_seq,
                 content=next_q.question_text,
@@ -1697,12 +739,13 @@ async def submit_response(
             db.add(main_msg)
 
             next_question_item = item
+            next_question_text = next_q.question_text
         else:
             logger.info(
                 "Session %s: question pool exhausted at main %d",
                 session_id,
                 next_main_no,
-        )
+            )
     else:
         logger.info("Session %s: all %d main questions answered", session_id, max_main)
 
@@ -1712,27 +755,29 @@ async def submit_response(
     if next_question_item:
         db.refresh(next_question_item)
 
-    # time_remaining = (
-    #     max(0, int((session.expires_at - now).total_seconds()))
-    #     if session.expires_at else 0
-    # )
-
     return StudentResponseResponse(
-        message_saved=StudentSavedMessageOut.model_validate(answer_msg),
+        message_saved=StudentSavedMessageOut(
+            sequence_no=answer_msg.sequence_no,
+            message_type=answer_msg.message_type,
+            content=answer_msg.content,
+        ),
         next_question=(
-            StudentNextQuestionOut.model_validate(next_question_item)
+            StudentNextQuestionOut(
+                id=next_question_item.id,
+                question_text=next_question_text or "",
+                question_kind=next_question_item.question_kind,
+                main_group_no=next_question_item.main_group_no,
+                followup_no=next_question_item.followup_no,
+            )
             if next_question_item else None
         ),
         session_status=session.status,
     )
 
 
-
-
 @router.post(
     "/sessions/{session_id}/complete",
     summary="Integration",
-
 )
 def complete_session(
     session_id: UUID,
@@ -1744,7 +789,7 @@ def complete_session(
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
-    if session.student_id != current_user.id:
+    if session.user_s_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have access to this session.",
@@ -1756,18 +801,11 @@ def complete_session(
             detail=f"Session cannot be completed from status '{session.status}'.",
         )
 
-    now = datetime.now(timezone.utc)
-    session.status = "submitted"
-    session.ended_at = now
-    session.transcript_locked = True
-    session.total_messages = (
-        db.query(TranscriptMessage)
-        .filter(TranscriptMessage.session_id == session_id)
-        .count()
-    )
+    session.status = "under_review"
+    session.completed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(session)
 
     background_tasks.add_task(_run_ai_summary_background, session_id)
 
-    return session
+    return {"session_id": str(session.id), "status": session.status}
