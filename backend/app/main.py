@@ -116,7 +116,7 @@ if settings.debug:
 else:
     # Production: only origins explicitly listed in CORS_ORIGINS
     _allowed_origins = _cors_origins if _cors_origins else []
-
+print("CORS allowed origins:", _allowed_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,

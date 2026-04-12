@@ -23,6 +23,8 @@ class AISummary(Base):
         comment="One AI summary per assessment session.",
     )
     summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+    strength: Mapped[str] = mapped_column(Text, nullable=True)
+    weakness: Mapped[str] = mapped_column(Text, nullable=True)
     suggested_grade: Mapped[int | None] = mapped_column(
         Integer, nullable=True,
         comment="Advisory numeric score suggested by the AI (0-100). Never auto-assigned.",
