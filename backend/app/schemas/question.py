@@ -1,11 +1,7 @@
 """Pydantic schemas for question pool and individual question API."""
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from app.schemas.enums import QuestionKind, AnswerStyle, Difficulty, PoolStatus
-
-from typing import Optional
-
+from pydantic import BaseModel, ConfigDict
 
 class UpdateNowRequest(BaseModel):
     material_id: UUID
@@ -17,3 +13,20 @@ class UpdateNowRequest(BaseModel):
     description : str | None = None
     open_at: datetime | None = None
     close_at: datetime | None = None
+
+class QuestionUpdate(BaseModel):
+    question_text: str | None = None
+
+
+class QuestionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    question_pool_id: UUID
+    question_text: str
+    question_index: int
+
+
+class UpdateNowResponse(BaseModel):
+    assessment_config: UUID
+    questions: list[QuestionOut]

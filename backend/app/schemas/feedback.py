@@ -15,3 +15,7 @@ class GradeUpdate(BaseModel):
 class InstructorReviewUpdate(BaseModel):
     final_grade: int = Field(ge=0, le=100)
     comments: str | None = None
+
+class AISummaryInfoOut(BaseModel):
+    suggested_grade: int | None = None
+    summary_text: str | None = None

@@ -7,166 +7,25 @@ from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_student
-from app.models.assessment import AssessmentConfig, AssessmentSession
-from app.models.course import CourseEnrollment, Course
-from app.models.feedback import AISummary, SessionFeedback
-from app.models.question import Question, QuestionPool
-from app.models.session_runtime import SessionQuestionItem, TranscriptMessage
-from app.models.user import User
+from app.models import (
+    User, 
+    AssessmentConfig, AssessmentSession, 
+    CourseEnrollment, Course, AISummary, Question, 
+    SessionQuestionItem, TranscriptMessage, SessionFeedback
+)
 
-from pydantic import BaseModel, ConfigDict
+from app.schemas import (
+    AssessmentHistoryItemOut, AssessmentHistoryOut, 
+    PendingReviewOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Pydantic response schemas (matching actual ORM models)
-# ---------------------------------------------------------------------------
-
-
-class CourseInfoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    course_code: str
-    course_name: str
-    term: str
-    description: str
-
-
-class AISummaryInfoOut(BaseModel):
-    suggested_grade: int | None = None
-    summary_text: str | None = None
-
-
-class SessionFeedbackOut(BaseModel):
-    final_grade: int | None = None
-    comments: str | None = None
-
-
-class AssessmentConfigInfoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    course_id: UUID
-    title: str
-    description: str | None = None
-    material_r_id: UUID
-    total_time_minute: int
-    main_question_num: int
-    follow_up_num: int
-    release_time: datetime | None = None
-    due_time: datetime | None = None
-    status: str
-
-
-class SessionInfoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    assessment_config_id: UUID
-    user_s_id: UUID
-    status: str
-
-
-class PendingReviewOut(BaseModel):
-    session: SessionInfoOut
-    assessment_config: AssessmentConfigInfoOut
-    course: CourseInfoOut
-    aisummary: AISummaryInfoOut | None
-    session_feedback: SessionFeedbackOut | None
-
-
-class StudentInfoOut(BaseModel):
-    full_name: str
-    email: str | None = None
-    image: str | None = None
-
-
-class AssessmentTitleOut(BaseModel):
-    title: str
-
-
-class TranscriptMessageOut(BaseModel):
-    sequence_no: int
-    message_type: str
-    content: str
-
-
-class TranscriptDetailOut(BaseModel):
-    session_id: UUID
-    student: StudentInfoOut
-    assessment: AssessmentTitleOut
-    ai_summary: AISummaryInfoOut | None = None
-    session_feedback: SessionFeedbackOut | None = None
-    transcript: list[TranscriptMessageOut]
-
-
-class StudentCourseAssessmentOut(BaseModel):
-    assessment_config_id: UUID
-    session_id: UUID
-    session_status: str
-    title: str
-    description: str | None = None
-    total_time_minute: int
-    main_question_num: int | None = None
-    follow_up_num: int | None = None
-    release_time: datetime | None = None
-    due_time: datetime | None = None
-
-
-class StudentSavedMessageOut(BaseModel):
-    sequence_no: int
-    message_type: str
-    content: str
-
-
-class StudentNextQuestionOut(BaseModel):
-    id: UUID
-    question_text: str
-    question_kind: str
-    main_group_no: int
-    followup_no: int
-
-
-class StudentResponseRequest(BaseModel):
-    answer_text: str
-
-
-class StudentResponseResponse(BaseModel):
-    message_saved: StudentSavedMessageOut
-    next_question: StudentNextQuestionOut | None = None
-    session_status: str
-
-
-class SessionStartResponse(BaseModel):
-    session_id: UUID
-    assessment_title: str
-    total_time_minute: int
-    main_question_num: int
-    follow_up_num: int
-
-
-class AssessmentHistoryItemOut(BaseModel):
-    session_id: UUID
-    assessment_config_id: UUID
-    assessment_title: str
-    final_grade: int
-    instructor_name: str
-    instructor_image: str | None = None
-    comments: str | None = None
-
-
-class AssessmentHistoryOut(BaseModel):
-    course_code: str | None = None
-    course_name: str
-    class_average_grade: float | None = None
-    items: list[AssessmentHistoryItemOut]
-
 
 # ---------------------------------------------------------------------------
 # Private helpers
