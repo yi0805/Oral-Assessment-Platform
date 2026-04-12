@@ -27,10 +27,6 @@ from app.schemas import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
 
 def _normalize_followup(text: str) -> str:
     text = " ".join(text.strip().split())
@@ -52,7 +48,7 @@ def _get_main_question_by_order(
     config: AssessmentConfig | None,
     order: int,
 ) -> Question | None:
-    """Return the main question at the given position from the pool."""
+    
     if not config or not config.question_pool:
         return None
 
@@ -75,10 +71,7 @@ async def _generate_ai_followup(
     main_question_text: str | None,
     current_followup: int,
 ) -> str:
-    """
-    Generate a context-aware follow-up question using the AI Gateway.
-    Falls back to a generic probing question on any AI error.
-    """
+
     from app.services.ai_gateway import chat_complete
 
     latest_student_msg = (
@@ -136,7 +129,6 @@ async def _generate_ai_followup(
 
 
 async def _run_ai_summary_background(session_id: UUID) -> None:
-    """Run AI summary generation in a background task with its own DB session."""
     from app.core.database import SessionLocal
     from app.services.ai_summary_service import generate_summary
 
@@ -325,13 +317,22 @@ def list_my_course_assessments(
 @router.get(
     "/courses/{course_id}/my-assessment-history",
     response_model=AssessmentHistoryOut,
-    summary="Integration",
+    summary="Get Assessment History for a Course",
 )
 def get_my_assessment_history(
     course_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    
+    course = db.query(Course).filter(Course.id == course_id).first()
+
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found.",
+        )
+    
     enrollment = (
         db.query(CourseEnrollment)
         .filter(
@@ -340,17 +341,11 @@ def get_my_assessment_history(
         )
         .first()
     )
+
     if not enrollment:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not enrolled in this course.",
-        )
-
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Course not found.",
         )
 
     rows = (
@@ -372,10 +367,10 @@ def get_my_assessment_history(
             session_id=session.id,
             assessment_config_id=config.id,
             assessment_title=config.title,
+            comments=feedback.comments,
             final_grade=feedback.final_grade,
             instructor_name=instructor.full_name,
             instructor_image=instructor.image,
-            comments=feedback.comments,
         )
         for session, config, feedback, instructor in rows
     ]

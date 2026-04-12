@@ -31,10 +31,10 @@ function Header() {
         <div className="flex items-center gap-3 border-l border-outline-variant/20 pl-4">
           <div className="hidden text-right sm:block">
             <p className="headline-font text-sm font-semibold text-on-surface">
-              {user.full_name || "User"}
+              {user?.full_name || "User"}
             </p>
             <p className="text-xs text-on-surface-variant">
-              {user.role || "Role"}
+              {user?.role || "Role"}
             </p>
           </div>
           <img
@@ -42,7 +42,7 @@ function Header() {
             className="h-10 w-10 rounded-full object-cover"
             data-alt="portrait of a young man with short brown hair and a friendly smile, clean-shaven, wearing a light blue oxford shirt in soft indoor lighting"
             referrerPolicy="no-referrer"
-            src={user.image || "/WhereRU.png"}
+            src={user?.image || "/WhereRU.png"}
           />
           <button
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-error transition-all hover:bg-error/5 active:scale-95"

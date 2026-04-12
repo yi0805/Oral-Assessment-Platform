@@ -145,6 +145,7 @@ def delete_question(
     current_user: User = Depends(require_instructor),
 ):
     question = db.query(Question).filter(Question.id == question_id).first()
+    
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 

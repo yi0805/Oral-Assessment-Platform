@@ -9,10 +9,12 @@ export function useCreateCourse() {
   const { mutate: createCourse, isPending } = useMutation({
     mutationFn: ({ course_code, course_name, description }) =>
       createCourseApi(course_code, course_name, description),
+
     onSuccess: (data) => {
       toast.success(data?.message || "Course created successfully.");
       queryClient.invalidateQueries({ queryKey: ["courses"] });
     },
+
     onError: (error) => {
       const message =
         error?.response?.data?.detail ||

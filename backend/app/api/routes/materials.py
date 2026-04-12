@@ -44,6 +44,7 @@ async def upload_material(
     current_user: User = Depends(require_instructor),
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
+    
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 

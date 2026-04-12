@@ -10,18 +10,22 @@ import { courseCodeRegex } from "../../utils/constants";
 
 function InstructorHome() {
   const navigate = useNavigate();
+
   const [showCourseModal, setShowCourseModal] = useState(false);
+
   const [courseCode, setCourseCode] = useState("");
   const [courseName, setCourseName] = useState("");
   const [description, setDescription] = useState("");
+
   const [courseCodeError, setCourseCodeError] = useState("");
   const [courseNameError, setCourseNameError] = useState("");
   const [courseDescriptionError, setCourseDescriptionError] = useState("");
 
   const { courses, isLoading } = useCourses();
+  const { createCourse, isPending } = useCreateCourse();
+
   const { pendingReviews, isLoading: isPendingReviewsLoading } =
     usePendingReviews();
-  const { createCourse, isPending } = useCreateCourse();
 
   if (isLoading || isPendingReviewsLoading) return <Spinner />;
 

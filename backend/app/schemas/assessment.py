@@ -3,8 +3,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from course import CourseInfoOut
-from feedback import AISummaryInfoOut
+from app.schemas import CourseInfoOut
+from app.schemas import AISummaryInfoOut
 
 
 class ReleaseResponse(BaseModel):

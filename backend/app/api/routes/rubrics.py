@@ -37,14 +37,13 @@ MIME_MAP = {
 @router.post(
     "/courses/{course_id}/rubrics/upload",
     status_code=status.HTTP_201_CREATED,
-    summary="Integration",
+    summary="Upload a rubric",
 
 )
 async def upload_rubric(
     course_id: UUID,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    title: str = Form(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):

@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { updateNow as updateNowApi } from "../../services/apiQuestion";
+import toast from "react-hot-toast";
 
 export function useUpdateNow() {
   const { mutateAsync: updateNow, isPending } = useMutation({
@@ -20,10 +21,17 @@ export function useUpdateNow() {
         totalTime,
       ),
 
-    onSuccess: () => {},
+    onSuccess: (data) => {
+      toast.success(data?.message || "Create assessment successfully.");
+    },
 
     onError: (error) => {
-      console.error("Failed to update now:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error.message ||
+        "Failed to create assessment.";
+
+      toast.error(message);
     },
   });
 

@@ -12,29 +12,40 @@ import { usePublishAssessment } from "./usePublishAssessment";
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);
   const [rubricFile, setRubricFile] = useState(null);
+
   const [courseId, setCourseId] = useState("");
+  const [assessmentConfigId, setAssessmentConfigId] = useState(null);
   const [assessmentName, setAssessmentName] = useState("");
+
   const [numQuestions, setNumQuestions] = useState("");
   const [assessmentTime, setAssessmentTime] = useState("");
+
   const [touched, setTouched] = useState({
     assessmentName: false,
     numQuestions: false,
     assessmentTime: false,
   });
+
   const [phase, setPhase] = useState("setup");
   const [statusMessage, setStatusMessage] = useState("");
   const [loading, setLoading] = useState(false);
+
   const [questions, setQuestions] = useState([]);
-  const [assessmentConfigId, setAssessmentConfigId] = useState(null);
+
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+
   const [sessionsCreated, setSessionsCreated] = useState(0);
+
   const { courses, isLoading } = useCourses();
+
   const { uploadMaterial } = useUploadMaterial();
   const { uploadRubric } = useUploadRubric();
+
   const { updateNow } = useUpdateNow();
-  const { deleteQuestion } = useDeleteQuestion();
+
   const { updateQuestion } = useUpdateQuestion();
+  const { deleteQuestion } = useDeleteQuestion();
   const { publishAssessment } = usePublishAssessment();
 
   useEffect(() => {
@@ -50,6 +61,7 @@ function UpdateMaterial() {
 
   const assessmentNameError =
     assessmentName.trim() === "" ? "Assessment name is required." : "";
+
   const numQuestionsError =
     numQuestions === ""
       ? "Number of questions is required."
@@ -58,6 +70,7 @@ function UpdateMaterial() {
         : num < 1 || num > 30
           ? "Must be between 1 and 30."
           : "";
+
   const assessmentTimeError =
     assessmentTime === ""
       ? "Assessment time is required."
@@ -66,10 +79,9 @@ function UpdateMaterial() {
         : time < 1 || time > 60
           ? "Must be between 1 and 60."
           : "";
+
   const isValid =
     !numQuestionsError && !assessmentTimeError && !assessmentNameError;
-
-  // console.log(courseId);
 
   async function handleSubmit() {
     setLoading(true);
@@ -86,9 +98,6 @@ function UpdateMaterial() {
       file: rubricFile,
     });
 
-    // console.log(MaterialId);
-    // console.log(RubricId);
-
     setStatusMessage("Generating questions with AI...");
     const updateResponse = await updateNow({
       courseId,
@@ -100,24 +109,26 @@ function UpdateMaterial() {
     });
 
     setQuestions(updateResponse.questions);
-    setAssessmentConfigId(updateResponse.assessment_config.id);
+    setAssessmentConfigId(updateResponse.assessment_config);
     setPhase("review");
     setStatusMessage("");
     setLoading(false);
-
-    console.log(updateResponse);
   }
 
   async function handleDelete(questionId) {
     setLoading(true);
+
     await deleteQuestion({ questionId });
+
     setQuestions((prev) => prev.filter((q) => q.id !== questionId));
     setLoading(false);
   }
 
   async function handleUpdate(questionId, questionText) {
     setLoading(true);
+
     await updateQuestion({ questionId, questionText });
+
     setQuestions((prev) =>
       prev.map((q) =>
         q.id === questionId ? { ...q, question_text: questionText } : q,
@@ -129,15 +140,15 @@ function UpdateMaterial() {
   async function handlePublish() {
     setLoading(true);
     setStatusMessage("Publishing assessment...");
+
     const response = await publishAssessment({ courseId, assessmentConfigId });
+
     setSessionsCreated(response.sessions_created);
     setPhase("published");
     setStatusMessage("");
     setLoading(false);
   }
 
-  console.log(questions);
-  console.log(assessmentConfigId);
   return (
     <div className="min-h-screen">
       <main className="ml-64 min-h-screen pt-16">
