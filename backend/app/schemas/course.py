@@ -1,8 +1,6 @@
 from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
-
+from pydantic import BaseModel, ConfigDict
 
 
 class CourseOut(BaseModel):
@@ -42,3 +40,13 @@ class InstructorDashboardAssessmentOut(BaseModel):
     submitted_count: int
     total_students: int
     students: list[InstructorDashboardStudentRow]
+
+
+class CourseInfoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    course_code: str
+    course_name: str
+    term: str
+    description: str

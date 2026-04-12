@@ -9,30 +9,9 @@ from app.core.dependencies import require_instructor
 from app.services.question_generator import generate_pool
 
 from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material
-from app.schemas import UpdateNowRequest
-
-
-from pydantic import BaseModel, ConfigDict
+from app.schemas import UpdateNowRequest, QuestionUpdate, QuestionOut, UpdateNowResponse
 
 router = APIRouter()
-
-class QuestionUpdate(BaseModel):
-    question_text: str | None = None
-
-
-class QuestionOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    question_pool_id: UUID
-    question_text: str
-    question_index: int
-
-
-class UpdateNowResponse(BaseModel):
-    assessment_config: UUID
-    questions: list[QuestionOut]
-
 
 @router.post(
     "/courses/{course_id}/update-now",

@@ -3,16 +3,19 @@
 from app.schemas.enums import *
 
 from app.schemas.user import UserResponse, GoogleLoginResponse
-
-from app.schemas.course import (CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut
+from app.schemas.course import (
+    CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, CourseInfoOut
 )
 
 from app.schemas.feedback import (
-    ReleaseReview, ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate
+    ReleaseReview, ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut
 )
 
 from app.schemas.assessment import (
-    ReleaseResponse
+    ReleaseResponse, AssessmentConfigInfoOut, AssessmentHistoryItemOut, AssessmentHistoryOut, AssessmentTitleOut,
+    SessionFeedbackOut, SessionInfoOut, PendingReviewOut, StudentInfoOut,
+    TranscriptMessageOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse
 )
 
 from app.schemas.question import (
