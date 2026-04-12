@@ -90,7 +90,12 @@ class AssessmentSession(Base):
         server_default="not_started",
         comment="not_started | in_progress | under_review | released",
     )
-
+    started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True,
+    )
 
     config = relationship("AssessmentConfig", back_populates="sessions")
     student = relationship("User", back_populates="sessions")

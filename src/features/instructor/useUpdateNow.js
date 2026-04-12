@@ -17,8 +17,8 @@ export function useUpdateNow() {
         materialId,
         rubricId,
         assessmentName,
-        numQuestions,
         totalTime,
+        numQuestions,
       ),
 
     onSuccess: (data) => {

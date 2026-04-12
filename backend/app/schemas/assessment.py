@@ -34,6 +34,7 @@ class AssessmentHistoryItemOut(BaseModel):
     instructor_name: str
     instructor_image: str | None = None
     comments: str | None = None
+    submitted_at: datetime | None = None
 
 
 class AssessmentHistoryOut(BaseModel):
@@ -57,17 +58,18 @@ class SessionInfoOut(BaseModel):
     user_s_id: UUID
     status: str
 
-class PendingReviewOut(BaseModel):
-    session: SessionInfoOut
-    assessment_config: AssessmentConfigInfoOut
-    course: CourseInfoOut
-    aisummary: AISummaryInfoOut | None
-    session_feedback: SessionFeedbackOut | None
-
 class StudentInfoOut(BaseModel):
     full_name: str
     email: str | None = None
     image: str | None = None
+
+class PendingReviewOut(BaseModel):
+    session: SessionInfoOut
+    user: StudentInfoOut
+    assessment_config: AssessmentConfigInfoOut
+    course: CourseInfoOut
+    aisummary: AISummaryInfoOut | None
+    session_feedback: SessionFeedbackOut | None
 
 class TranscriptMessageOut(BaseModel):
     sequence_no: int
@@ -120,3 +122,6 @@ class SessionStartResponse(BaseModel):
     total_time_minute: int
     main_question_num: int
     follow_up_num: int
+    expires_at: datetime | None = None
+    current_question: StudentNextQuestionOut | None = None
+    can_complete: bool = False

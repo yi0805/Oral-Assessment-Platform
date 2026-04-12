@@ -26,8 +26,8 @@ function Transcipt() {
   useEffect(() => {
     if (!transcript) return;
 
-    setFinalGrade(transcript.instructor_feedback?.final_grade ?? "");
-    setComments(transcript.instructor_feedback?.comments ?? "");
+    setFinalGrade(transcript.session_feedback?.final_grade ?? "");
+    setComments(transcript.session_feedback?.comments ?? "");
   }, [transcript]);
 
   useEffect(() => {

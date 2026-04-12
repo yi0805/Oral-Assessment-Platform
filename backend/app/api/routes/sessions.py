@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -21,7 +21,7 @@ from app.models import (
 from app.schemas import (
     AssessmentHistoryItemOut, AssessmentHistoryOut, 
     PendingReviewOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
-    StudentResponseRequest, StudentResponseResponse, SessionStartResponse
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut
 )
 
 router = APIRouter()
@@ -187,6 +187,11 @@ def pending_Reviews(
     return [
         {
             "session": session,
+            "user": StudentInfoOut(
+                full_name=user.full_name,
+                email=user.email,
+                image=user.image,
+            ),
             "assessment_config": assessment_config,
             "course": course,
             "aisummary": {
@@ -371,6 +376,7 @@ def get_my_assessment_history(
             final_grade=feedback.final_grade,
             instructor_name=instructor.full_name,
             instructor_image=instructor.image,
+            submitted_at=session.completed_at,
         )
         for session, config, feedback, instructor in rows
     ]
@@ -462,6 +468,7 @@ def start_session(
 
     if session.status == "not_started":
         session.status = "in_progress"
+        session.started_at = now
         db.flush()
 
         first_question = None
@@ -499,21 +506,80 @@ def start_session(
         db.add(msg)
         db.commit()
 
+        expires_at = now + timedelta(minutes=config.total_time_minute)
+
         return SessionStartResponse(
             session_id=session.id,
             assessment_title=config.title,
             total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
+            expires_at=expires_at,
+            current_question=StudentNextQuestionOut(
+                id=item.id,
+                question_text=first_question.question_text,
+                question_kind="main",
+                main_group_no=1,
+                followup_no=0,
+            ),
+            can_complete=False,
         )
 
     if session.status == "in_progress":
+        last_item = (
+            db.query(SessionQuestionItem)
+            .filter(SessionQuestionItem.session_id == session.id)
+            .order_by(SessionQuestionItem.main_group_no.desc(), SessionQuestionItem.followup_no.desc())
+            .first()
+        )
+
+        current_question = None
+        if last_item:
+            last_answer = (
+                db.query(TranscriptMessage)
+                .filter(
+                    TranscriptMessage.session_question_item_id == last_item.id,
+                    TranscriptMessage.message_type == "student_answer",
+                )
+                .first()
+            )
+            if not last_answer:
+                source_q = db.query(Question).filter(Question.id == last_item.source_question_id).first()
+                q_text = source_q.question_text if source_q else ""
+                if last_item.question_kind == "followup":
+                    followup_msg = (
+                        db.query(TranscriptMessage)
+                        .filter(
+                            TranscriptMessage.session_question_item_id == last_item.id,
+                            TranscriptMessage.message_type == "followup_question",
+                        )
+                        .first()
+                    )
+                    if followup_msg:
+                        q_text = followup_msg.content
+                current_question = StudentNextQuestionOut(
+                    id=last_item.id,
+                    question_text=q_text,
+                    question_kind=last_item.question_kind,
+                    main_group_no=last_item.main_group_no,
+                    followup_no=last_item.followup_no or 0,
+                )
+
+        started_at = getattr(session, "started_at", None) or now
+        expires_at = started_at + timedelta(minutes=config.total_time_minute)
+
+        max_main = config.main_question_num or 0
+        all_answered = current_question is None and last_item is not None
+
         return SessionStartResponse(
             session_id=session.id,
             assessment_title=config.title,
             total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
+            expires_at=expires_at,
+            current_question=current_question,
+            can_complete=all_answered,
         )
 
     raise HTTPException(
@@ -736,6 +802,7 @@ def complete_session(
         )
 
     session.status = "under_review"
+    session.completed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(session)
 
