@@ -81,7 +81,7 @@ function Sidebar() {
             >
               edit_note
             </span>
-            <span>Update Material</span>
+            <span>Generate Assessment</span>
           </NavLink>
         )}
         <a

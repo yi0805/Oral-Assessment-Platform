@@ -13,8 +13,9 @@ class User(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String, nullable=False)
+    upi: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     image : Mapped[str | None] = mapped_column(String, nullable=True)
     role: Mapped[str] = mapped_column(
         String, nullable=False, comment="student | instructor"
@@ -24,4 +25,4 @@ class User(Base):
     enrollments = relationship("CourseEnrollment", back_populates="user",  passive_deletes=True,)
 
     def __repr__(self) -> str:
-        return f"<User {self.email} ({self.role})>"
+        return f"<User {self.upi} {self.email} ({self.role})>"
