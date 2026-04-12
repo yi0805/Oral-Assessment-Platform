@@ -174,4 +174,5 @@ def get_extracted_text_chunks(
         material_id,
         max_chars - remaining,
     )
+    
     return excerpts

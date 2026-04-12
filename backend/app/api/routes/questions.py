@@ -123,6 +123,7 @@ async def update_now(
             rubric_id=payload.material_r_id,
             num_main_questions=payload.num_main_questions,
             course_id=course_id,
+            config_id=config.id,
         )
 
     except ValueError as exc:

@@ -26,10 +26,11 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
-from app.models.question import Question, QuestionPool
-from app.models.material import Material, MaterialChunk
 from app.services import rag_search
 from app.services.ai_gateway import chat_complete
+
+
+from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,7 @@ async def generate_pool(
     material_id: UUID,
     rubric_id: UUID | None = None,
     num_main_questions: int = 3,
+    config_id: UUID | None = None,
 ) -> QuestionPool:
     """
     Generate MAIN questions only for a pool using RAG-grounded LLM prompting.
@@ -279,6 +281,11 @@ async def generate_pool(
     # Clear existing questions (idempotent retry)
     db.query(Question).filter(Question.question_pool_id == pool_id).delete()
 
+    config = db.query(AssessmentConfig).filter(AssessmentConfig.id == config_id).first()
+
+    if config:
+        config.description = await _generate_description(questions_data, rubric_section)
+
     for order, qdata in enumerate(questions_data, start=1):
         main_q = Question(
             question_pool_id=pool_id,
@@ -301,6 +308,41 @@ async def generate_pool(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+async def _generate_description(
+    questions_data: list[dict],
+    rubric_section: str,
+) -> str:
+    questions_summary = "\n".join(
+        f"  {i}. {q['main_question']} (difficulty: {q.get('difficulty', 'N/A')}, "
+        f"objective: {q.get('learning_objective', 'N/A')})"
+        for i, q in enumerate(questions_data, start=1)
+    )
+
+    prompt = (
+        "Based on the following oral assessment questions and rubric, write a "
+        "concise 2-3 sentence description of this assessment. The description "
+        "should tell students what topics are covered and what skills will be "
+        "evaluated. Do NOT include any JSON formatting — return plain text only.\n\n"
+        f"=== RUBRIC ===\n{rubric_section}\n\n"
+        f"=== QUESTIONS ===\n{questions_summary}"
+    )
+
+    try:
+        return await chat_complete(
+            messages=[{"role": "user", "content": prompt}],
+            system_prompt=(
+                "You are a university educator. Write a brief, clear assessment "
+                "description in plain text (no markdown, no JSON)."
+            ),
+            temperature=0.5,
+            max_tokens=300,
+        )
+    
+    except (RuntimeError, ValueError) as exc:
+        logger.warning("Description generation failed: %s — using fallback", exc)
+        return "AI oral assessment covering key course topics."
+
 
 def _parse_llm_response(
     raw: str,
