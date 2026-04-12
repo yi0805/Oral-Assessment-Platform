@@ -33,10 +33,6 @@ class Course(Base):
 class CourseEnrollment(Base):
     __tablename__ = "course_enrollments"
 
-    __table_args__ = (
-        UniqueConstraint("course_id", "user_id", name="uq_enrollment_course_user"),
-    )
-
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
@@ -46,7 +42,7 @@ class CourseEnrollment(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    upi: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    upi: Mapped[str] = mapped_column(String, nullable=False)
 
     course = relationship("Course", back_populates="enrollments")
     user = relationship("User", back_populates="enrollments")

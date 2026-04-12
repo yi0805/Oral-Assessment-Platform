@@ -143,6 +143,11 @@ function UpdateMaterial() {
 
     const response = await publishAssessment({ courseId, assessmentConfigId });
 
+    if (!response)
+      return setStatusMessage(
+        "Failed to publish assessment. Please try again.",
+      );
+
     setSessionsCreated(response.sessions_created);
     setPhase("published");
     setStatusMessage("");

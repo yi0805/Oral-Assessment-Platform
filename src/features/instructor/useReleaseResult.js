@@ -9,11 +9,14 @@ export function useReleaseResult() {
   const { mutate: releaseResult, isPending } = useMutation({
     mutationFn: ({ sessionId, studentId }) =>
       updatePendingReview(sessionId, studentId),
+
     onSuccess: (data) => {
       toast.success(data?.message || "Result released successfully.");
+
       queryClient.invalidateQueries({ queryKey: ["pendingReviews"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     },
+
     onError: (error) => {
       const message =
         error?.response?.data?.detail ||
