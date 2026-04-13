@@ -62,9 +62,6 @@ function DashboardTable({
                 AI Score
               </th>
               <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
-                AI Summary
-              </th>
-              <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
                 Final Score
               </th>
               <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
@@ -78,7 +75,7 @@ function DashboardTable({
           <tbody className="divide-y divide-surface-container">
             {currentRows.length > 0 ? (
               currentRows.map((student) => {
-                const currentGrade = grades[student.session_id] ?? "";
+                const currentGrade = grades[student.session_id] ?? student.ai_suggested_score ?? "";
                 const canPublish = isValidGrade(currentGrade);
                 return (
                   <tr
@@ -135,17 +132,12 @@ function DashboardTable({
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-2">
                         <span className="font-headline text-sm font-bold text-tertiary">
-                          {student.ai_suggested_score ?? "-"}/10
+                          {student.ai_suggested_score ?? "-"}
                         </span>
                         <span className="material-symbols-outlined text-[16px] text-outline">
                           auto_awesome
                         </span>
                       </div>
-                    </td>
-                    <td className="max-w-xs px-8 py-5">
-                      <p className="line-clamp-2 text-xs italic text-on-surface-variant">
-                        {student.ai_summary || "No summary available."}
-                      </p>
                     </td>
                     <td className="px-8 py-5">
                       {student.status === "published" ? (

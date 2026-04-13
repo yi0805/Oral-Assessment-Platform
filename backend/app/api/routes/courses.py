@@ -101,6 +101,7 @@ def create_course(
     enrollment = CourseEnrollment(
         course_id=course.id,
         user_id=current_user.id,
+        upi = current_user.upi,
     )
     db.add(enrollment)
 
@@ -256,6 +257,9 @@ def get_instructor_dashboard(
             else None
         )
 
+        total_score = (
+            
+        )
 
         response.append(
             InstructorDashboardAssessmentOut(
@@ -268,6 +272,7 @@ def get_instructor_dashboard(
                 submitted_count=group["submitted_count"],
                 total_students=total_students,
                 students=student_rows,
+                total_score=total_score,
             )
         )
 

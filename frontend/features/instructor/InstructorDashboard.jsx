@@ -80,6 +80,29 @@ export default function InstructorDashboard() {
     releaseAllResults({ assessments });
   }
 
+  // // to fill up all the marks that is not filled personally with AI grade
+  // function handleAcceptAllAI() {
+  //   const newGrades = {};
+
+  //   reviewStudents.map((student) => {
+  //     if (student.status !== "published") {
+  //       newGrades[student.session_id] = student.ai_suggested_score;
+  //     }
+  //   });
+
+  //   setGrades((prev) => {
+  //     const updated = { ...prev };
+      
+  //     reviewStudents.forEach((student) => {
+  //       if (!isValidGrade(updated[student.session_id])) {
+  //         updated[student.session_id] = student.ai_suggested_score;
+  //       }
+  //     });
+
+  //     return updated;
+  //   });
+  // }
+
   return (
     <div className="min-h-screen">
       <main className="ml-64 px-10 pb-12 pt-24">
@@ -132,7 +155,7 @@ export default function InstructorDashboard() {
           </div>
         </div>
 
-        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-4">
+        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
           <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
             <div className="relative z-10">
               <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
@@ -143,7 +166,7 @@ export default function InstructorDashboard() {
                   <span className="font-headline text-5xl font-extrabold text-primary">
                     {aiAverageScore}
                   </span>
-                  <span className="text-lg font-bold text-outline">/ 10</span>
+                  <span className="text-lg font-bold text-outline">/ 100</span>
                 </div>
 
                 <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-tertiary-container px-2 py-1 text-xs font-semibold text-on-tertiary-container">
@@ -154,12 +177,12 @@ export default function InstructorDashboard() {
                 </div>
               </div>
 
-              <div>
+              <div className="mt-2">
                 <div className="flex items-baseline gap-2">
                   <span className="font-headline text-5xl font-extrabold text-secondary">
                     {publishedAverageScore}
                   </span>
-                  <span className="text-lg font-bold text-outline">/ 10</span>
+                  <span className="text-lg font-bold text-outline">/ 100</span>
                 </div>
                 <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">
                   <span className="material-symbols-outlined text-xs">
@@ -175,37 +198,43 @@ export default function InstructorDashboard() {
               </span>
             </div>
           </div>
-          <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
-            <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
-              Submissions
-            </p>
-            <div className="flex items-baseline gap-2">
-              <span className="font-headline text-5xl font-extrabold text-on-surface">
-                {submittedCount}
-              </span>
-              <span className="text-lg font-bold text-outline">
-                / {totalStudents}
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
+            <div className="relative z-10">
+              <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
+                Submissions
+              </p>
+              <div className="flex items-baseline gap-2">
+                <span className="font-headline text-5xl font-extrabold text-on-surface">
+                  {submittedCount}
+                </span>
+                <span className="text-lg font-bold text-outline">
+                  / {totalStudents}
+                </span>
+              </div>
+              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-container">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${completionRate}%` }}
+                ></div>
+              </div>
+              <p className="mt-2 text-[10px] font-medium text-on-surface-variant">
+                {completionRate}% Completion rate
+              </p>
+            </div>
+            <div className="absolute -bottom-4 -right-4 opacity-5">
+              <span className="material-symbols-outlined text-[120px]">
+                check_circle
               </span>
             </div>
-            <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-container">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${completionRate}%` }}
-              ></div>
-            </div>
-            <p className="mt-2 text-[10px] font-medium text-on-surface-variant">
-              {completionRate}% Completion rate
-            </p>
           </div>
 
           <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
             <div>
               <p className="mb-2 text-xs font-bold uppercase tracking-wider text-outline-variant">
-                Publication Status
+                Pending Markings
               </p>
               <p className="font-body text-sm leading-relaxed text-on-surface-variant">
-                {remainingToPublish} scores pending manual review before
-                release.
+                {remainingToPublish} students scores await marking before official release.
               </p>
             </div>
 
@@ -220,8 +249,20 @@ export default function InstructorDashboard() {
                 handlePublishAll();
               }}
             >
-              Publish All Scores
+              Release All Scores
             </button>
+
+            {/* <button
+              className={`mt-4 w-full rounded-xl py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 
+                  ? "bg-secondary text-on-secondary hover:bg-secondary-dim"
+                  : "cursor-not-allowed bg-surface-container text-outline"
+              }`}
+              onClick={() => {
+                handleAcceptAllAI();
+              }}
+            >
+              Accept AI Score
+            </button> */}
           </div>
         </div>
 
