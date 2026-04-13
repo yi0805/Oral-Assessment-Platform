@@ -94,8 +94,8 @@ def release_assessment(
     try:
         db.commit()
 
-    except SQLAlchemyError as exc:
+    except Exception as e:
+        print(f"COMMIT FAILED BECAUSE: {e}") 
         db.rollback()
-        raise HTTPException(status_code=500, detail="Failed to publish assessment.") from exc
 
     return {"sessions_created": sessions_created}

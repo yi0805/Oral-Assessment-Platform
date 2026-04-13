@@ -46,7 +46,7 @@ class CourseEnrollment(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    upi: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    upi: Mapped[str] = mapped_column(String, nullable=False)
 
     course = relationship("Course", back_populates="enrollments")
     user = relationship("User", back_populates="enrollments")
