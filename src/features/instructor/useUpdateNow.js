@@ -1,9 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
-import { updateNow as updateNowApi } from "../../services/apiQuestion";
+import { questionGenerate as questionGenerateApi } from "../../services/apiQuestion";
 import toast from "react-hot-toast";
 
-export function useUpdateNow() {
-  const { mutateAsync: updateNow, isPending } = useMutation({
+export function useQuestionGenerate() {
+  const { mutateAsync: questionGenerate, isPending } = useMutation({
     mutationFn: ({
       courseId,
       materialId,
@@ -12,7 +12,7 @@ export function useUpdateNow() {
       numQuestions,
       totalTime,
     }) =>
-      updateNowApi(
+      questionGenerateApi(
         courseId,
         materialId,
         rubricId,
@@ -35,5 +35,5 @@ export function useUpdateNow() {
     },
   });
 
-  return { updateNow, isPending };
+  return { questionGenerate, isPending };
 }

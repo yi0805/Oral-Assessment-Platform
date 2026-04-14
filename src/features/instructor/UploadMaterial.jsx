@@ -4,7 +4,7 @@ import { useCourses } from "../../hooks/useCourses";
 import Spinner from "../../ui/Spinner";
 import { useUploadMaterial } from "./useUploadMaterial";
 import { useUploadRubric } from "./useLoadRubric";
-import { useUpdateNow } from "./useUpdateNow";
+import { useQuestionGenerate } from "./useQuestionGenerate";
 import { useDeleteQuestion } from "./useDeleteQuestion";
 import { useUpdateQuestion } from "./useUpdateQuestion";
 import { usePublishAssessment } from "./usePublishAssessment";
@@ -42,7 +42,7 @@ function UpdateMaterial() {
   const { uploadMaterial } = useUploadMaterial();
   const { uploadRubric } = useUploadRubric();
 
-  const { updateNow } = useUpdateNow();
+  const { questionGenerate } = useQuestionGenerate();
 
   const { updateQuestion } = useUpdateQuestion();
   const { deleteQuestion } = useDeleteQuestion();
@@ -99,7 +99,7 @@ function UpdateMaterial() {
     });
 
     setStatusMessage("Generating questions with AI...");
-    const updateResponse = await updateNow({
+    const updateResponse = await questionGenerate({
       courseId,
       materialId: MaterialId,
       rubricId: RubricId,
