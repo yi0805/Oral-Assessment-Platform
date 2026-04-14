@@ -44,10 +44,25 @@ def import_students_csv(
     course_id: UUID,
     file: UploadFile = File(..., description="CSV file with a single 'UPI' column."),
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
+    owns = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not owns:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an instructor of this course.",
+        )
 
     try:
         raw = file.file.read().decode("utf-8-sig")

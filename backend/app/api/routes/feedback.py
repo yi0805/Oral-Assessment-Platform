@@ -230,6 +230,7 @@ def accept_ai_and_release(
 
     feedback = SessionFeedback(
         session_id=session_id,
+        user_i_id=current_user.id,
         final_grade=final_grade,
         comments=comments,
         status="published",
