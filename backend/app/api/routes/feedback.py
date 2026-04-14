@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
-from app.models import AssessmentSession, SessionFeedback, User
-from app.schemas  import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate
+from app.models import AssessmentSession, SessionFeedback, User, AISummary
+from app.schemas  import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut
 
 router = APIRouter()
 
@@ -175,3 +175,69 @@ def upsert_review(
     db.refresh(session)
 
     return {"message": f"Instructor review saved for session {session_id}."}
+
+
+
+# ---------------------------------------------------------------------------
+# A button for approving the AI score
+# ---------------------------------------------------------------------------
+
+@router.post(
+    "/sessions/{session_id}/ai-summary/approve",
+    summary="Approve AI grade and release to student in one step",
+)
+def accept_ai_and_release(
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    sess = _get_session_or_404(db, session_id)
+
+    if sess.status not in ("under_review"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot accept AI grade for session with status '{sess.status}'. "
+                "Session must be in 'under_review' state."
+            ),
+        )
+
+    # Require an AI summary to exist
+    ai_summary = db.query(AISummary).filter(AISummary.session_id == session_id).first()
+    if not ai_summary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=("No AI summary found for this session. "),
+        )
+    if ai_summary.suggested_grade is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=("AI summary did not produce a valid suggested grade. "),
+        )
+
+    existing = db.query(SessionFeedback).filter(
+        SessionFeedback.session_id == session_id
+    ).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Feedback already exists for this session.",
+        )
+
+    # Use AI suggested grade as the final grade
+    final_grade = ai_summary.suggested_grade
+    comments = ai_summary.summary_text
+
+    feedback = SessionFeedback(
+        session_id=session_id,
+        final_grade=final_grade,
+        comments=comments,
+        status="published",
+    )
+    db.add(feedback)
+
+    sess.status = "released"
+
+    db.commit()
+    db.refresh(feedback)
+    return {"message": f"Results released to student {sess.user_s_id} for session {session_id}."}
