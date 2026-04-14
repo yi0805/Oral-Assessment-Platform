@@ -39,20 +39,16 @@ def dashboard_status(session_status: str) -> str:
     "/{course_id}/students/import-csv",
     status_code=status.HTTP_200_OK,
     summary="Bulk-enroll students from a CSV file",
-    description=(
-        "Instructor-only. Upload a CSV file with required column Login ID, "
-        "and other optional columns. Creates missing user accounts, then enrols each user in this course. "
-        "Returns a summary of what was created/skipped plus any per-row errors."
-    ),
 )
 def import_students_csv(
     course_id: UUID,
-    file: UploadFile = File(..., description="CSV file with Login ID column and optional other columns."),
+    file: UploadFile = File(..., description="CSV file with a single 'UPI' column."),
     db: Session = Depends(get_db),
 ):
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+
     try:
         raw = file.file.read().decode("utf-8-sig")
     except Exception as exc:
@@ -62,68 +58,33 @@ def import_students_csv(
         ) from exc
 
     df = pd.read_csv(StringIO(raw))
-    if "Login ID" not in df.columns:
+    if "UPI" not in df.columns:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="CSV file is missing 'Login ID' column.",
+            detail="CSV file is missing 'UPI' column.",
         )
 
-    users_created = 0
-    users_found = 0
-    enrolled = 0
-    already_enrolled = 0
-    errors: list[dict] = []
+    existing_upis = {
+        upi for (upi,) in db.query(CourseEnrollment.upi)
+        .filter(CourseEnrollment.course_id == course_id)
+        .all()
+    }
 
-    for index, row in df.iterrows():
-        login_id = row.get("Login ID") or ""
-        if not login_id:
-            errors.append({"row": row, "error": "Missing Login ID"})
+    for upi in df["UPI"].dropna().astype(str).str.strip():
+        if not upi or upi in existing_upis:
             continue
-        try:
-            user = db.query(User).filter(User.upi == login_id).first()
-            if user:
-                users_found += 1
-            else:
-                user = User(
-                    upi = login_id,
-                    role="student",
-                )
-                db.add(user)
-                db.flush()
-                users_created += 1
-
-            existing_enrollment = (
-                db.query(CourseEnrollment)
-                .filter(
-                    CourseEnrollment.course_id == course_id,
-                    CourseEnrollment.upi == login_id,
-                )
-                .first()
-            )
-            if existing_enrollment:
-                already_enrolled += 1
-                if not existing_enrollment.is_active:
-                    existing_enrollment.is_active = True
-            else:
-                enrollment = CourseEnrollment(
-                    course_id=course_id,
-                    upi=login_id,
-                )
-                db.add(enrollment)
-                enrolled += 1
-
-        except Exception as exc:
-            db.rollback()
-            errors.append({"row": row, "upi":login_id, "error": str(exc)})
-            continue
+        db.add(CourseEnrollment(course_id=course_id, upi=upi))
+        existing_upis.add(upi)
 
     db.commit()
-    return {
-    "message": f"{enrolled} users enrolled!",
-    "errors": errors,
-    "users_created": users_created,
-    "already_enrolled": already_enrolled
-}
+
+    total_enrolled = (
+        db.query(CourseEnrollment)
+        .filter(CourseEnrollment.course_id == course_id)
+        .count()
+    )
+
+    return {"total_enrolled": total_enrolled}
 
 @router.get(
     "",

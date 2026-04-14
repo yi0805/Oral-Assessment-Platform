@@ -95,7 +95,11 @@ def release_assessment(
         db.commit()
 
     except Exception as e:
-        print(f"COMMIT FAILED BECAUSE: {e}") 
         db.rollback()
+        
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to release assessment due to a server error.",
+        )
 
     return {"sessions_created": sessions_created}
