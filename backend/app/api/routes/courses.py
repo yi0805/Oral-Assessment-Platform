@@ -1,26 +1,22 @@
 from uuid import UUID
+from io import StringIO
+from datetime import datetime
 
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
-import pandas as pd
-from io import StringIO
-
-from datetime import datetime
-
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 
-from app.models.feedback import AISummary, SessionFeedback
-from app.models.user import User
-from app.models.assessment import AssessmentConfig, AssessmentSession
-
-from app.models import Course, CourseEnrollment
+from app.models import Course, CourseEnrollment, AISummary, SessionFeedback, User, AssessmentConfig, AssessmentSession
 from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut
 
-
 router = APIRouter()
+
+
+# Helpers
 
 def generate_term() -> str:
     now = datetime.now()
@@ -28,12 +24,16 @@ def generate_term() -> str:
     semester = "S1" if now.month <= 6 else "S2"
     return f"{year_short}{semester}"
 
+
 def dashboard_status(session_status: str) -> str:
     if session_status == "released":
         return "published"
     if session_status == "under_review":
         return "review"
     return "inprogress"
+
+
+# Import students via CSV
 
 @router.post(
     "/{course_id}/students/import-csv",
@@ -66,9 +66,7 @@ def import_students_csv(
 
     try:
         raw = file.file.read().decode("utf-8-sig")
-
     except Exception as exc:
-
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Could not read uploaded file: {exc}",
@@ -92,7 +90,6 @@ def import_students_csv(
     for upi in df["UPI"].dropna().astype(str).str.strip():
         if not upi or upi in existing_upis:
             continue
-
         db.add(CourseEnrollment(course_id=course_id, upi=upi))
         existing_upis.add(upi)
         newly_enrolled += 1
@@ -100,6 +97,9 @@ def import_students_csv(
     db.commit()
 
     return {"newly_enrolled": newly_enrolled}
+
+
+# List courses
 
 @router.get(
     "",
@@ -110,7 +110,6 @@ def list_courses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    
     term = generate_term()
 
     courses = (
@@ -125,6 +124,8 @@ def list_courses(
     return courses
 
 
+# Create course
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -135,7 +136,6 @@ def create_course(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    
     term = generate_term()
 
     existing = (
@@ -169,14 +169,15 @@ def create_course(
     enrollment = CourseEnrollment(
         course_id=course.id,
         user_id=current_user.id,
-        upi = current_user.upi,
+        upi=current_user.upi,
     )
     db.add(enrollment)
-
     db.commit()
 
     return {"message": f"Course '{payload.course_name}' created successfully with term '{term}'."}
 
+
+# Instructor dashboard
 
 @router.get(
     "/{course_id}/instructor/dashboard",
@@ -188,7 +189,6 @@ def get_instructor_dashboard(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(
@@ -203,8 +203,8 @@ def get_instructor_dashboard(
             CourseEnrollment.course_id == course_id,
             User.role == "student",
         )
-    .count()
-)
+        .count()
+    )
 
     rows = (
         db.query(
@@ -213,20 +213,10 @@ def get_instructor_dashboard(
             User,
             AISummary,
             SessionFeedback,
-            
         )
-        .join(
-            AssessmentConfig,
-            AssessmentConfig.id == AssessmentSession.assessment_config_id,
-        )
-        .join(
-            User,
-            User.id == AssessmentSession.user_s_id,
-        )
-        .outerjoin(
-            AISummary,
-            AISummary.session_id == AssessmentSession.id,
-        )
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .join(User, User.id == AssessmentSession.user_s_id)
+        .outerjoin(AISummary, AISummary.session_id == AssessmentSession.id)
         .outerjoin(
             SessionFeedback,
             and_(
@@ -234,9 +224,7 @@ def get_instructor_dashboard(
                 SessionFeedback.user_i_id == current_user.id,
             ),
         )
-        .filter(
-            AssessmentConfig.course_id == course_id,
-        )
+        .filter(AssessmentConfig.course_id == course_id)
         .order_by(User.full_name.asc())
         .all()
     )
@@ -248,6 +236,7 @@ def get_instructor_dashboard(
         .all()
     )
 
+    # Build grouped structure keyed by assessment config id
     grouped = {}
 
     for assessment_config in assessment_configs:
@@ -307,6 +296,7 @@ def get_instructor_dashboard(
 
         group["students"].append(student_row)
 
+    # Assemble response
     response = []
 
     for group in grouped.values():
@@ -325,7 +315,6 @@ def get_instructor_dashboard(
             if ai_scores
             else None
         )
-
 
         response.append(
             InstructorDashboardAssessmentOut(

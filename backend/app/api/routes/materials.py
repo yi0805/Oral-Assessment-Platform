@@ -1,24 +1,15 @@
 import logging
 from uuid import UUID, uuid4
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    File,
-    HTTPException,
-    UploadFile,
-    status,
-)
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
-
 from app.services import material_pipeline, s3_client
 
-from app.models import  Course, CourseEnrollment, Material, User
+from app.models import Course, CourseEnrollment, Material, User
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -30,6 +21,8 @@ MIME_MAP = {
     "txt": "text/plain",
 }
 
+
+# Upload material
 
 @router.post(
     "/courses/{course_id}/materials/upload",
@@ -43,8 +36,9 @@ async def upload_material(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    # Validate course and instructor 
     course = db.query(Course).filter(Course.id == course_id).first()
-    
+
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
@@ -66,6 +60,7 @@ async def upload_material(
     filename = file.filename or "unknown"
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
+    # Check for existing material
     existing_material = (
         db.query(Material)
         .filter(
@@ -77,7 +72,8 @@ async def upload_material(
 
     if existing_material:
         return existing_material.id
-    
+
+    # Read file bytes 
     file_bytes = await file.read()
 
     if not file_bytes:
@@ -86,6 +82,7 @@ async def upload_material(
             detail="The uploaded file is empty.",
         )
 
+    # Upload to storage
     material_id = uuid4()
     storage_key = s3_client.generate_key(course_id, material_id, filename)
     content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
@@ -101,13 +98,13 @@ async def upload_material(
                 "title": filename,
             },
         )
-
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Storage upload failed: {exc}",
         ) from exc
 
+    # Save material record
     material = Material(
         id=material_id,
         course_id=course_id,
@@ -126,8 +123,8 @@ async def upload_material(
         db.rollback()
         try:
             s3_client.delete_file(storage_key)
-
-        except Exception:  
+            
+        except Exception:
             logger.exception("Rollback cleanup failed for storage key=%s", storage_key)
 
         raise HTTPException(
@@ -135,6 +132,7 @@ async def upload_material(
             detail="Material metadata could not be saved.",
         ) from exc
 
+    # Kick off background pipeline
     background_tasks.add_task(material_pipeline.run_pipeline, material.id)
 
     return material.id

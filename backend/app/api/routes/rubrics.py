@@ -1,25 +1,14 @@
-from uuid import UUID, uuid4
 import logging
-from sqlalchemy.exc import SQLAlchemyError
+from uuid import UUID, uuid4
 
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    File,
-    Form,
-    HTTPException,
-    Query,
-    UploadFile,
-    status,
-)
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.services import s3_client, material_pipeline
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
-
+from app.services import s3_client, material_pipeline
 from app.models import Course, CourseEnrollment, Material, User
 
 router = APIRouter()
@@ -33,12 +22,12 @@ MIME_MAP = {
 }
 
 
+# Upload rubric
 
 @router.post(
     "/courses/{course_id}/rubrics/upload",
     status_code=status.HTTP_201_CREATED,
     summary="Upload a rubric",
-
 )
 async def upload_rubric(
     course_id: UUID,
@@ -47,7 +36,9 @@ async def upload_rubric(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    # Validate course and instructor 
     course = db.query(Course).filter(Course.id == course_id).first()
+
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
 
@@ -65,18 +56,17 @@ async def upload_rubric(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not an instructor in this course.",
         )
- 
 
+    # Check for existing rubric 
     filename = file.filename or "unknown"
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-
 
     existing_rubric = (
         db.query(Material)
         .filter(
-                Material.course_id == course_id,
-                Material.filename == filename,
-                Material.material_category == "rubric",
+            Material.course_id == course_id,
+            Material.filename == filename,
+            Material.material_category == "rubric",
         )
         .first()
     )
@@ -84,6 +74,7 @@ async def upload_rubric(
     if existing_rubric:
         return existing_rubric.id
 
+    # Read file bytes 
     file_bytes = await file.read()
 
     if not file_bytes:
@@ -92,6 +83,7 @@ async def upload_rubric(
             detail="The uploaded file is empty.",
         )
 
+    # Upload to storage 
     material_id = uuid4()
     storage_key = s3_client.generate_key(course_id, material_id, filename)
     content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
@@ -102,20 +94,19 @@ async def upload_rubric(
             storage_key,
             content_type=content_type,
             metadata={
-               "course_id": str(course_id),
+                "course_id": str(course_id),
                 "material_id": str(material_id),
                 "title": filename,
                 "material_category": "rubric",
             },
         )
-
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Storage upload failed: {exc}",
         ) from exc
 
-   
+    # Save material record 
     material = Material(
         id=material_id,
         course_id=course_id,
@@ -125,8 +116,6 @@ async def upload_rubric(
         material_category="rubric",
     )
 
-
-
     try:
         db.add(material)
         db.commit()
@@ -134,10 +123,11 @@ async def upload_rubric(
 
     except SQLAlchemyError as exc:
         db.rollback()
+
         try:
             s3_client.delete_file(storage_key)
 
-        except Exception:  
+        except Exception:
             logger.exception("Rollback cleanup failed for storage key=%s", storage_key)
 
         raise HTTPException(
@@ -145,7 +135,7 @@ async def upload_rubric(
             detail="Material metadata could not be saved.",
         ) from exc
 
-
+    #  Kick off background pipeline 
     background_tasks.add_task(material_pipeline.run_pipeline, material.id)
 
     return material.id

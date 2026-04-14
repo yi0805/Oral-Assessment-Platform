@@ -11,22 +11,24 @@ from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_student
-from app.models import (
-    User, 
-    AssessmentConfig, AssessmentSession, 
-    CourseEnrollment, Course, AISummary, Question, 
-    SessionQuestionItem, TranscriptMessage, SessionFeedback
-)
 
+from app.models import (
+    User,
+    AssessmentConfig, AssessmentSession,
+    CourseEnrollment, Course, AISummary, Question,
+    SessionQuestionItem, TranscriptMessage, SessionFeedback,
+)
 from app.schemas import (
-    AssessmentHistoryItemOut, AssessmentHistoryOut, 
+    AssessmentHistoryItemOut, AssessmentHistoryOut,
     PendingReviewOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
-    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
 )
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+
+# Helpers
 
 def _normalize_followup(text: str) -> str:
     text = " ".join(text.strip().split())
@@ -48,7 +50,6 @@ def _get_main_question_by_order(
     config: AssessmentConfig | None,
     order: int,
 ) -> Question | None:
-    
     if not config or not config.question_pool:
         return None
 
@@ -71,7 +72,6 @@ async def _generate_ai_followup(
     main_question_text: str | None,
     current_followup: int,
 ) -> str:
-
     from app.services.ai_gateway import chat_complete
 
     latest_student_msg = (
@@ -116,6 +116,7 @@ async def _generate_ai_followup(
         )
 
         followup_text = _normalize_followup(result)
+
         return followup_text.strip().strip('"').strip("'")
 
     except RuntimeError as exc:
@@ -125,6 +126,7 @@ async def _generate_ai_followup(
             "What evidence or reasoning supports your answer?",
             "How would this apply in a real-world scenario?",
         ]
+
         return fallback_probes[current_followup % len(fallback_probes)]
 
 
@@ -135,16 +137,15 @@ async def _run_ai_summary_background(session_id: UUID) -> None:
     db = SessionLocal()
     try:
         await generate_summary(db=db, session_id=session_id)
+
     except Exception:
         logger.exception("Background AI summary failed for session %s", session_id)
+
     finally:
         db.close()
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
-
+# Pending reviews
 
 @router.get(
     "/pendingReviews",
@@ -168,7 +169,7 @@ def pending_Reviews(
         .distinct()
         .all()
     )
- 
+
     return [
         PendingReviewOut(
             session=SessionInfoOut.model_validate(session),
@@ -192,7 +193,9 @@ def pending_Reviews(
     ]
 
 
-@router.get("/transcript/{session_id}", response_model=TranscriptDetailOut, summary="Integration")
+# Transcript detail
+
+@router.get("/transcript/{session_id}", response_model=TranscriptDetailOut, summary="Get detailed transcript and info for a session")
 def get_transcript_detail(
     session_id: UUID,
     db: Session = Depends(get_db),
@@ -249,10 +252,12 @@ def get_transcript_detail(
     }
 
 
+# List student course assessments
+
 @router.get(
     "/courses/{course_id}/my-assessment-sessions",
     response_model=list[StudentCourseAssessmentOut],
-    summary="Integration",
+    summary="List student's assessment sessions for a course",
 )
 def list_my_course_assessments(
     course_id: UUID,
@@ -267,6 +272,7 @@ def list_my_course_assessments(
         )
         .first()
     )
+
     if not enrollment:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -304,6 +310,8 @@ def list_my_course_assessments(
     return items
 
 
+# Assessment history
+
 @router.get(
     "/courses/{course_id}/my-assessment-history",
     response_model=AssessmentHistoryOut,
@@ -314,7 +322,6 @@ def get_my_assessment_history(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    
     course = db.query(Course).filter(Course.id == course_id).first()
 
     if not course:
@@ -322,7 +329,7 @@ def get_my_assessment_history(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Course not found.",
         )
-    
+
     enrollment = (
         db.query(CourseEnrollment)
         .filter(
@@ -386,17 +393,20 @@ def get_my_assessment_history(
     )
 
 
+# Start session
+
 @router.post(
     "/assessments/{assessment_config_id}/sessions/start",
     response_model=SessionStartResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Integration",
+    summary="Start an assessment session",
 )
 def start_session(
     assessment_config_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    # Validate config
     config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_config_id).first()
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
@@ -406,6 +416,7 @@ def start_session(
             detail="This assessment is not currently published.",
         )
 
+    # Validate enrollment and timing
     enrollment = (
         db.query(CourseEnrollment)
         .filter(
@@ -434,6 +445,7 @@ def start_session(
             detail="This assessment has closed.",
         )
 
+    # Fetch session
     session = (
         db.query(AssessmentSession)
         .filter(
@@ -451,6 +463,7 @@ def start_session(
 
     pool = config.question_pool
 
+    # Handle not_started
     if session.status == "not_started":
         session.status = "in_progress"
         session.started_at = now
@@ -510,6 +523,7 @@ def start_session(
             can_complete=False,
         )
 
+    # Handle in_progress
     if session.status == "in_progress":
         last_item = (
             db.query(SessionQuestionItem)
@@ -573,10 +587,12 @@ def start_session(
     )
 
 
+# Submit response
+
 @router.post(
     "/sessions/{session_id}/respond",
     response_model=StudentResponseResponse,
-    summary="Integration",
+    summary="Submit student's answer and get next question",
 )
 async def submit_response(
     session_id: UUID,
@@ -584,6 +600,7 @@ async def submit_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    # Validate session
     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -606,6 +623,7 @@ async def submit_response(
         .first()
     )
 
+    # Record student answer
     last_msg = (
         db.query(TranscriptMessage)
         .filter(TranscriptMessage.session_id == session_id)
@@ -632,9 +650,7 @@ async def submit_response(
     db.flush()
     next_seq += 1
 
-    # ------------------------------------------------------------------
     # Decide next question
-    # ------------------------------------------------------------------
     next_question_item: SessionQuestionItem | None = None
     next_question_text: str | None = None
 
@@ -760,9 +776,11 @@ async def submit_response(
     )
 
 
+# Complete session
+
 @router.post(
     "/sessions/{session_id}/complete",
-    summary="Integration",
+    summary="Complete the session",
 )
 def complete_session(
     session_id: UUID,
