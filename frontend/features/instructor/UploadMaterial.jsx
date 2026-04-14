@@ -19,6 +19,7 @@ function UpdateMaterial() {
 
   const [numQuestions, setNumQuestions] = useState("");
   const [assessmentTime, setAssessmentTime] = useState("");
+  // const [timePerQ, setTimePerQuestion] = useState("");
 
   const [touched, setTouched] = useState({
     assessmentName: false,
@@ -57,7 +58,9 @@ function UpdateMaterial() {
   if (isLoading) return <Spinner />;
 
   const num = Number(numQuestions);
+  const max_q = 50
   const time = Number(assessmentTime);
+  const max_time = 120
 
   const assessmentNameError =
     assessmentName.trim() === "" ? "Assessment name is required." : "";
@@ -67,8 +70,8 @@ function UpdateMaterial() {
       ? "Number of questions is required."
       : !Number.isInteger(num)
         ? "Must be a whole number."
-        : num < 1 || num > 30
-          ? "Must be between 1 and 30."
+        : num < 1 || num > max_q
+          ? "Must be between 1 and " + str(max_q) + "."
           : "";
 
   const assessmentTimeError =
@@ -76,8 +79,8 @@ function UpdateMaterial() {
       ? "Assessment time is required."
       : !Number.isFinite(time)
         ? "Must be a number."
-        : time < 1 || time > 60
-          ? "Must be between 1 and 60."
+        : time < 1 || time > max_time
+          ? "Must be between 1 and " + str(max_time) + "."
           : "";
 
   const isValid =
@@ -256,46 +259,75 @@ function UpdateMaterial() {
                         </p>
                       )}
                     </div>
-                    <div className="space-y-2">
-                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                        Number of Questions
-                      </label>
-                      <input
-                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                        min={1}
-                        max={30}
-                        step={1}
-                        placeholder="e.g. 15"
-                        type="number"
-                        value={numQuestions}
-                        onChange={(e) => setNumQuestions(e.target.value)}
-                        onBlur={() =>
-                          setTouched((current) => ({
-                            ...current,
-                            numQuestions: true,
-                          }))
-                        }
-                      />
-                      {touched.numQuestions && numQuestionsError && (
-                        <p className="ml-1 text-xs font-medium text-error">
-                          {numQuestionsError}
-                        </p>
-                      )}
-                    </div>
+                    <div className="grid grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                          No. of Questions
+                        </label>
+                        <input
+                          className="rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                          style={{width: "95%"}}
+                          min={1}
+                          max={max_q}
+                          step={1}
+                          placeholder="e.g. 15"
+                          type="number"
+                          value={numQuestions}
+                          onChange={(e) => setNumQuestions(e.target.value)}
+                          onBlur={() =>
+                            setTouched((current) => ({
+                              ...current,
+                              numQuestions: true,
+                            }))
+                          }
+                        />
+                        {touched.numQuestions && numQuestionsError && (
+                          <p className="ml-1 text-xs font-medium text-error">
+                            {numQuestionsError}
+                          </p>
+                        )}
+                      </div>
 
-                    <div className="space-y-2">
+                      <div className="space-y-2">
+                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                          Total Timer (mins)
+                        </label>
+                        <input
+                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                          min={1}
+                          max={max_time}
+                          step={0.5}
+                          placeholder="e.g. 30"
+                          type="number"
+                          value={assessmentTime}
+                          onChange={(e) => setAssessmentTime(e.target.value)}
+                          onBlur={() =>
+                            setTouched((current) => ({
+                              ...current,
+                              assessmentTime: true,
+                            }))
+                          }
+                        />
+                        {touched.assessmentTime && assessmentTimeError && (
+                          <p className="ml-1 text-xs font-medium text-error">
+                            {assessmentTimeError}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {/* <div className="space-y-2">
                       <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                        Assessment Time (minutes)
+                        Timer per Main Question + Follow-up (mins)
                       </label>
                       <input
                         className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
                         min={1}
-                        max={60}
+                        max={10}
                         step={0.5}
-                        placeholder="e.g. 30"
+                        placeholder="e.g. 5"
                         type="number"
-                        value={assessmentTime}
-                        onChange={(e) => setAssessmentTime(e.target.value)}
+                        value={timePerQ}
+                        onChange={(e) => setTimePerQuestion(e.target.value)}
                         onBlur={() =>
                           setTouched((current) => ({
                             ...current,
@@ -308,7 +340,7 @@ function UpdateMaterial() {
                           {assessmentTimeError}
                         </p>
                       )}
-                    </div>
+                    </div> */}
                   </form>
                 </section>
               </div>
@@ -325,8 +357,8 @@ function UpdateMaterial() {
                         upload_file
                       </span>
                     </div>
-                    <h3 className="mb-1 text-base font-bold">Assessment PDF</h3>
-                    <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
+                    <h1 className="mb-1 text-base font-bold">Assessment PDF</h1>
+                    <p className="mb-4 px-2 text-[13px] text-on-surface-variant">
                       Upload the source material or a previous assessment to
                       refine your questions.
                     </p>
