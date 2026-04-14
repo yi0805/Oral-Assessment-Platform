@@ -19,6 +19,6 @@ from app.schemas.assessment import (
 )
 
 from app.schemas.question import (
-   UpdateNowRequest, QuestionUpdate, QuestionOut, UpdateNowResponse
+   QuestionGenerationRequest, QuestionUpdate, QuestionOut, QuestionGenerationResponse
 )
 

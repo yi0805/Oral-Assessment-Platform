@@ -3,7 +3,7 @@ from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
-class UpdateNowRequest(BaseModel):
+class QuestionGenerationRequest(BaseModel):
     material_id: UUID
     material_r_id: UUID
     assessment_title: str
@@ -27,6 +27,6 @@ class QuestionOut(BaseModel):
     question_index: int
 
 
-class UpdateNowResponse(BaseModel):
+class QuestionGenerationResponse(BaseModel):
     assessment_config: UUID
     questions: list[QuestionOut]

@@ -9,20 +9,20 @@ from app.core.dependencies import require_instructor
 from app.services.question_generator import generate_pool
 
 from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material
-from app.schemas import UpdateNowRequest, QuestionUpdate, QuestionOut, UpdateNowResponse
+from app.schemas import QuestionGenerationRequest, QuestionUpdate, QuestionOut, QuestionGenerationResponse
 
 router = APIRouter()
 
 @router.post(
-    "/courses/{course_id}/update-now",
-    response_model=UpdateNowResponse,
+    "/courses/{course_id}/generate-question",
+    response_model=QuestionGenerationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Generate question pool from materials",
 
 )
-async def update_now(
+async def generate_question(
     course_id: UUID,
-    payload: UpdateNowRequest,
+    payload: QuestionGenerationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
@@ -127,7 +127,7 @@ async def update_now(
         .all()
     )
 
-    return UpdateNowResponse(
+    return QuestionGenerationResponse(
         assessment_config=config.id,
         questions=[QuestionOut.model_validate(q) for q in questions],
     )
