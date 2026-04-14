@@ -9,10 +9,12 @@ export function useLogin() {
 
   const { mutate: login, isPending } = useMutation({
     mutationFn: ({ accessToken }) => loginWithGoogle({ accessToken }),
+
     onSuccess: (data) => {
       queryClient.setQueryData(["user"], data.user);
       navigate("/home");
     },
+
     onError: (error) => {
       console.error("Failed to get JWT token:", error);
     },

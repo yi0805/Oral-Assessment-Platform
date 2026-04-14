@@ -1,30 +1,92 @@
 from uuid import UUID
-from datetime import datetime
 
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
-from app.schemas import CourseInfoOut
-from app.schemas import AISummaryInfoOut
+from app.schemas import CourseInfoOut, AISummaryInfoOut
 
 
-class ReleaseResponse(BaseModel):
-    sessions_created: int
+# Shared / common
+
+class StudentInfoOut(BaseModel):
+    full_name: str
+    email: str | None = None
+    image: str | None = None
+
+class AssessmentTitleOut(BaseModel):
+    title: str
+
+class SessionFeedbackOut(BaseModel):
+    final_grade: int | None = None
+    comments: str | None = None
+
+
+# Assessment config
 
 class AssessmentConfigInfoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: UUID
-    course_id: UUID
     title: str
-    description: str | None = None
-    material_r_id: UUID
+
+class ReleaseResponse(BaseModel):
+    sessions_created: int
+
+
+# Session
+
+class SessionInfoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    user_s_id: UUID
+
+class SessionStartResponse(BaseModel):
+    session_id: UUID
+    assessment_title: str
     total_time_minute: int
     main_question_num: int
     follow_up_num: int
+    expires_at: datetime | None = None
+    current_question: "StudentNextQuestionOut | None" = None
+    can_complete: bool = False
+
+
+# Student — assessment view
+
+class StudentCourseAssessmentOut(BaseModel):
+    assessment_config_id: UUID
+    session_id: UUID
+    session_status: str
+    title: str
+    description: str | None = None
+    total_time_minute: int
+    main_question_num: int | None = None
+    follow_up_num: int | None = None
     release_time: datetime | None = None
     due_time: datetime | None = None
-    status: str
 
+class StudentNextQuestionOut(BaseModel):
+    id: UUID
+    question_text: str
+    question_kind: str
+    main_group_no: int
+    followup_no: int
+
+class StudentSavedMessageOut(BaseModel):
+    sequence_no: int
+    message_type: str
+    content: str
+
+class StudentResponseRequest(BaseModel):
+    answer_text: str
+
+class StudentResponseResponse(BaseModel):
+    message_saved: StudentSavedMessageOut
+    next_question: StudentNextQuestionOut | None = None
+    session_status: str
+
+
+# Assessment history
 
 class AssessmentHistoryItemOut(BaseModel):
     session_id: UUID
@@ -36,32 +98,14 @@ class AssessmentHistoryItemOut(BaseModel):
     comments: str | None = None
     submitted_at: datetime | None = None
 
-
 class AssessmentHistoryOut(BaseModel):
     course_code: str | None = None
     course_name: str
     class_average_grade: float | None = None
     items: list[AssessmentHistoryItemOut]
 
-class AssessmentTitleOut(BaseModel):
-    title: str
 
-class SessionFeedbackOut(BaseModel):
-    final_grade: int | None = None
-    comments: str | None = None
-
-class SessionInfoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    assessment_config_id: UUID
-    user_s_id: UUID
-    status: str
-
-class StudentInfoOut(BaseModel):
-    full_name: str
-    email: str | None = None
-    image: str | None = None
+# Review / transcript (instructor-facing)
 
 class PendingReviewOut(BaseModel):
     session: SessionInfoOut
@@ -83,45 +127,3 @@ class TranscriptDetailOut(BaseModel):
     ai_summary: AISummaryInfoOut | None = None
     session_feedback: SessionFeedbackOut | None = None
     transcript: list[TranscriptMessageOut]
-
-class StudentCourseAssessmentOut(BaseModel):
-    assessment_config_id: UUID
-    session_id: UUID
-    session_status: str
-    title: str
-    description: str | None = None
-    total_time_minute: int
-    main_question_num: int | None = None
-    follow_up_num: int | None = None
-    release_time: datetime | None = None
-    due_time: datetime | None = None
-
-class StudentSavedMessageOut(BaseModel):
-    sequence_no: int
-    message_type: str
-    content: str
-
-class StudentNextQuestionOut(BaseModel):
-    id: UUID
-    question_text: str
-    question_kind: str
-    main_group_no: int
-    followup_no: int
-
-class StudentResponseRequest(BaseModel):
-    answer_text: str
-
-class StudentResponseResponse(BaseModel):
-    message_saved: StudentSavedMessageOut
-    next_question: StudentNextQuestionOut | None = None
-    session_status: str
-
-class SessionStartResponse(BaseModel):
-    session_id: UUID
-    assessment_title: str
-    total_time_minute: int
-    main_question_num: int
-    follow_up_num: int
-    expires_at: datetime | None = None
-    current_question: StudentNextQuestionOut | None = None
-    can_complete: bool = False

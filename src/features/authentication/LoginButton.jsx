@@ -1,11 +1,13 @@
 import { useGoogleLogin } from "@react-oauth/google";
+import toast from "react-hot-toast";
 
 function LoginButton({ role, login }) {
   const googleLogin = useGoogleLogin({
     onSuccess: (tokenResponse) => {
       login({ accessToken: tokenResponse.access_token });
     },
-    onError: (error) => console.error("Google login failed:", error),
+
+    onError: (error) => toast.error("Login failed: " + error.message),
   });
 
   return role === "student" ? (

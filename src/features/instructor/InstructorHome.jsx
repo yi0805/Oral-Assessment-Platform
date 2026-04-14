@@ -1,11 +1,12 @@
 import { useNavigate } from "react-router";
 import { useState } from "react";
 
-import InstructorCourseCard from "../../ui/InstructorCourseCard";
 import { useCourses } from "../../hooks/useCourses";
-import Spinner from "../../ui/Spinner";
 import { usePendingReviews } from "./usePendingReviews";
 import { useCreateCourse } from "./useCreateCourse";
+
+import InstructorCourseCard from "../../ui/InstructorCourseCard";
+import Spinner from "../../ui/Spinner";
 import { courseCodeRegex } from "../../utils/constants";
 
 function InstructorHome() {
@@ -91,10 +92,12 @@ function InstructorHome() {
                       Pending Reviews
                     </span>
                   </div>
+
                   <h2 className="text-center font-headline text-4xl font-extrabold leading-none tracking-tight text-primary">
                     {pendingReviews.length}
                   </h2>
                 </div>
+
                 <div className="hidden h-10 w-[1px] bg-outline-variant/20 md:block"></div>
                 {pendingReviews.length > 0 ? (
                   <p className="max-w-sm font-body text-sm text-on-surface-variant">
@@ -107,12 +110,14 @@ function InstructorHome() {
                   </p>
                 )}
               </div>
+
               <div className="flex w-full flex-row gap-3 md:w-auto">
                 <button
-                  className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 font-headline text-xs font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-primary px-5 py-2 font-headline text-xs font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95 disabled:opacity-50"
                   onClick={() => {
                     navigate("/instructor/pendingGrades");
                   }}
+                  disabled={pendingReviews.length === 0}
                 >
                   Review Submissions
                   <span className="material-symbols-outlined text-xs">
@@ -148,6 +153,7 @@ function InstructorHome() {
                   Add New Course
                 </h2>
               </div>
+
               <button
                 className="rounded-full p-2 text-on-surface-variant transition-colors hover:bg-surface-container-high"
                 type="button"
@@ -156,6 +162,7 @@ function InstructorHome() {
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
+
             <div className="space-y-6 p-8">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                 <div className="space-y-2">
@@ -180,6 +187,7 @@ function InstructorHome() {
                     <p className="text-sm text-red-500">{courseCodeError}</p>
                   )}
                 </div>
+
                 <div className="space-y-2">
                   <label
                     className="block font-headline text-xs font-bold uppercase tracking-widest text-secondary"
@@ -203,6 +211,7 @@ function InstructorHome() {
                   )}
                 </div>
               </div>
+
               <div className="space-y-2">
                 <label
                   className="block font-headline text-xs font-bold uppercase tracking-widest text-secondary"
@@ -227,6 +236,7 @@ function InstructorHome() {
                 )}
               </div>
             </div>
+
             <div className="flex justify-end gap-3 border-t border-outline-variant/10 bg-surface-container-low p-6">
               <button
                 className="rounded-xl px-6 py-2.5 font-headline text-sm font-bold text-secondary transition-all hover:bg-surface-container-high"
@@ -235,7 +245,7 @@ function InstructorHome() {
                 Cancel
               </button>
               <button
-                className="rounded-xl bg-primary px-8 py-2.5 font-headline text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
+                className="rounded-xl bg-primary px-8 py-2.5 font-headline text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95 disabled:opacity-50"
                 type="button"
                 onClick={handleSubmit}
                 disabled={isPending}

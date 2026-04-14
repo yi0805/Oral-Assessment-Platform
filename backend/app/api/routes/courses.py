@@ -121,6 +121,7 @@ def list_courses(
         .order_by(Course.course_code)
         .all()
     )
+
     return courses
 
 
@@ -141,7 +142,6 @@ def create_course(
         db.query(Course)
         .filter(
             Course.course_code == payload.course_code,
-            Course.course_name == payload.course_name,
             Course.term == term,
         )
         .first()

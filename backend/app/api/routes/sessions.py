@@ -21,7 +21,7 @@ from app.models import (
 from app.schemas import (
     AssessmentHistoryItemOut, AssessmentHistoryOut, 
     PendingReviewOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
-    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut
 )
 
 router = APIRouter()
@@ -149,7 +149,7 @@ async def _run_ai_summary_background(session_id: UUID) -> None:
 @router.get(
     "/pendingReviews",
     response_model=list[PendingReviewOut],
-    summary="Integration",
+    summary="Show Pending Reviews for Instructor Dashboard",
 )
 def pending_Reviews(
     db: Session = Depends(get_db),
@@ -157,52 +157,37 @@ def pending_Reviews(
 ):
     rows = (
         db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary, SessionFeedback)
-        .join(
-            AssessmentConfig,
-            AssessmentConfig.id == AssessmentSession.assessment_config_id,
-        )
-        .join(
-            CourseEnrollment,
-            CourseEnrollment.course_id == AssessmentConfig.course_id,
-        )
-        .join(
-            User,
-            User.id == AssessmentSession.user_s_id,
-        )
-        .join(
-            Course,
-            Course.id == AssessmentConfig.course_id,
-        )
-        .outerjoin(
-            AISummary,
-            AISummary.session_id == AssessmentSession.id,
-        )
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .join(CourseEnrollment, CourseEnrollment.course_id == AssessmentConfig.course_id)
+        .join(User, User.id == AssessmentSession.user_s_id)
+        .join(Course, Course.id == AssessmentConfig.course_id)
+        .outerjoin(AISummary, AISummary.session_id == AssessmentSession.id)
         .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .filter(CourseEnrollment.user_id == current_user.id)
         .filter(AssessmentSession.status == "under_review")
         .distinct()
         .all()
     )
-
+ 
     return [
-        {
-            "session": session,
-            "user": StudentInfoOut(
+        PendingReviewOut(
+            session=SessionInfoOut.model_validate(session),
+            user=StudentInfoOut(
                 full_name=user.full_name,
                 email=user.email,
                 image=user.image,
             ),
-            "assessment_config": assessment_config,
-            "course": course,
-            "aisummary": {
-                "suggested_grade": ai_summary.suggested_grade,
-                "summary_text": ai_summary.summary_text,
-            } if ai_summary else None,
-            "session_feedback": {
-                "final_grade": feedback.final_grade,
-                "comments": feedback.comments,
-            } if feedback else None,
-        }
+            assessment_config=AssessmentConfigInfoOut.model_validate(assessment_config),
+            course=CourseInfoOut.model_validate(course),
+            aisummary=AISummaryInfoOut(
+                suggested_grade=ai_summary.suggested_grade,
+                summary_text=ai_summary.summary_text,
+            ) if ai_summary else None,
+            session_feedback=SessionFeedbackOut(
+                final_grade=feedback.final_grade,
+                comments=feedback.comments,
+            ) if feedback else None,
+        )
         for session, assessment_config, user, course, ai_summary, feedback in rows
     ]
 

@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.security import create_access_token, is_login_domain_allowed, resolve_role_for_new_user
 
-from app.models import User
+from app.models import User, CourseEnrollment
 from app.schemas import GoogleLoginResponse, UserResponse
 
 router = APIRouter()
@@ -20,11 +20,14 @@ def _fetch_google_userinfo(token: str) -> dict:
         headers={"Authorization": f"Bearer {token}"},
         timeout=10.0,
     )
+
     if resp.status_code != 200:
+
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Google userinfo fetch failed: {resp.text}",
         )
+    
     return resp.json()
 
 
@@ -34,7 +37,6 @@ def _upsert_user(db: Session, email: str, full_name: str, upi: str, image: str |
 
     if user:
         user.full_name = full_name
-        user.upi = upi
         user.image = image
 
         db.commit()
@@ -43,6 +45,7 @@ def _upsert_user(db: Session, email: str, full_name: str, upi: str, image: str |
         return user
 
     role = resolve_role_for_new_user(email)
+
     user = User(
         email=email,
         full_name=full_name,
@@ -97,6 +100,13 @@ def login_with_google(
 
     user = _upsert_user(db, email=email, full_name=full_name, upi=upi, image=image)
 
+    # Link any existing enrollments (imported via CSV)
+    db.query(CourseEnrollment).filter(
+        CourseEnrollment.upi == upi,
+        CourseEnrollment.user_id == None,
+    ).update({"user_id": user.id})
+    db.commit()
+
     jwt_token = create_access_token(
         user_id=str(user.id),
         role=user.role,
@@ -121,6 +131,7 @@ def login_with_google(
              summary="user Logout",
 )
 def logout(response: Response):
+
     response.delete_cookie(
         key="access_token",
         httponly=True,
@@ -128,7 +139,8 @@ def logout(response: Response):
         samesite="lax",
         path="/",
     )
-    return {"message": "Logged out"}
+
+    return {"message": "Logged out successfully."}
 
 
 
