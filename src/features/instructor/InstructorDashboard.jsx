@@ -133,43 +133,97 @@ export default function InstructorDashboard() {
         </div>
 
         <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-4">
-          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 shadow-sm md:col-span-2">
             <div className="relative z-10">
               <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
-                Average Score
+                Score Overview
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="font-headline text-5xl font-extrabold text-primary">
-                  {aiAverageScore}
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-0">
+                <div className="md:pr-4">
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-outline-variant">
+                    Average Score
+                  </p>
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-headline text-4xl font-extrabold text-primary">
+                      {aiAverageScore}
+                    </span>
+                    <span className="text-base font-bold text-outline">
+                      / 10
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex w-fit items-center gap-2 rounded-lg bg-tertiary-container px-2 py-1 text-xs font-semibold text-on-tertiary-container">
+                    <span className="material-symbols-outlined text-xs">
+                      auto_awesome
+                    </span>
+                    Calculated by AI
+                  </div>
+                </div>
+
+                <div className="border-t border-outline-variant/30 pt-4 md:border-l md:border-t-0 md:pl-4 md:pt-0">
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-outline-variant">
+                    Official Avg. Score
+                  </p>
+
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-headline text-4xl font-extrabold text-secondary">
+                      {publishedAverageScore}
+                    </span>
+                    <span className="text-base font-bold text-outline">
+                      / 10
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex w-fit items-center gap-2 rounded-lg bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">
+                    <span className="material-symbols-outlined text-xs">
+                      verified
+                    </span>
+                    Finalized Score
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pointer-events-none absolute inset-0">
+              <div className="absolute inset-y-0 left-0 w-1/2">
+                <span className="material-symbols-outlined absolute -bottom-5 right-4 text-[90px] opacity-5">
+                  grade
                 </span>
-                <span className="text-lg font-bold text-outline">/ 10</span>
               </div>
 
-              <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-tertiary-container px-2 py-1 text-xs font-semibold text-on-tertiary-container">
-                <span className="material-symbols-outlined text-xs">
-                  auto_awesome
+              <div className="absolute inset-y-0 right-0 w-1/2">
+                <span className="material-symbols-outlined absolute -bottom-5 right-4 text-[90px] opacity-5">
+                  check_circle
                 </span>
-                Calculated by AI
               </div>
             </div>
-            <div className="absolute -bottom-4 -right-4 opacity-5">
-              <span className="material-symbols-outlined text-[120px]">
-                grade
-              </span>
-            </div>
           </div>
+
           <div className="rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
             <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
               Submissions
             </p>
-            <div className="flex items-baseline gap-2">
-              <span className="font-headline text-5xl font-extrabold text-on-surface">
-                {submittedCount}
-              </span>
-              <span className="text-lg font-bold text-outline">
-                / {totalStudents}
-              </span>
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end sm:gap-3">
+              <div className="flex min-w-0 items-baseline gap-2">
+                <span className="font-headline text-5xl font-extrabold text-on-surface">
+                  {submittedCount}
+                </span>
+                <span className="text-lg font-bold text-outline">/</span>
+              </div>
+
+              <div className="inline-flex w-fit max-w-full min-w-0 shrink-0 items-center gap-1 rounded-full bg-secondary-container px-2.5 py-1 text-xs font-semibold text-on-secondary-container sm:mb-1 sm:gap-1 sm:px-3 sm:text-sm">
+                <span className="material-symbols-outlined shrink-0 text-[14px] sm:text-[16px]">
+                  groups
+                </span>
+                <span className="truncate">
+                  {totalStudents} enrolments
+                </span>
+              </div>
             </div>
+
             <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-container">
               <div
                 className="h-full rounded-full bg-primary"
@@ -179,31 +233,6 @@ export default function InstructorDashboard() {
             <p className="mt-2 text-[10px] font-medium text-on-surface-variant">
               {completionRate}% Completion rate
             </p>
-          </div>
-
-          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
-            <div className="relative z-10">
-              <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
-                Publication Avg. Score
-              </p>
-              <div className="flex items-baseline gap-2">
-                <span className="font-headline text-5xl font-extrabold text-secondary">
-                  {publishedAverageScore}
-                </span>
-                <span className="text-lg font-bold text-outline">/ 10</span>
-              </div>
-              <div className="mt-4 flex w-fit items-center gap-2 rounded-lg bg-secondary-container px-2 py-1 text-xs font-semibold text-on-secondary-container">
-                <span className="material-symbols-outlined text-xs">
-                  verified
-                </span>
-                Finalized Score
-              </div>
-            </div>
-            <div className="absolute -bottom-4 -right-4 opacity-5">
-              <span className="material-symbols-outlined text-[120px]">
-                check_circle
-              </span>
-            </div>
           </div>
 
           <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
