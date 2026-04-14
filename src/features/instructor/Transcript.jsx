@@ -6,6 +6,7 @@ import { useTranscript } from "./useTranscript";
 import Spinner from "../../ui/Spinner";
 import { buildQuestionBlocks } from "../../utils/buildQuestionBlocks";
 import { useUpdateReview } from "./useUpdateReview";
+import { useApproveAiGrade } from "./useApproveAiGrade";
 
 function Transcipt() {
   const { sessionId } = useParams();
@@ -18,6 +19,7 @@ function Transcipt() {
   const moveback = useMoveBack();
   const { transcript, isLoading } = useTranscript(sessionId);
   const { updateReview } = useUpdateReview();
+  const { approveAiGrade, isPending: isApproving } = useApproveAiGrade();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -68,6 +70,10 @@ function Transcipt() {
         currentReviewIndex: currentReviewIndex + 1,
       },
     });
+  }
+
+  function handleApproveAi() {
+    approveAiGrade({ sessionId });
   }
 
   function handleSubmitReview() {
@@ -178,6 +184,23 @@ function Transcipt() {
                   {transcript.ai_summary?.summary_text ||
                     "No AI summary available for this response."}
                 </p>
+                {/* <button
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-tertiary/40 bg-tertiary-container/40 py-3 font-headline text-sm font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={handleApproveAi}
+                  disabled={
+                    isApproving ||
+                    !transcript.ai_summary?.suggested_grade ||
+                    !!transcript.session_feedback
+                  }
+                >
+                  <span
+                    className="material-symbols-outlined text-base"
+                    style={{ fontVariationSettings: '"FILL" 1' }}
+                  >
+                    auto_awesome
+                  </span>
+                  Accept AI Grade
+                </button> */}
               </div>
             </div>
 
@@ -326,6 +349,24 @@ function Transcipt() {
                         onClick={handleSubmitReview}
                       >
                         Confirm &amp; Submit Grade
+                      </button>
+
+                      <button
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-tertiary/40 bg-tertiary-container/40 py-3 font-headline text-sm font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={handleApproveAi}
+                        disabled={
+                          isApproving ||
+                          !transcript.ai_summary?.suggested_grade ||
+                          !!transcript.session_feedback
+                        }
+                      >
+                        <span
+                          className="material-symbols-outlined text-base"
+                          style={{ fontVariationSettings: '"FILL" 1' }}
+                        >
+                          auto_awesome
+                        </span>
+                        Accept AI Grade
                       </button>
                     </div>
                   </div>

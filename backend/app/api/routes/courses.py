@@ -51,13 +51,16 @@ def import_students_csv(
 
     try:
         raw = file.file.read().decode("utf-8-sig")
+
     except Exception as exc:
+
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Could not read uploaded file: {exc}",
         ) from exc
 
     df = pd.read_csv(StringIO(raw))
+
     if "UPI" not in df.columns:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -70,21 +73,18 @@ def import_students_csv(
         .all()
     }
 
+    newly_enrolled = 0
     for upi in df["UPI"].dropna().astype(str).str.strip():
         if not upi or upi in existing_upis:
             continue
+
         db.add(CourseEnrollment(course_id=course_id, upi=upi))
         existing_upis.add(upi)
+        newly_enrolled += 1
 
     db.commit()
 
-    total_enrolled = (
-        db.query(CourseEnrollment)
-        .filter(CourseEnrollment.course_id == course_id)
-        .count()
-    )
-
-    return {"total_enrolled": total_enrolled}
+    return {"newly_enrolled": newly_enrolled}
 
 @router.get(
     "",
@@ -273,6 +273,7 @@ def get_instructor_dashboard(
             session_id=session.id,
             student_id=student.id,
             student_name=student.full_name,
+            student_upi=student.upi,
             student_email=student.email,
             student_image=student.image,
             ai_suggested_score=(

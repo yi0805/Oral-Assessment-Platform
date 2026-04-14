@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 
 import { useGrading } from "../features/instructor/useGrading";
 import { useReleaseResult } from "../features/instructor/useReleaseResult";
+import { useApproveAiGrade } from "../features/instructor/useApproveAiGrade";
 
 function DashboardTable({
   filteredStudents,
@@ -15,6 +16,7 @@ function DashboardTable({
 
   const { updateGrade } = useGrading();
   const { releaseResult } = useReleaseResult();
+  const { approveAiGrade, isPending: isApproving } = useApproveAiGrade();
 
   const rowsPerPage = 6;
   const totalPages = Math.ceil(filteredStudents.length / rowsPerPage);
@@ -179,8 +181,29 @@ function DashboardTable({
                       </span>
                     </td>
                     <td className="px-8 py-5 text-right">
-                      <button
-                        className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
+                      <div className="flex items-center justify-end gap-2">
+                        {student.status !== "published" && (
+                          <button
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-tertiary/30 bg-tertiary-container/40 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
+                            onClick={() =>
+                              approveAiGrade({ sessionId: student.session_id })
+                            }
+                            disabled={
+                              isApproving || !student.ai_suggested_score
+                            }
+                            title="Accept AI suggested grade and release"
+                          >
+                            <span
+                              className="material-symbols-outlined text-sm"
+                              style={{ fontVariationSettings: '"FILL" 1' }}
+                            >
+                              auto_awesome
+                            </span>
+                            Accept AI
+                          </button>
+                        )}
+                        <button
+                          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
                         onClick={() => {
                           const formattedStudents = filteredStudents.map(
                             (item) => ({
@@ -204,11 +227,12 @@ function DashboardTable({
                           );
                         }}
                       >
-                        <span className="material-symbols-outlined text-sm">
-                          visibility
-                        </span>
-                        View Answer
-                      </button>
+                          <span className="material-symbols-outlined text-sm">
+                            visibility
+                          </span>
+                          View Answer
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );

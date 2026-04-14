@@ -23,7 +23,7 @@ function LoginButton({ role, login }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Student
         </h2>
-        <p class="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
+        <p className="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
           Access your assigned oral exams, review your session history, and view
           personalized feedback.
         </p>
@@ -59,7 +59,7 @@ function LoginButton({ role, login }) {
         <h2 className="headline-font mb-3 text-2xl font-bold text-on-surface">
           Login as Instructor
         </h2>
-        <p class="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
+        <p className="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
           Manage course curriculums, design assessment rubrics, and grade
           student oral performances.
         </p>
