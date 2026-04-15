@@ -39,6 +39,19 @@ function PendingStudentTable({
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   }
 
+  function handleReview(review) {
+    const reviews = filteredReviews.map((item) => ({
+      sessionId: item.sessionId,
+    }));
+    const currentReviewIndex = filteredReviews.findIndex(
+      (item) => item.sessionId === review.sessionId,
+    );
+
+    navigate(`/instructor/transcript/${review.sessionId}`, {
+      state: { reviews, currentReviewIndex },
+    });
+  }
+
   function handleRelease(sessionId, studentId) {
     releaseResult({ sessionId, studentId });
   }
@@ -201,20 +214,7 @@ function PendingStudentTable({
 
                         <button
                           className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
-                          onClick={() => {
-                            navigate(
-                              `/instructor/transcript/${review.sessionId}`,
-                              {
-                                state: {
-                                  reviews: filteredReviews,
-                                  currentReviewIndex: filteredReviews.findIndex(
-                                    (item) =>
-                                      item.sessionId === review.sessionId,
-                                  ),
-                                },
-                              },
-                            );
-                          }}
+                          onClick={() => handleReview(review)}
                         >
                           Review
                         </button>

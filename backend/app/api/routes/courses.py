@@ -270,7 +270,6 @@ def get_instructor_dashboard(
             session_id=session.id,
             student_id=student.id,
             student_name=student.full_name,
-            student_upi=student.upi,
             student_email=student.email,
             student_image=student.image,
             ai_suggested_score=(

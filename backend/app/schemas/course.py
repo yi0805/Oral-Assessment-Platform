@@ -31,7 +31,6 @@ class InstructorDashboardStudentRow(BaseModel):
     student_id: UUID
     student_name: str
     student_email: str
-    student_upi: str
     student_image: str | None = None
     ai_suggested_score: int | None = None
     ai_summary: str | None = None

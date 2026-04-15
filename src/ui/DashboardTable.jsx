@@ -38,6 +38,19 @@ function DashboardTable({
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   }
 
+  function handleViewAnswer(student) {
+    const reviews = filteredStudents.map((item) => ({
+      sessionId: item.session_id,
+    }));
+    const currentReviewIndex = filteredStudents.findIndex(
+      (item) => item.session_id === student.session_id,
+    );
+
+    navigate(`/instructor/transcript/${student.session_id}`, {
+      state: { reviews, currentReviewIndex },
+    });
+  }
+
   function handleGradeChange(sessionId, grade) {
     if (!isValidGrade(grade)) return;
 
@@ -83,13 +96,16 @@ function DashboardTable({
               currentRows.map((student) => {
                 const currentGrade = grades[student.session_id] ?? "";
                 const canPublish = isValidGrade(currentGrade);
+                const isPublished = student.status === "published";
+                const isReview = student.status === "review";
+                const isInProgress = student.status === "inprogress";
                 return (
                   <tr
                     className="group transition-colors hover:bg-surface-container-high/30"
                     key={student.session_id}
                   >
                     <td className="px-8 py-5">
-                      {student.status === "published" ? (
+                      {isPublished && (
                         <label className="relative inline-flex cursor-pointer items-center">
                           <input
                             className="peer sr-only"
@@ -97,9 +113,12 @@ function DashboardTable({
                             checked={true}
                             disabled={true}
                           />
+
                           <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
                         </label>
-                      ) : (
+                      )}
+
+                      {isReview && (
                         <label className="relative inline-flex cursor-pointer items-center">
                           <input
                             className="peer sr-only"
@@ -112,8 +131,15 @@ function DashboardTable({
                               );
                             }}
                           />
+
                           <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
                         </label>
+                      )}
+
+                      {isInProgress && (
+                        <span className="text-sm font-bold text-outline-variant">
+                          —
+                        </span>
                       )}
                     </td>
 
@@ -124,10 +150,12 @@ function DashboardTable({
                           className="h-10 w-10 rounded-full object-cover"
                           src={student.student_image || "/WhereRU.png"}
                         />
+
                         <div>
                           <p className="text-sm font-bold text-on-surface">
                             {student.student_name || "Unknown Student"}
                           </p>
+
                           <p className="text-[10px] text-on-surface-variant">
                             {student.student_email || "No email available"}
                           </p>
@@ -140,25 +168,33 @@ function DashboardTable({
                         <span className="font-headline text-sm font-bold text-tertiary">
                           {student.ai_suggested_score ?? "-"}/100
                         </span>
+
                         <span className="material-symbols-outlined text-[16px] text-outline">
                           auto_awesome
                         </span>
                       </div>
                     </td>
+
                     <td className="max-w-xs px-8 py-5">
                       <p className="line-clamp-2 text-xs italic text-on-surface-variant">
                         {student.ai_summary || "No summary available."}
                       </p>
                     </td>
+
                     <td className="px-8 py-5">
-                      {student.status === "published" ? (
+                      {isPublished && (
                         <span className="inline-flex min-w-[3rem] items-center justify-center rounded-lg bg-surface-container px-3 py-1.5 text-sm font-bold text-on-surface shadow-sm">
                           {student.final_grade ?? "-"}
                         </span>
-                      ) : (
+                      )}
+
+                      {isReview && (
                         <input
                           className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
-                          type="text"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
                           value={currentGrade}
                           onChange={(e) =>
                             onGradeChange(student.session_id, e.target.value)
@@ -171,19 +207,37 @@ function DashboardTable({
                           }}
                         />
                       )}
+
+                      {isInProgress && (
+                        <span className="text-sm font-bold text-outline-variant">
+                          —
+                        </span>
+                      )}
                     </td>
+
                     <td className="px-8 py-5">
-                      <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${student.status === "published" ? "bg-primary-container text-on-primary-container" : "bg-error-container/20 text-error"}`}
-                      >
-                        {student.status === "published"
-                          ? "Published"
-                          : "Review"}
-                      </span>
+                      {isPublished && (
+                        <span className="rounded-full bg-primary-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-primary-container">
+                          Published
+                        </span>
+                      )}
+
+                      {isReview && (
+                        <span className="rounded-full bg-error-container/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-error">
+                          Review
+                        </span>
+                      )}
+
+                      {isInProgress && (
+                        <span className="rounded-full border border-outline-variant/40 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                          In Progress
+                        </span>
+                      )}
                     </td>
+
                     <td className="px-8 py-5 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        {student.status !== "published" && (
+                        {isReview && (
                           <button
                             className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-tertiary/30 bg-tertiary-container/40 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
                             onClick={() =>
@@ -203,37 +257,18 @@ function DashboardTable({
                             Accept AI
                           </button>
                         )}
-                        <button
-                          className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
-                          onClick={() => {
-                            const formattedStudents = filteredStudents.map(
-                              (item) => ({
-                                ...item,
-                                sessionId: item.session_id,
-                                studentId: item.student_id,
-                                studentName: item.student_name,
-                              }),
-                            );
-                            navigate(
-                              `/instructor/transcript/${student.session_id}`,
-                              {
-                                state: {
-                                  reviews: formattedStudents,
-                                  currentReviewIndex:
-                                    formattedStudents.findIndex(
-                                      (item) =>
-                                        item.sessionId === student.session_id,
-                                    ),
-                                },
-                              },
-                            );
-                          }}
-                        >
-                          <span className="material-symbols-outlined text-sm">
-                            visibility
-                          </span>
-                          View Answer
-                        </button>
+
+                        {!isInProgress && (
+                          <button
+                            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
+                            onClick={() => handleViewAnswer(student)}
+                          >
+                            <span className="material-symbols-outlined text-sm">
+                              visibility
+                            </span>
+                            View Answer
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -246,9 +281,11 @@ function DashboardTable({
                     <span className="material-symbols-outlined text-3xl opacity-60">
                       fact_check
                     </span>
+
                     <p className="text-sm font-medium">
                       Nothing to review right now
                     </p>
+
                     <p className="text-xs">
                       New submissions will appear here when they are ready for
                       grading.
