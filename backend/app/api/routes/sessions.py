@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user, require_student
+from app.core.dependencies import require_instructor, require_student
 
 from app.models import (
     User,
@@ -20,7 +20,8 @@ from app.models import (
 )
 from app.schemas import (
     AssessmentHistoryItemOut, AssessmentHistoryOut,
-    PendingReviewOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
+    PendingReviewOut, TranscriptDetailOut, TranscriptMessageOut, AssessmentTitleOut,
+    StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
 )
 
@@ -154,7 +155,7 @@ async def _run_ai_summary_background(session_id: UUID) -> None:
 )
 def pending_Reviews(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_instructor),
 ):
     rows = (
         db.query(AssessmentSession, AssessmentConfig, User, Course, AISummary, SessionFeedback)
@@ -199,7 +200,7 @@ def pending_Reviews(
 def get_transcript_detail(
     session_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_instructor),
 ):
     general_info = (
         db.query(AssessmentSession, User, AssessmentConfig, AISummary, SessionFeedback)
@@ -223,33 +224,13 @@ def get_transcript_detail(
         .all()
     )
 
-    return {
-        "session_id": session_obj.id,
-        "student": {
-            "full_name": user_obj.full_name,
-            "email": user_obj.email,
-            "image": user_obj.image,
-        },
-        "assessment": {
-            "title": assessment_obj.title,
-        },
-        "ai_summary": None if not ai_obj else {
-            "suggested_grade": ai_obj.suggested_grade,
-            "summary_text": ai_obj.summary_text,
-        },
-        "session_feedback": None if not feedback_obj else {
-            "final_grade": feedback_obj.final_grade,
-            "comments": feedback_obj.comments,
-        },
-        "transcript": [
-            {
-                "sequence_no": transcript.sequence_no,
-                "message_type": transcript.message_type,
-                "content": transcript.content,
-            }
-            for transcript in transcripts
-        ],
-    }
+    return TranscriptDetailOut(
+        student=StudentInfoOut.model_validate(user_obj),
+        assessment=AssessmentTitleOut.model_validate(assessment_obj),
+        ai_summary=AISummaryInfoOut.model_validate(ai_obj) if ai_obj else None,
+        session_feedback=SessionFeedbackOut.model_validate(feedback_obj) if feedback_obj else None,
+        transcript=[TranscriptMessageOut.model_validate(t) for t in transcripts],
+    )
 
 
 # List student course assessments

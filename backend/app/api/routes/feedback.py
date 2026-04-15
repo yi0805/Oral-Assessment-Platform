@@ -167,6 +167,15 @@ def upsert_review(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
     feedback = (
         db.query(SessionFeedback)
         .filter(SessionFeedback.session_id == session_id)
@@ -185,12 +194,6 @@ def upsert_review(
     else:
         feedback.final_grade = payload.final_grade
         feedback.comments = payload.comments
-
-    session = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.id == session_id)
-        .first()
-    )
 
     feedback.status = "published"
     session.status = "released"

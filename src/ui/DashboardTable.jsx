@@ -12,6 +12,7 @@ function DashboardTable({
   onGradeChange,
 }) {
   const navigate = useNavigate();
+
   const [currentPage, setCurrentPage] = useState(1);
 
   const { updateGrade } = useGrading();
@@ -47,7 +48,6 @@ function DashboardTable({
     releaseResult({ sessionId, studentId });
   }
 
-  console.log(filteredStudents);
   return (
     <>
       <div className="overflow-x-auto">
@@ -77,6 +77,7 @@ function DashboardTable({
               </th>
             </tr>
           </thead>
+
           <tbody className="divide-y divide-surface-container">
             {currentRows.length > 0 ? (
               currentRows.map((student) => {
@@ -137,7 +138,7 @@ function DashboardTable({
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-2">
                         <span className="font-headline text-sm font-bold text-tertiary">
-                          {student.ai_suggested_score ?? "-"}/10
+                          {student.ai_suggested_score ?? "-"}/100
                         </span>
                         <span className="material-symbols-outlined text-[16px] text-outline">
                           auto_awesome
@@ -204,29 +205,30 @@ function DashboardTable({
                         )}
                         <button
                           className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
-                        onClick={() => {
-                          const formattedStudents = filteredStudents.map(
-                            (item) => ({
-                              ...item,
-                              sessionId: item.session_id,
-                              studentId: item.student_id,
-                              studentName: item.student_name,
-                            }),
-                          );
-                          navigate(
-                            `/instructor/transcript/${student.session_id}`,
-                            {
-                              state: {
-                                reviews: formattedStudents,
-                                currentReviewIndex: formattedStudents.findIndex(
-                                  (item) =>
-                                    item.sessionId === student.session_id,
-                                ),
+                          onClick={() => {
+                            const formattedStudents = filteredStudents.map(
+                              (item) => ({
+                                ...item,
+                                sessionId: item.session_id,
+                                studentId: item.student_id,
+                                studentName: item.student_name,
+                              }),
+                            );
+                            navigate(
+                              `/instructor/transcript/${student.session_id}`,
+                              {
+                                state: {
+                                  reviews: formattedStudents,
+                                  currentReviewIndex:
+                                    formattedStudents.findIndex(
+                                      (item) =>
+                                        item.sessionId === student.session_id,
+                                    ),
+                                },
                               },
-                            },
-                          );
-                        }}
-                      >
+                            );
+                          }}
+                        >
                           <span className="material-symbols-outlined text-sm">
                             visibility
                           </span>
@@ -258,6 +260,7 @@ function DashboardTable({
           </tbody>
         </table>
       </div>
+
       {filteredStudents.length > 0 && (
         <div className="flex items-center justify-between border-t border-surface-container bg-surface-container-low px-8 py-4">
           <span className="text-xs font-medium text-on-surface-variant">
@@ -265,6 +268,7 @@ function DashboardTable({
             {Math.min(endIndex, filteredStudents.length)} of{" "}
             {filteredStudents.length} submissions
           </span>
+
           <div className="flex gap-2">
             <button
               className="rounded p-2 text-outline transition-colors hover:bg-surface-container"

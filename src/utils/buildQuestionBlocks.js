@@ -1,5 +1,6 @@
 export function buildQuestionBlocks(transcript) {
   const blocks = [];
+
   let currentMainBlock = null;
   let currentFollowup = null;
 

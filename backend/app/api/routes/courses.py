@@ -5,7 +5,6 @@ from datetime import datetime
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
@@ -217,13 +216,7 @@ def get_instructor_dashboard(
         .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
         .join(User, User.id == AssessmentSession.user_s_id)
         .outerjoin(AISummary, AISummary.session_id == AssessmentSession.id)
-        .outerjoin(
-            SessionFeedback,
-            and_(
-                SessionFeedback.session_id == AssessmentSession.id,
-                SessionFeedback.user_i_id == current_user.id,
-            ),
-        )
+        .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .filter(AssessmentConfig.course_id == course_id)
         .order_by(User.full_name.asc())
         .all()

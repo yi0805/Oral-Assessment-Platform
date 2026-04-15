@@ -9,14 +9,20 @@ from app.schemas import CourseInfoOut, AISummaryInfoOut
 # Shared / common
 
 class StudentInfoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     full_name: str
     email: str | None = None
     image: str | None = None
 
 class AssessmentTitleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     title: str
 
 class SessionFeedbackOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     final_grade: int | None = None
     comments: str | None = None
 
@@ -116,12 +122,13 @@ class PendingReviewOut(BaseModel):
     session_feedback: SessionFeedbackOut | None
 
 class TranscriptMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     sequence_no: int
     message_type: str
     content: str
 
 class TranscriptDetailOut(BaseModel):
-    session_id: UUID
     student: StudentInfoOut
     assessment: AssessmentTitleOut
     ai_summary: AISummaryInfoOut | None = None
