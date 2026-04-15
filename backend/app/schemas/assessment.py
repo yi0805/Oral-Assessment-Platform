@@ -79,12 +79,10 @@ class StudentResponseRequest(BaseModel):
 class StudentResponseResponse(BaseModel):
     next_question: StudentNextQuestionOut | None = None
 
-
 # Assessment history
 
 class AssessmentHistoryItemOut(BaseModel):
     session_id: UUID
-    assessment_config_id: UUID
     assessment_title: str
     final_grade: int
     instructor_name: str
@@ -93,8 +91,6 @@ class AssessmentHistoryItemOut(BaseModel):
     submitted_at: datetime | None = None
 
 class AssessmentHistoryOut(BaseModel):
-    course_code: str | None = None
-    course_name: str
     class_average_grade: float | None = None
     items: list[AssessmentHistoryItemOut]
 

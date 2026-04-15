@@ -4,6 +4,7 @@ function InstructorFeedback({ assessmentResults }) {
       <h3 className="mb-6 text-xl font-bold text-on-surface">
         Course Instructor Guidance
       </h3>
+
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
         {assessmentResults.map((result) => (
           <div
@@ -23,18 +24,22 @@ function InstructorFeedback({ assessmentResults }) {
                   <span className="material-symbols-outlined">person</span>
                 )}
               </div>
+
               <div>
                 <p className="text-sm font-bold text-on-surface">
                   {result.instructorName}
                 </p>
+
                 <p className="text-xs text-on-surface-variant">
                   {result.department}
                 </p>
               </div>
             </div>
+
             <p className="text-sm italic leading-relaxed text-on-surface-variant">
               {result.feedback}
             </p>
+
             <div className="mt-4 flex items-center justify-between border-t border-surface-container pt-4"></div>
           </div>
         ))}

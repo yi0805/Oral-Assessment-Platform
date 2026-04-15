@@ -197,7 +197,7 @@ export default function StudentAssessment() {
             <span className="material-symbols-outlined">timer</span>
 
             <span
-              className={`font-label text-sm font-medium ${timeLeft != null && timeLeft < 60 ? "text-error" : ""}`}
+              className={`font-label text-sm font-medium ${timeLeft != null && timeLeft < 30 ? "text-error" : ""}`}
             >
               {formatTime(timeLeft)}
             </span>
@@ -207,9 +207,11 @@ export default function StudentAssessment() {
             <span className="material-symbols-outlined cursor-pointer rounded-full p-2 text-[#4f6073] transition-colors hover:bg-[#eaeff1]">
               notifications
             </span>
+
             <span className="material-symbols-outlined cursor-pointer rounded-full p-2 text-[#4f6073] transition-colors hover:bg-[#eaeff1]">
               help
             </span>
+
             <button
               className="rounded-lg px-4 py-2 text-sm font-semibold text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"
               onClick={() => logout()}
@@ -219,17 +221,20 @@ export default function StudentAssessment() {
           </div>
         </div>
       </header>
+
       <main className="flex min-h-screen flex-col items-center px-6 pb-12 pt-24">
         <div className="mb-12 w-full max-w-4xl">
           <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-on-surface-variant">
             {course
               ? `${course.course_code} • ${course.course_name}`
-              : "Unknown Course"}
+              : "Course Name Not Available"}
           </p>
+
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-primary">
-            {assessmentTitle}
+            {assessmentTitle || "Assessment Title Not Available"}
           </h1>
         </div>
+
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
           <div className="space-y-8 md:col-span-8">
             {error && (
@@ -246,8 +251,9 @@ export default function StudentAssessment() {
 
                   <div className="space-y-2">
                     <h2 className="font-headline text-2xl font-semibold text-on-background">
-                      Something went wrong
+                      Oops, something went wrong
                     </h2>
+
                     <p className="text-sm leading-relaxed text-on-surface-variant">
                       {error}
                     </p>
@@ -272,6 +278,7 @@ export default function StudentAssessment() {
                     <h2 className="font-headline text-2xl font-semibold text-on-background">
                       All questions answered
                     </h2>
+
                     <p className="text-sm leading-relaxed text-on-surface-variant">
                       Your final answer has been saved. You can now submit and
                       complete the assessment.
@@ -280,14 +287,17 @@ export default function StudentAssessment() {
                 </div>
               </div>
             )}
+
             {currentQuestion && (
               <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-8 shadow-sm">
                 <div className="absolute left-0 top-0 h-full w-2 bg-primary"></div>
+
                 <div className="mb-6 flex items-center gap-3">
                   <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
                     {questionKindLabel}
                   </span>
                 </div>
+
                 <h2 className="mb-4 font-headline text-2xl font-semibold leading-snug text-on-background">
                   {currentQuestion?.question_text}
                 </h2>
@@ -300,6 +310,7 @@ export default function StudentAssessment() {
                   <p className="mb-8 font-medium text-on-surface-variant">
                     Tap the microphone to speak your answer
                   </p>
+
                   <div className="relative">
                     <div className="absolute -inset-4 rounded-full bg-primary/5 blur-xl"></div>
                     <button className="relative flex h-24 w-24 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-all hover:bg-primary-dim active:scale-95">
@@ -312,6 +323,7 @@ export default function StudentAssessment() {
                       </span>
                     </button>
                   </div>
+
                   <div className="mt-8 flex gap-2">
                     <div className="h-4 w-1 rounded-full bg-primary/20"></div>
                     <div className="h-8 w-1 rounded-full bg-primary/40"></div>
@@ -327,6 +339,7 @@ export default function StudentAssessment() {
                       keyboard
                     </span>
                   </div>
+
                   <textarea
                     className="block w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-4 pl-12 pr-4 font-body text-sm placeholder:text-outline-variant focus:border-primary focus:ring-primary"
                     placeholder="Type your response here if you prefer not to use voice..."
@@ -344,6 +357,12 @@ export default function StudentAssessment() {
                         e.preventDefault();
                       }
                     }}
+                    onDrop={(e) => e.preventDefault()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onContextMenu={(e) => e.preventDefault()}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
                   ></textarea>
                 </div>
               </div>
@@ -477,10 +496,12 @@ export default function StudentAssessment() {
             <div className="rounded-xl bg-tertiary-container/30 p-6">
               <div className="mb-2 flex items-center gap-2 text-on-tertiary-container">
                 <span className="material-symbols-outlined text-sm">info</span>
+
                 <span className="text-xs font-bold uppercase tracking-wider">
                   Curator's Tip
                 </span>
               </div>
+
               <p className="text-xs leading-relaxed text-on-tertiary-container/80">
                 Try to structure your answer using the 'Statement, Explanation,
                 Example' framework for higher clarity scoring.

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 
 import { useCourses } from "../../hooks/useCourses";
+import { useAssessmentHistory } from "./useAssessmentHistory";
+
 import Spinner from "../../ui/Spinner";
 import InstructorFeedback from "../../ui/InstructorFeedback";
 import CourseSelector from "../../ui/CourseSelector";
-import { useAssessmentHistory } from "./useAssessmentHistory";
 
 function StudentPreviousAssessment() {
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -26,9 +27,8 @@ function StudentPreviousAssessment() {
 
   const assessmentResults = items.map((item) => ({
     sessionId: item.session_id,
-    assessment: item.assessment_title,
+    title: item.assessment_title,
     grade: item.final_grade.toFixed(1),
-    weight: 10,
     submittedDate: item.submitted_at
       ? new Date(item.submitted_at).toLocaleDateString("en-US", {
           month: "short",
@@ -43,6 +43,7 @@ function StudentPreviousAssessment() {
   }));
 
   const Grades = items.map((i) => i.final_grade);
+
   const studentAvg =
     Grades.length > 0 ? Grades.reduce((s, g) => s + g, 0) / Grades.length : 0;
   const classAvg =
@@ -59,14 +60,14 @@ function StudentPreviousAssessment() {
 
   const bestAssessmentName =
     bestGrade != null
-      ? (assessmentResults.find((a) => Number(a.grade) === bestGrade)
-          ?.assessment ?? "—")
+      ? (assessmentResults.find((a) => Number(a.grade) === bestGrade)?.title ??
+        "—")
       : "—";
 
   const lowestAssessmentName =
     lowestGrade != null
       ? (assessmentResults.find((a) => Number(a.grade) === lowestGrade)
-          ?.assessment ?? "—")
+          ?.title ?? "—")
       : "—";
 
   return (
@@ -77,6 +78,7 @@ function StudentPreviousAssessment() {
             <span className="text-xs font-medium uppercase tracking-widest text-outline">
               Performance History
             </span>
+
             <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-on-surface">
               Previous Assessments
             </h1>
@@ -94,11 +96,12 @@ function StudentPreviousAssessment() {
             </div>
           </div>
 
-          {items.length === 0 ? (
+          {assessmentResults.length === 0 ? (
             <div className="flex flex-col items-center gap-4 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-12 text-center shadow-sm">
               <span className="material-symbols-outlined text-6xl text-on-surface-variant">
                 sentiment_dissatisfied
               </span>
+
               <p className="text-lg font-medium text-on-surface">
                 No previous assessments found.
               </p>
@@ -113,14 +116,17 @@ function StudentPreviousAssessment() {
                         analytics
                       </span>
                     </div>
+
                     <p className="text-sm font-medium text-on-surface-variant">
                       Course Average
                     </p>
                   </div>
+
                   <div className="mt-4">
                     <span className="text-4xl font-bold text-primary">
-                      {studentAvg.toFixed(1)} / 10
+                      {studentAvg.toFixed(1)} / 100
                     </span>
+
                     {classAverageGradeText && (
                       <span className="ml-2 text-xs font-medium text-secondary">
                         {classAverageGradeText}
@@ -128,6 +134,7 @@ function StudentPreviousAssessment() {
                     )}
                   </div>
                 </div>
+
                 <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
                   <div>
                     <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-tertiary-container">
@@ -135,19 +142,23 @@ function StudentPreviousAssessment() {
                         emoji_events
                       </span>
                     </div>
+
                     <p className="text-sm font-medium text-on-surface-variant">
                       Highest Score
                     </p>
                   </div>
+
                   <div className="mt-4">
                     <span className="text-4xl font-bold text-on-surface">
                       {bestGrade != null ? bestGrade.toFixed(1) : "—"}
                     </span>
+
                     <p className="mt-1 text-xs text-on-surface-variant">
                       {bestAssessmentName}
                     </p>
                   </div>
                 </div>
+
                 <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-8 shadow-sm">
                   <div>
                     <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-surface-container-highest">
@@ -155,14 +166,17 @@ function StudentPreviousAssessment() {
                         trending_down
                       </span>
                     </div>
+
                     <p className="text-sm font-medium text-on-surface-variant">
                       Lowest Score
                     </p>
                   </div>
+
                   <div className="mt-4">
                     <span className="text-4xl font-bold text-on-surface">
                       {lowestGrade != null ? lowestGrade.toFixed(1) : "—"}
                     </span>
+
                     <p className="mt-1 text-xs text-on-surface-variant">
                       {lowestAssessmentName}
                     </p>
@@ -179,9 +193,8 @@ function StudentPreviousAssessment() {
 
                 <div className="overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
                   <div className="grid grid-cols-12 bg-surface-container-low px-6 py-4 text-xs font-bold uppercase tracking-wider text-outline">
-                    <div className="col-span-5">Assessment Title</div>
-                    <div className="col-span-2">Date Submitted</div>
-                    <div className="col-span-2 text-center">Weight</div>
+                    <div className="col-span-7">Assessment Title</div>
+                    <div className="col-span-3">Date Submitted</div>
                     <div className="col-span-2 text-center">Score</div>
                   </div>
 
@@ -192,20 +205,14 @@ function StudentPreviousAssessment() {
                         index !== 0 ? "border-t border-surface-container" : ""
                       }`}
                     >
-                      <div className="col-span-5">
+                      <div className="col-span-7">
                         <p className="font-semibold text-on-surface">
-                          {assessment.assessment}
+                          {assessment.title}
                         </p>
                       </div>
 
-                      <div className="col-span-2 text-sm text-on-surface-variant">
+                      <div className="col-span-3 text-sm text-on-surface-variant">
                         {assessment.submittedDate}
-                      </div>
-
-                      <div className="col-span-2 text-center">
-                        <span className="rounded-full bg-surface-container px-2 py-1 text-xs text-on-surface-variant">
-                          {assessment.weight}%
-                        </span>
                       </div>
 
                       <div className="col-span-2 text-center">

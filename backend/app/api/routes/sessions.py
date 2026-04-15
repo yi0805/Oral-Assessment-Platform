@@ -347,7 +347,6 @@ def get_my_assessment_history(
     items = [
         AssessmentHistoryItemOut(
             session_id=session.id,
-            assessment_config_id=config.id,
             assessment_title=config.title,
             comments=feedback.comments,
             final_grade=feedback.final_grade,
@@ -371,8 +370,6 @@ def get_my_assessment_history(
     )
 
     return AssessmentHistoryOut(
-        course_code=course.course_code,
-        course_name=course.course_name,
         class_average_grade=round(float(class_avg), 2) if class_avg is not None else None,
         items=items,
     )
