@@ -1,13 +1,3 @@
-"""
-RAG (Retrieval-Augmented Generation) search service.
-Uses pgvector HNSW cosine similarity to find relevant material chunks.
-
-This is the interface between Bess's data layer and Joanne's AI layer:
-  Input: a natural language query + course_id
-  Output: top-k most relevant text chunks ranked by cosine similarity
-
-Used by: question_generator (Phase 3) and ai_summary_service (Phase 5)
-"""
 import logging
 from uuid import UUID
 from dataclasses import dataclass
@@ -20,10 +10,7 @@ from app.services.embedding_service import embed_text
 logger = logging.getLogger(__name__)
 
 # Minimum cosine similarity to consider a result meaningful.
-# Zero-vector embeddings (stored as fallback when Gemini key is absent or
-# embedding fails) produce cosine distance ≈ 1.0 → similarity ≈ 0.0.
-# Any real embedding will score higher than this threshold.
-_MIN_SCORE = 0.05
+_MIN_SCORE = 0.45
 
 
 @dataclass

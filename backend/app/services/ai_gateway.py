@@ -1,38 +1,17 @@
-"""
-AI API Gateway — Project 20 centralised AI client.
-
-All AI calls in the system must go through this module. Never call
-external AI APIs directly from service files.
-
-Provider routing
-----------------
-  Embeddings  → Google Gemini  (gemini-embedding-001)
-                Endpoint: generativelanguage.googleapis.com
-                Dimension: 768 (RETRIEVAL_DOCUMENT task type)
-
-  Chat / LLM  → OpenRouter free tier  (openrouter/free)
-                Endpoint: openrouter.ai/api/v1/chat/completions
-                OpenAI-compatible schema
-
-Dev fallback
-------------
-When a key is not configured the gateway returns zero vectors (embeddings)
-or a clearly labelled placeholder string (chat) so the rest of the pipeline
-stays testable end-to-end without live API keys.
-
-Configuration keys (set in .env)
----------------------------------
-  GEMINI_API_KEY       - Google AI Studio key (Gemini embedding)
-  OPENROUTER_API_KEY   - OpenRouter key (chat completions)
-"""
 from __future__ import annotations
 
+import asyncio
+import json as _json
 import logging
-from typing import Any
-
 import httpx
 
+from typing import Any
+
 from app.core.config import settings
+
+# Retry policy for transient OpenRouter failures. Backoffs are in seconds.
+_CHAT_RETRY_BACKOFFS: tuple[float, ...] = (1.0, 3.0)
+_CHAT_RETRY_STATUS: frozenset[int] = frozenset({408, 425, 429, 500, 502, 503, 504})
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +19,8 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-OPENROUTER_MODEL = "openrouter/free"
+# Pin a specific OpenRouter model rather than the "openrouter/free" auto-router. auto-routing swaps providers per-request, which makes prompt tuning impossible.
+OPENROUTER_MODEL = "google/gemini-2.0-flash-exp:free"
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -257,26 +237,38 @@ async def chat_complete(
         "max_tokens": max_tokens,
     }
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    body = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    headers = {
+        "Authorization": f"Bearer {settings.openrouter_api_key}",
+        # Explicitly request UTF-8 to prevent decode errors with
+        # answers that contain math/Unicode symbols (∑, ∫, ≤, etc.)
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json",
+        "HTTP-Referer": "https://project20.localhost",
+        "X-Title": "Project 20 AI Oral Assessment",
+    }
+
+    max_attempts = len(_CHAT_RETRY_BACKOFFS) + 1
+
+    for attempt in range(1, max_attempts + 1):
         try:
-            response = await client.post(
-                OPENROUTER_CHAT_URL,
-                headers={
-                    "Authorization": f"Bearer {settings.openrouter_api_key}",
-                    # Explicitly request UTF-8 to prevent decode errors with
-                    # answers that contain math/Unicode symbols (∑, ∫, ≤, etc.)
-                    "Content-Type": "application/json; charset=utf-8",
-                    "Accept": "application/json",
-                    "HTTP-Referer": "https://project20.localhost",
-                    "X-Title": "Project 20 AI Oral Assessment",
-                },
-                content=__import__("json").dumps(payload, ensure_ascii=False).encode("utf-8"),
-            )
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(OPENROUTER_CHAT_URL, headers=headers, content=body)
+
+            if response.status_code in _CHAT_RETRY_STATUS and attempt < max_attempts:
+                wait_s = _CHAT_RETRY_BACKOFFS[attempt - 1]
+                logger.warning(
+                    "[AI Gateway] OpenRouter HTTP %s (attempt %d/%d) — retrying in %.1fs",
+                    response.status_code, attempt, max_attempts, wait_s,
+                )
+                await asyncio.sleep(wait_s)
+                continue
+
             response.raise_for_status()
+
             # Explicitly decode as UTF-8 to avoid charset-detection failures when
             # response bodies contain Unicode math symbols or non-ASCII characters.
-
-            data = __import__("json").loads(response.content.decode("utf-8"))
+            data = _json.loads(response.content.decode("utf-8"))
             choices = data.get("choices") or []
             if not choices:
                 raise RuntimeError(f"OpenRouter returned no choices: {data}")
@@ -290,12 +282,25 @@ async def chat_complete(
             content = str(content).strip()
 
             logger.info(
-                "[AI Gateway] OpenRouter chat: %d input tokens, reply=%d chars",
+                "[AI Gateway] OpenRouter chat: %d input tokens, reply=%d chars (attempt %d)",
                 data.get("usage", {}).get("prompt_tokens", 0),
                 len(content),
+                attempt,
             )
             return content
-        
+
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout, httpx.PoolTimeout) as exc:
+            if attempt >= max_attempts:
+                logger.error("[AI Gateway] OpenRouter transport error after %d attempts: %s", attempt, exc)
+                raise RuntimeError(f"OpenRouter chat transport error: {exc}") from exc
+            wait_s = _CHAT_RETRY_BACKOFFS[attempt - 1]
+            logger.warning(
+                "[AI Gateway] OpenRouter transport error %s (attempt %d/%d) — retrying in %.1fs",
+                type(exc).__name__, attempt, max_attempts, wait_s,
+            )
+            await asyncio.sleep(wait_s)
+            continue
+
         except httpx.HTTPStatusError as exc:
             logger.error(
                 "[AI Gateway] OpenRouter HTTP %s: %s",
@@ -303,7 +308,9 @@ async def chat_complete(
                 exc.response.text,
             )
             raise RuntimeError(f"OpenRouter chat failed: {exc.response.text}") from exc
-        
+
         except Exception as exc:
             logger.error("[AI Gateway] OpenRouter error: %s", exc)
             raise RuntimeError(f"OpenRouter chat error: {exc}") from exc
+
+    raise RuntimeError(f"OpenRouter chat failed after {max_attempts} attempts")

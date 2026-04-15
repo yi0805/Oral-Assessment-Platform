@@ -67,6 +67,9 @@ def release_assessment(
 
     if not question_pool:
         raise HTTPException(status_code=422, detail="No question pool found for this assessment.")
+    
+    if question_pool.status != "draft":
+        raise HTTPException(status_code=422, detail="Question pool was already published.")
 
     # Publish config and question pool
     question_pool.status = "published"
@@ -99,11 +102,12 @@ def release_assessment(
 
     try:
         db.commit()
+        
     except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to release assessment due to a server error.")
 
-    return {"sessions_created": sessions_created}
+    return ReleaseResponse(sessions_created=sessions_created)
 
 
 # Get assessment config
