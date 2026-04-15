@@ -59,11 +59,11 @@ export default function InstructorDashboard() {
   }
 
   function isValidGrade(grade) {
-    if (grade === null || grade === undefined || grade === "") return false;
+    if (grade == null || String(grade).trim() === "") return false;
 
     const numericGrade = Number(grade);
     return (
-      !Number.isNaN(numericGrade) && numericGrade >= 0 && numericGrade <= 100
+      Number.isInteger(numericGrade) && numericGrade >= 0 && numericGrade <= 100
     );
   }
 

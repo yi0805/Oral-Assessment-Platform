@@ -123,7 +123,7 @@ function StudentPreviousAssessment() {
                   </div>
 
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-primary">
+                    <span className="text-2xl font-bold text-primary">
                       {studentAvg.toFixed(1)} / 100
                     </span>
 
@@ -149,7 +149,7 @@ function StudentPreviousAssessment() {
                   </div>
 
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-on-surface">
+                    <span className="text-2xl font-bold text-on-surface">
                       {bestGrade != null ? bestGrade.toFixed(1) : "—"}
                     </span>
 
@@ -173,7 +173,7 @@ function StudentPreviousAssessment() {
                   </div>
 
                   <div className="mt-4">
-                    <span className="text-4xl font-bold text-on-surface">
+                    <span className="text-2xl font-bold text-on-surface">
                       {lowestGrade != null ? lowestGrade.toFixed(1) : "—"}
                     </span>
 
@@ -192,8 +192,8 @@ function StudentPreviousAssessment() {
                 </div>
 
                 <div className="overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest shadow-sm">
-                  <div className="grid grid-cols-12 bg-surface-container-low px-6 py-4 text-xs font-bold uppercase tracking-wider text-outline">
-                    <div className="col-span-7">Assessment Title</div>
+                  <div className="grid grid-cols-10 bg-surface-container-low px-6 py-5 text-xs font-bold uppercase tracking-wider text-outline">
+                    <div className="col-span-5">Assessment Title</div>
                     <div className="col-span-3">Date Submitted</div>
                     <div className="col-span-2 text-center">Score</div>
                   </div>
@@ -201,17 +201,17 @@ function StudentPreviousAssessment() {
                   {assessmentResults.map((assessment, index) => (
                     <div
                       key={assessment.sessionId}
-                      className={`group grid cursor-pointer grid-cols-12 items-center px-6 py-6 transition-colors hover:bg-surface-container-low ${
+                      className={`group grid cursor-pointer grid-cols-10 items-center px-6 py-6 transition-colors hover:bg-surface-container-low ${
                         index !== 0 ? "border-t border-surface-container" : ""
                       }`}
                     >
-                      <div className="col-span-7">
+                      <div className="col-span-5">
                         <p className="font-semibold text-on-surface">
                           {assessment.title}
                         </p>
                       </div>
 
-                      <div className="col-span-3 text-sm text-on-surface-variant">
+                      <div className="col-span-3 text-base text-on-surface-variant">
                         {assessment.submittedDate}
                       </div>
 

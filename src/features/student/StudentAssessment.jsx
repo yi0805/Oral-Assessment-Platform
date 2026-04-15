@@ -103,7 +103,7 @@ export default function StudentAssessment() {
 
     async function autoComplete() {
       try {
-        await completeAssessment({ sessionId });
+        await completeAssessment({ sessionId, courseId });
         navigate(`/student/${courseId}`);
       } catch (error) {
         hasAutoCompleted.current = false;
@@ -163,7 +163,7 @@ export default function StudentAssessment() {
     setIsSubmitting(true);
 
     try {
-      await completeAssessment({ sessionId });
+      await completeAssessment({ sessionId, courseId });
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));

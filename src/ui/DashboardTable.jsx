@@ -96,6 +96,7 @@ function DashboardTable({
               currentRows.map((student) => {
                 const currentGrade = grades[student.session_id] ?? "";
                 const canPublish = isValidGrade(currentGrade);
+
                 const isPublished = student.status === "published";
                 const isReview = student.status === "review";
                 const isInProgress = student.status === "inprogress";
@@ -194,16 +195,29 @@ function DashboardTable({
                           type="number"
                           min="0"
                           max="100"
-                          step="0.5"
+                          step="1"
                           value={currentGrade}
-                          onChange={(e) =>
-                            onGradeChange(student.session_id, e.target.value)
-                          }
+                          onChange={(e) => {
+                            const val = e.target.value;
+
+                            if (val === "" || /^\d+$/.test(val)) {
+                              onGradeChange(student.session_id, val);
+                            }
+                          }}
                           onBlur={(e) => {
-                            handleGradeChange(
-                              student.session_id,
-                              e.target.value,
+                            const raw = e.target.value;
+
+                            if (raw === "") {
+                              handleGradeChange(student.session_id, "");
+                              return;
+                            }
+
+                            const val = Math.min(
+                              100,
+                              Math.max(0, parseInt(raw, 10) || 0),
                             );
+
+                            handleGradeChange(student.session_id, val);
                           }}
                         />
                       )}

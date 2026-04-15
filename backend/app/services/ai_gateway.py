@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Pin a specific OpenRouter model rather than the "openrouter/free" auto-router. auto-routing swaps providers per-request, which makes prompt tuning impossible.
-OPENROUTER_MODEL = "google/gemini-2.0-flash-exp:free"
+OPENROUTER_MODEL = "openrouter/free"
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 
@@ -46,19 +46,6 @@ async def get_embedding(
     text: str,
     task_type: str = "RETRIEVAL_DOCUMENT",
 ) -> list[float]:
-    """
-    Return a 768-dimensional float vector for *text* using Gemini Embedding.
-
-    Args:
-        text:       The text to embed (keep under ~2 000 tokens for best results).
-        task_type:  Gemini task hint — one of RETRIEVAL_DOCUMENT, RETRIEVAL_QUERY,
-                    SEMANTIC_SIMILARITY, CLASSIFICATION, CLUSTERING.
-                    Use RETRIEVAL_DOCUMENT when indexing material chunks.
-                    Use RETRIEVAL_QUERY when embedding a search query.
-
-    Returns:
-        A list of 768 floats.  Returns a zero vector when the key is absent (dev mode).
-    """
     if not settings.gemini_api_key:
         logger.warning("[AI Gateway] GEMINI_API_KEY not set — returning zero vector (dev mode)")
 
@@ -104,16 +91,6 @@ async def get_embeddings_batch(
     texts: list[str],
     task_type: str = "RETRIEVAL_DOCUMENT",
 ) -> list[list[float]]:
-    """
-    Batch embed multiple texts via Gemini batchEmbedContents.
-
-    Automatically splits into sub-batches of at most BATCH_SIZE=100 because
-    the Gemini batchEmbedContents API accepts a maximum of 100 requests per call.
-    Falls back to sequential single-embed calls if the batch API errors.
-
-    Returns a list of 768-float vectors in the same order as *texts*.
-    Returns zero vectors when GEMINI_API_KEY is not set (dev mode).
-    """
     BATCH_SIZE = 100  # Gemini batchEmbedContents hard limit
 
     if not texts:
@@ -204,23 +181,6 @@ async def chat_complete(
     max_tokens: int = 1500,
     model: str | None = None,
 ) -> str:
-    """
-    Call OpenRouter's free-tier model and return the assistant message content.
-
-    Args:
-        messages:      A list of ``{"role": "user"|"assistant", "content": "..."}``
-                       dicts in the order they should appear.  Do NOT include a
-                       system message here — use *system_prompt* instead.
-        system_prompt: Optional system instruction prepended to the conversation.
-        temperature:   Sampling temperature (0 = deterministic, 1 = creative).
-        max_tokens:    Maximum number of tokens in the completion.
-        model:         Override the default OpenRouter model.  Defaults to
-                       ``openrouter/free``.
-
-    Returns:
-        The assistant's reply as a plain string.
-        Returns a clearly marked placeholder when OPENROUTER_API_KEY is absent.
-    """
     if not settings.openrouter_api_key:
         logger.warning("[AI Gateway] OPENROUTER_API_KEY not set — returning placeholder (dev mode)")
         return "[AI response placeholder — set OPENROUTER_API_KEY in .env to enable live AI]"
@@ -240,6 +200,7 @@ async def chat_complete(
     body = _json.dumps(payload, ensure_ascii=False).encode("utf-8")
     headers = {
         "Authorization": f"Bearer {settings.openrouter_api_key}",
+
         # Explicitly request UTF-8 to prevent decode errors with
         # answers that contain math/Unicode symbols (∑, ∫, ≤, etc.)
         "Content-Type": "application/json; charset=utf-8",

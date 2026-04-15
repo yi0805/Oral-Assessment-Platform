@@ -16,7 +16,6 @@ export function useUpdateReview() {
       queryClient.invalidateQueries({ queryKey: ["transcript"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["pendingReviews"] });
-      toast.success("Review updated successfully!");
     },
 
     onError: (error) => {

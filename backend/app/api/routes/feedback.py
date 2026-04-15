@@ -88,7 +88,7 @@ def release_result(
     _release_one_result(db, session_id, student_id)
     db.commit()
 
-    return {"message": f"Results released to student {student_id} for session {session_id}."}
+    return {"message": f"Results released to student."}
 
 
 # Release all results
@@ -155,7 +155,7 @@ def update_grade(
     db.commit()
     db.refresh(feedback)
 
-    return {"message": f"Grade updated for session {session_id}."}
+    return {"message": f"Grade updated successfully."}
 
 
 # Upsert instructor review
@@ -202,7 +202,7 @@ def upsert_review(
     db.refresh(feedback)
     db.refresh(session)
 
-    return {"message": f"Instructor review saved for session {session_id}."}
+    return {"message": f"Instructor review saved for session."}
 
 
 # Approve AI score
@@ -276,4 +276,4 @@ def accept_ai_and_release(
     db.commit()
     db.refresh(feedback)
 
-    return {"message": f"Results released to student {sess.user_s_id} for session {session_id}."}
+    return {"message": f"Results released to student."}

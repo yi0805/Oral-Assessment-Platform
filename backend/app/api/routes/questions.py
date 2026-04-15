@@ -64,7 +64,7 @@ async def generate_question(
         db.query(Material)
         .filter(
             Material.id == payload.material_id,
-            Material.material_category == "material",
+            Material.material_category == "course_material",
         )
         .first()
     )

@@ -173,19 +173,26 @@ function PendingStudentTable({
                         type="number"
                         min={0}
                         max={100}
-                        step={0.5}
+                        step={1}
                         value={currentGrade}
                         onChange={(e) => {
                           const val = e.target.value;
 
-                          if (val === "" || /^\d+(\.\d?)?$/.test(val)) {
+                          if (val === "" || /^\d+$/.test(val)) {
                             onGradeChange(review.sessionId, val);
                           }
                         }}
                         onBlur={(e) => {
+                          const raw = e.target.value;
+
+                          if (raw === "") {
+                            handleGradeChange(review.sessionId, "");
+                            return;
+                          }
+
                           const val = Math.min(
                             100,
-                            Math.max(0, parseFloat(e.target.value) || 0),
+                            Math.max(0, parseInt(raw, 10) || 0),
                           );
 
                           handleGradeChange(review.sessionId, val);
