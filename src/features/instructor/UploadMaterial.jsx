@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 import { useCourses } from "../../hooks/useCourses";
-import Spinner from "../../ui/Spinner";
 import { useUploadMaterial } from "./useUploadMaterial";
 import { useUploadRubric } from "./useLoadRubric";
 import { useQuestionGenerate } from "./useQuestionGenerate";
@@ -9,11 +8,14 @@ import { useDeleteQuestion } from "./useDeleteQuestion";
 import { useUpdateQuestion } from "./useUpdateQuestion";
 import { usePublishAssessment } from "./usePublishAssessment";
 
+import Spinner from "../../ui/Spinner";
+
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);
   const [rubricFile, setRubricFile] = useState(null);
 
   const [courseId, setCourseId] = useState("");
+
   const [assessmentConfigId, setAssessmentConfigId] = useState(null);
   const [assessmentName, setAssessmentName] = useState("");
 
@@ -67,8 +69,8 @@ function UpdateMaterial() {
       ? "Number of questions is required."
       : !Number.isInteger(num)
         ? "Must be a whole number."
-        : num < 1 || num > 30
-          ? "Must be between 1 and 30."
+        : num < 1 || num > 15
+          ? "Must be between 1 and 15."
           : "";
 
   const assessmentTimeError =
@@ -76,82 +78,92 @@ function UpdateMaterial() {
       ? "Assessment time is required."
       : !Number.isFinite(time)
         ? "Must be a number."
-        : time < 1 || time > 60
-          ? "Must be between 1 and 60."
+        : time < 5 || time > 90
+          ? "Must be between 5 and 90."
           : "";
 
   const isValid =
-    !numQuestionsError && !assessmentTimeError && !assessmentNameError;
+    !numQuestionsError &&
+    !assessmentTimeError &&
+    !assessmentNameError &&
+    materialFile &&
+    rubricFile;
 
   async function handleSubmit() {
-    setLoading(true);
-    setStatusMessage("Uploading material...");
+    try {
+      setLoading(true);
+      setStatusMessage("Uploading material...");
 
-    const MaterialId = await uploadMaterial({
-      courseId,
-      file: materialFile,
-    });
+      const MaterialId = await uploadMaterial({
+        courseId,
+        file: materialFile,
+      });
 
-    setStatusMessage("Uploading rubric...");
-    const RubricId = await uploadRubric({
-      courseId,
-      file: rubricFile,
-    });
+      setStatusMessage("Uploading rubric...");
+      const RubricId = await uploadRubric({
+        courseId,
+        file: rubricFile,
+      });
 
-    setStatusMessage("Generating questions with AI...");
-    const updateResponse = await questionGenerate({
-      courseId,
-      materialId: MaterialId,
-      rubricId: RubricId,
-      assessmentName,
-      numQuestions,
-      totalTime: time,
-    });
+      setStatusMessage("Generating questions with AI...");
+      const updateResponse = await questionGenerate({
+        courseId,
+        materialId: MaterialId,
+        rubricId: RubricId,
+        assessmentName,
+        numQuestions,
+        totalTime: time,
+      });
 
-    setQuestions(updateResponse.questions);
-    setAssessmentConfigId(updateResponse.assessment_config);
-    setPhase("review");
-    setStatusMessage("");
-    setLoading(false);
+      setQuestions(updateResponse.questions);
+      setAssessmentConfigId(updateResponse.assessment_config);
+      setPhase("review");
+    } finally {
+      setStatusMessage("");
+      setLoading(false);
+    }
   }
 
   async function handleDelete(questionId) {
-    setLoading(true);
-
-    await deleteQuestion({ questionId });
-
-    setQuestions((prev) => prev.filter((q) => q.id !== questionId));
-    setLoading(false);
+    try {
+      setLoading(true);
+      await deleteQuestion({ questionId });
+      setQuestions((prev) => prev.filter((q) => q.id !== questionId));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleUpdate(questionId, questionText) {
-    setLoading(true);
-
-    await updateQuestion({ questionId, questionText });
-
-    setQuestions((prev) =>
-      prev.map((q) =>
-        q.id === questionId ? { ...q, question_text: questionText } : q,
-      ),
-    );
-    setLoading(false);
+    try {
+      setLoading(true);
+      await updateQuestion({ questionId, questionText });
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.id === questionId ? { ...q, question_text: questionText } : q,
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handlePublish() {
-    setLoading(true);
-    setStatusMessage("Publishing assessment...");
+    try {
+      setLoading(true);
+      setStatusMessage("Publishing assessment...");
 
-    const response = await publishAssessment({ courseId, assessmentConfigId });
+      const response = await publishAssessment({
+        courseId,
+        assessmentConfigId,
+      });
 
-    if (!response)
-      return setStatusMessage(
-        "Failed to publish assessment. Please try again.",
-      );
-
-    setSessionsCreated(response.sessions_created);
-    setPhase("published");
-    setStatusMessage("");
-    setLoading(false);
+      setSessionsCreated(response.sessions_created);
+      setPhase("published");
+    } finally {
+      setStatusMessage("");
+      setLoading(false);
+    }
   }
 
   return (
@@ -169,6 +181,7 @@ function UpdateMaterial() {
               <span className="material-symbols-outlined animate-spin text-lg">
                 progress_activity
               </span>
+
               {statusMessage}
               <button
                 className="ml-4 font-bold underline"
@@ -187,9 +200,11 @@ function UpdateMaterial() {
               <span className="material-symbols-outlined mb-4 text-5xl text-primary">
                 check_circle
               </span>
+
               <h2 className="mb-2 text-2xl font-bold text-primary">
                 Assessment Published
               </h2>
+
               <p className="text-on-surface-variant">
                 {sessionsCreated} student{sessionsCreated !== 1 ? "s" : ""} can
                 now take this assessment.
@@ -217,6 +232,7 @@ function UpdateMaterial() {
                       <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                         Select Course
                       </label>
+
                       <div className="group relative">
                         <select
                           className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
@@ -229,6 +245,7 @@ function UpdateMaterial() {
                             </option>
                           ))}
                         </select>
+
                         <span
                           className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
                           data-icon="expand_more"
@@ -238,10 +255,12 @@ function UpdateMaterial() {
                         </span>
                       </div>
                     </div>
+
                     <div className="space-y-2">
                       <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                         Assessment Name
                       </label>
+
                       <input
                         className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
                         placeholder="e.g. A1 Intro to Python"
@@ -255,16 +274,19 @@ function UpdateMaterial() {
                           }))
                         }
                       />
+
                       {touched.assessmentName && assessmentNameError && (
                         <p className="ml-1 text-xs font-medium text-error">
                           {assessmentNameError}
                         </p>
                       )}
                     </div>
+
                     <div className="space-y-2">
                       <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                         Number of Questions
                       </label>
+
                       <input
                         className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
                         min={1}
@@ -281,6 +303,7 @@ function UpdateMaterial() {
                           }))
                         }
                       />
+
                       {touched.numQuestions && numQuestionsError && (
                         <p className="ml-1 text-xs font-medium text-error">
                           {numQuestionsError}
@@ -292,6 +315,7 @@ function UpdateMaterial() {
                       <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                         Assessment Time (minutes)
                       </label>
+
                       <input
                         className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
                         min={1}
@@ -308,6 +332,7 @@ function UpdateMaterial() {
                           }))
                         }
                       />
+
                       {touched.assessmentTime && assessmentTimeError && (
                         <p className="ml-1 text-xs font-medium text-error">
                           {assessmentTimeError}
@@ -330,7 +355,9 @@ function UpdateMaterial() {
                         upload_file
                       </span>
                     </div>
+
                     <h3 className="mb-1 text-base font-bold">Assessment PDF</h3>
+
                     <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
                       Upload the source material or a previous assessment to
                       refine your questions.
@@ -353,6 +380,7 @@ function UpdateMaterial() {
                             <p className="truncate text-sm font-semibold">
                               {materialFile.name}
                             </p>
+
                             <p className="text-[9px] text-outline">
                               {(materialFile.size / 1024 / 1024).toFixed(1)} MB
                             </p>
@@ -382,6 +410,7 @@ function UpdateMaterial() {
                             setMaterialFile(e.target.files[0] || null)
                           }
                         />
+
                         <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
                           Browse Files
                         </div>
@@ -399,9 +428,11 @@ function UpdateMaterial() {
                         rule
                       </span>
                     </div>
+
                     <h3 className="mb-1 text-base font-bold">
                       Assessment Rubrics
                     </h3>
+
                     <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
                       Upload evaluation criteria for precise grading.
                     </p>
@@ -414,14 +445,17 @@ function UpdateMaterial() {
                               picture_as_pdf
                             </span>
                           </div>
+
                           <div className="min-w-0 flex-1">
                             <p className="truncate text-sm font-semibold">
                               {rubricFile.name}
                             </p>
+
                             <p className="text-[9px] text-outline">
                               {(rubricFile.size / 1024 / 1024).toFixed(1)} MB
                             </p>
                           </div>
+
                           <button
                             className="text-on-surface-variant transition-colors hover:text-error"
                             onClick={() => setRubricFile(null)}
@@ -432,6 +466,7 @@ function UpdateMaterial() {
                           </button>
                         </div>
                       )}
+
                       <label className="block cursor-pointer">
                         <input
                           className="hidden"
@@ -441,6 +476,7 @@ function UpdateMaterial() {
                             setRubricFile(e.target.files[0] || null)
                           }
                         />
+
                         <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
                           Browse Files
                         </div>
@@ -460,15 +496,18 @@ function UpdateMaterial() {
                         auto_awesome
                       </span>
                     </div>
+
                     <div>
                       <p className="text-sm font-bold text-primary">
                         AI Question Generation
                       </p>
+
                       <p className="text-[11px] text-on-surface-variant">
                         Update questions based on material
                       </p>
                     </div>
                   </div>
+
                   <button
                     className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={!isValid || loading}
@@ -487,6 +526,7 @@ function UpdateMaterial() {
                 <h2 className="text-2xl font-bold text-on-surface">
                   Review Generated Questions ({questions.length})
                 </h2>
+
                 <button
                   className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
                   onClick={handlePublish}
@@ -495,6 +535,7 @@ function UpdateMaterial() {
                   {loading ? "Working..." : "Publish Assessment"}
                 </button>
               </div>
+
               <p className="text-sm text-on-surface-variant">
                 Review the AI-generated questions below. You can edit or delete
                 any question before publishing.
@@ -515,6 +556,7 @@ function UpdateMaterial() {
                           </span>
                         )}
                       </span>
+
                       <div className="flex gap-2">
                         {editingId !== question.id && (
                           <>
@@ -527,6 +569,7 @@ function UpdateMaterial() {
                             >
                               Edit
                             </button>
+
                             <button
                               className="rounded-lg px-3 py-1 text-xs font-bold text-error transition-all hover:bg-error/10"
                               onClick={() => handleDelete(question.id)}
@@ -545,6 +588,7 @@ function UpdateMaterial() {
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
                         />
+
                         <div className="flex gap-2">
                           <button
                             className="rounded-lg bg-primary px-4 py-1.5 text-xs font-bold text-on-primary"
@@ -555,6 +599,7 @@ function UpdateMaterial() {
                           >
                             Save
                           </button>
+
                           <button
                             className="rounded-lg px-4 py-1.5 text-xs font-bold text-on-surface-variant hover:bg-surface-container-high"
                             onClick={() => setEditingId(null)}
@@ -584,6 +629,7 @@ function UpdateMaterial() {
                     All questions have been deleted. Go back to generate new
                     ones.
                   </p>
+
                   <button
                     className="mt-4 rounded-xl bg-primary px-6 py-2 text-sm font-bold text-on-primary"
                     onClick={() => setPhase("setup")}
@@ -603,15 +649,20 @@ function UpdateMaterial() {
                   className="h-12 w-12 rounded-lg object-cover opacity-60 grayscale"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVCGVyyQqfO-19vp2pmD6AID9Ui4jZyVdFBJC4Dd9xIwyi_Wq3zmfIrzALaNCanKTKzb69Zw80EoWXyNplx9aPxwuzrUKam9awbyqcrNcNnR607gF_8jVGD_WYOsOIV3Ykxl4NHG7Tk3vrvrnqBcQZ7wnwI3tZRmk2UYvJtFtsfSxcI5ynho1SQgebXGpy91RN9qpxIAh6BVWjZf3s_99wKYtTr9KAPOWeND0i8Rn0e2imsnCp5pNpUGQw_mXdGzzUlxtInB2-xVVj"
                 />
+
                 <div className="flex-1">
                   <h4 className="text-sm font-bold text-on-surface">
                     Curator's Tip
                   </h4>
+
                   <p className="text-xs leading-relaxed text-on-surface-variant">
                     Ensure clear headings and objectives to improve AI results
                     from OCR-processed documents.
                   </p>
                 </div>
+
+                {/* implement guide modal later */}
+
                 {/* <button className="shrink-0 rounded-lg px-4 py-2 text-xs font-bold text-primary transition-all hover:bg-white">
                   View Guide
                 </button> */}

@@ -100,6 +100,7 @@ async def upload_rubric(
                 "material_category": "rubric",
             },
         )
+        
     except RuntimeError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

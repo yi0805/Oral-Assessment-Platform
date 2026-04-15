@@ -25,15 +25,15 @@ export async function updateQuestion(questionId, questionText) {
   return response.data;
 }
 
+export async function deleteQuestion(questionId) {
+  const response = await api.delete(`/questions/${questionId}`);
+
+  return response.data;
+}
+
 export async function publishAssessment(courseId, assessmentConfigId) {
   const response = await api.post(
     `/courses/${courseId}/assessments/${assessmentConfigId}/release`,
   );
-  return response.data;
-}
-
-export async function deleteQuestion(questionId) {
-  const response = await api.delete(`/questions/${questionId}`);
-
   return response.data;
 }

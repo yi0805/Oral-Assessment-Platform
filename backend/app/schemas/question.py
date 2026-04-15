@@ -1,6 +1,5 @@
 from uuid import UUID
 
-from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 
@@ -27,9 +26,6 @@ class QuestionGenerationRequest(BaseModel):
     total_time_minutes: int
     num_main_questions: int
     max_followups_per_main: int = 3
-    description: str | None = None
-    open_at: datetime | None = None
-    close_at: datetime | None = None
 
 class QuestionGenerationResponse(BaseModel):
     assessment_config: UUID

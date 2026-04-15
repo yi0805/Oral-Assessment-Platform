@@ -46,7 +46,7 @@ async def generate_question(
     if not enrollment:
         raise HTTPException(status_code=403, detail="You are not an instructor in this course.")
 
-    # Validate rubric and assessment 
+    # Validate rubric and material 
     rubric = (
         db.query(Material)
         .filter(
@@ -58,6 +58,19 @@ async def generate_question(
 
     if not rubric:
         raise HTTPException(status_code=404, detail="Rubric not found")
+    
+
+    material = (
+        db.query(Material)
+        .filter(
+            Material.id == payload.material_id,
+            Material.material_category == "material",
+        )
+        .first()
+    )
+
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
 
     published = (
         db.query(AssessmentConfig)
@@ -79,7 +92,6 @@ async def generate_question(
     config = AssessmentConfig(
         course_id=course_id,
         title=payload.assessment_title,
-        description=payload.description,
         material_r_id=payload.material_r_id,
         total_time_minute=payload.total_time_minutes,
         main_question_num=payload.num_main_questions,
@@ -107,7 +119,6 @@ async def generate_question(
             material_id=payload.material_id,
             rubric_id=payload.material_r_id,
             num_main_questions=payload.num_main_questions,
-            course_id=course_id,
             config_id=config.id,
         )
 

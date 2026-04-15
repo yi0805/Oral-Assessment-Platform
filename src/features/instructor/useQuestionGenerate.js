@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
-import { questionGenerate as questionGenerateApi } from "../../services/apiQuestion";
 import toast from "react-hot-toast";
+
+import { questionGenerate as questionGenerateApi } from "../../services/apiQuestion";
 
 export function useQuestionGenerate() {
   const { mutateAsync: questionGenerate, isPending } = useMutation({

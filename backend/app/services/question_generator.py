@@ -85,12 +85,11 @@ Example (do not copy verbatim):
 
 async def generate_pool(
     db: Session,
+    config_id: UUID,
     pool_id: UUID,
-    course_id: UUID,
     material_id: UUID,
-    rubric_id: UUID | None = None,
-    num_main_questions: int = 3,
-    config_id: UUID | None = None,
+    rubric_id: UUID,
+    num_main_questions: int,
 ) -> QuestionPool:
     """
     Generate MAIN questions only for a pool using RAG-grounded LLM prompting.
@@ -110,6 +109,7 @@ async def generate_pool(
         The updated QuestionPool (refreshed from DB).
     """
     pool = db.query(QuestionPool).filter(QuestionPool.id == pool_id).first()
+
     if not pool:
         raise ValueError(f"Question pool {pool_id} not found")
 
@@ -165,7 +165,6 @@ async def generate_pool(
             hits = await rag_search.search(
                 db=db,
                 query_text=query,
-                course_id=course_id,
                 top_k=chunks_per_query,
                 material_id=material_id,
             )
