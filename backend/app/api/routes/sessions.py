@@ -11,6 +11,7 @@ from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.dependencies import require_instructor, require_student
+from app.services._prompt_safety import sanitize_untrusted
 
 from app.models import (
     User,
@@ -67,20 +68,6 @@ def _get_main_question_by_order(
     return questions[idx] if 0 <= idx < len(questions) else None
 
 
-_ROLE_INJECTION_RE = re.compile(
-    r"(?i)(^|\n)\s*(system|assistant|user)\s*:",
-)
-
-
-def _sanitize_untrusted(text: str) -> str:
-    if not text:
-        return ""
-    cleaned = text.replace("```", "").replace("<|im_start|>", "").replace("<|im_end|>", "")
-    cleaned = _ROLE_INJECTION_RE.sub(r"\1", cleaned)
-    cleaned = cleaned.replace("</student_answer>", "").replace("</main_question>", "")
-    return cleaned.strip()
-
-
 async def _generate_ai_followup(
     db: Session,
     session: AssessmentSession,
@@ -99,8 +86,8 @@ async def _generate_ai_followup(
         .first()
     )
 
-    student_answer = _sanitize_untrusted(latest_student_msg.content if latest_student_msg else "")
-    safe_main_question = _sanitize_untrusted(main_question_text or "")
+    student_answer = sanitize_untrusted(latest_student_msg.content if latest_student_msg else "")
+    safe_main_question = sanitize_untrusted(main_question_text or "")
 
     FOLLOWUP_SYSTEM_PROMPT = """
         You are an expert academic assessor conducting an oral exam.
@@ -819,27 +806,28 @@ def complete_session(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    now = datetime.now(timezone.utc)
 
-    if session.user_s_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this session.",
+    updated = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.id == session_id,
+            AssessmentSession.user_s_id == current_user.id,
+            AssessmentSession.status == "in_progress",
         )
+        .update(
+            {"status": "under_review", "completed_at": now},
+            synchronize_session=False,
+        )
+    )
+    db.commit()
 
-    if session.status != "in_progress":
+    if updated == 0:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Session cannot be completed from status '{session.status}'.",
+            detail="Session is not in progress (already completed, doesn't exist, or not yours).",
         )
-
-    session.status = "under_review"
-    session.completed_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(session)
 
     background_tasks.add_task(_run_ai_summary_background, session_id)
 
-    return {"session_id": str(session.id), "status": session.status}
+    return {"session_id": str(session_id), "status": "under_review"}

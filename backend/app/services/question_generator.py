@@ -1,43 +1,22 @@
-"""
-Question generation service — RAG-grounded AI question generation.
-
-Flow:
-  1. Instructor selects materials + rubric and specifies num_main_questions
-  2. RAG search retrieves the most relevant chunks from selected materials
-  3. Chunks + rubric_text are assembled into a structured prompt
-  4. Prompt is sent to the LLM via the AI Gateway (OpenRouter free tier)
-  5. LLM output is parsed into main question objects
-  6. Main questions are saved to the pool in the database
-
-Note: Only MAIN questions are generated here. Follow-up questions are NOT
-pre-generated. They are dynamically generated during the student's assessment
-session based on the student's actual answer to each main question — see
-app/api/routes/sessions.py:_generate_ai_followup().
-
-AI provider: OpenRouter free  (openrouter/free)
-Gateway:      app.services.ai_gateway.chat_complete
-"""
 from __future__ import annotations
 
-import json
 import logging
-import re
 from uuid import UUID
 
 from sqlalchemy.orm import Session
 
 from app.services import rag_search
+from app.services._prompt_safety import (
+    extract_json_array,
+    sanitize_untrusted,
+    truncate_for_prompt,
+)
 from app.services.ai_gateway import chat_complete
 
 
 from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk
 
 logger = logging.getLogger(__name__)
-
-
-# ---------------------------------------------------------------------------
-# Prompt templates
-# ---------------------------------------------------------------------------
 
 _SYSTEM_PROMPT = """\
 You are an expert university educator designing oral assessment questions.
@@ -78,11 +57,6 @@ Example (do not copy verbatim):
 ]
 """
 
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
 async def generate_pool(
     db: Session,
     config_id: UUID,
@@ -91,31 +65,11 @@ async def generate_pool(
     rubric_id: UUID,
     num_main_questions: int,
 ) -> QuestionPool:
-    """
-    Generate MAIN questions only for a pool using RAG-grounded LLM prompting.
-
-    Follow-up questions are NOT generated here. They are dynamically produced
-    during the student's session based on the student's actual answer —
-    see sessions.py:_generate_ai_followup().
-
-    Steps:
-    1. Retrieve relevant material chunks via pgvector RAG search
-    2. Load the rubric (if provided)
-    3. Call the LLM via the AI Gateway
-    4. Parse JSON output into Question ORM objects (main questions only)
-    5. Persist all questions to the database
-
-    Returns:
-        The updated QuestionPool (refreshed from DB).
-    """
     pool = db.query(QuestionPool).filter(QuestionPool.id == pool_id).first()
 
     if not pool:
         raise ValueError(f"Question pool {pool_id} not found")
 
-    # ------------------------------------------------------------------
-    # 1. Get rubric text
-    # ------------------------------------------------------------------
     rubric_text = ""
 
     if rubric_id:
@@ -134,19 +88,6 @@ async def generate_pool(
 
             rubric_text = "\n\n".join(c.chunk_text for c in rubric_chunks)
 
-    # ------------------------------------------------------------------
-    # 2. RAG: retrieve relevant chunks from the selected materials only
-    # ------------------------------------------------------------------
-    # Strategy:
-    #   A) Vector RAG (preferred) — 5 diverse queries scoped to selected
-    #      material_ids.  Returns empty list (not raises) when embeddings are
-    #      zero vectors or Gemini key is absent.
-    #   B) Direct text fallback — if RAG returns nothing, read extracted_text
-    #      from the materials table directly.  This always works because
-    #      extracted_text is stored during the Extract stage, before embedding.
-    #
-    # This ensures questions are grounded in actual uploaded content even when
-    # the vector index is not yet built.
 
     _COVERAGE_QUERIES = [
         "key concepts, definitions, and terminology",
@@ -196,9 +137,6 @@ async def generate_pool(
         f" (RAG error: {rag_error})" if rag_error else "",
     )
 
-    # ------------------------------------------------------------------
-    # 2b. Text fallback — load extracted_text when RAG returned nothing
-    # ------------------------------------------------------------------
     text_fallback_excerpts: list[dict] = []
 
     if not unique_chunks:
@@ -221,12 +159,14 @@ async def generate_pool(
                 pool_id, material_id,
             )
 
-    # ------------------------------------------------------------------
-    # 3. Build the prompt
-    # ------------------------------------------------------------------
-    rubric_section = rubric_text.strip() if rubric_text else "No rubric provided — generate generally applicable questions."
+
+    if rubric_text.strip():
+        rubric_section = truncate_for_prompt(sanitize_untrusted(rubric_text))
+    else:
+        rubric_section = "No rubric provided — generate generally applicable questions."
 
     if unique_chunks:
+        
         # Vector RAG path — semantically ranked excerpts
         chunks_section = "\n\n---\n\n".join(
             f"[Excerpt {i+1} | relevance score {c.score:.2f}]\n{c.chunk_text}"
@@ -235,6 +175,7 @@ async def generate_pool(
         context_source = f"vector RAG ({len(unique_chunks)} chunks)"
 
     elif text_fallback_excerpts:
+
         # Text fallback path — raw extracted text
         chunks_section = "\n\n---\n\n".join(
             f"[Material: {ex['file_name']}]\n{ex['text']}"
@@ -257,9 +198,6 @@ async def generate_pool(
         chunks_section=chunks_section,
     )
 
-    # ------------------------------------------------------------------
-    # 4. Call LLM
-    # ------------------------------------------------------------------
     try:
         raw_response = await chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
@@ -271,12 +209,11 @@ async def generate_pool(
 
     except (RuntimeError, ValueError) as exc:
         logger.error("Question generation LLM call failed: %s", exc)
+
         # Fall back to clearly labelled placeholder questions
         questions_data = _fallback_questions(num_main_questions)
 
-    # ------------------------------------------------------------------
-    # 5. Persist to database
-    # ------------------------------------------------------------------
+
     # Clear existing questions (idempotent retry)
     db.query(Question).filter(Question.question_pool_id == pool_id).delete()
 
@@ -304,9 +241,6 @@ async def generate_pool(
     return pool
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 async def _generate_description(
     questions_data: list[dict],
@@ -347,23 +281,10 @@ def _parse_llm_response(
     raw: str,
     expected_main: int,
 ) -> list[dict]:
-    """
-    Parse the LLM's JSON response into a list of main question dicts.
-    Strips markdown code fences if the model includes them.
-    Falls back to placeholder questions on parse failure.
-    """
-    # Strip markdown code fences
-    cleaned = re.sub(r"```(?:json)?\s*", "", raw).strip().rstrip("```").strip()
-
-    # Find the JSON array even if there is surrounding text
-    match = re.search(r"\[.*\]", cleaned, re.DOTALL)
-    if match:
-        cleaned = match.group(0)
-
     try:
-        data = json.loads(cleaned)
+        data = extract_json_array(raw)
 
-    except json.JSONDecodeError as exc:
+    except ValueError as exc:
         logger.error("LLM response JSON parse failed: %s\nRaw: %.500s", exc, raw)
         return _fallback_questions(expected_main)
 
@@ -391,7 +312,6 @@ def _parse_llm_response(
 
 
 def _fallback_questions(num_main: int) -> list[dict]:
-    """Return clearly-labelled placeholder main questions for dev/fallback use."""
     return [
         {
             "main_question": f"[AI generation failed — main question {i+1}. Check OPENROUTER_API_KEY.]",
