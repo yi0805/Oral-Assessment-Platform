@@ -21,7 +21,7 @@ from app.models import (
 from app.schemas import (
     AssessmentHistoryItemOut, AssessmentHistoryOut,
     PendingReviewOut, TranscriptDetailOut, TranscriptMessageOut, AssessmentTitleOut,
-    StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
+    StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
 )
 
@@ -280,9 +280,9 @@ def list_my_course_assessments(
             detail="You are not enrolled in this course.",
         )
 
-    rows = (
-        db.query(AssessmentSession, AssessmentConfig)
-        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+    configs = (
+        db.query(AssessmentConfig)
+        .join(AssessmentSession, AssessmentSession.assessment_config_id == AssessmentConfig.id)
         .filter(
             AssessmentConfig.course_id == course_id,
             AssessmentSession.user_s_id == current_user.id,
@@ -295,17 +295,14 @@ def list_my_course_assessments(
     items = [
         StudentCourseAssessmentOut(
             assessment_config_id=config.id,
-            session_id=session.id,
-            session_status=session.status,
             title=config.title,
             description=config.description,
             total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
-            release_time=config.release_time,
             due_time=config.due_time,
         )
-        for session, config in rows
+        for config in configs
     ]
 
     return items
@@ -409,15 +406,17 @@ def start_session(
 ):
     # Validate config
     config = db.query(AssessmentConfig).filter(AssessmentConfig.id == assessment_config_id).first()
+
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+
     if config.status != "published":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This assessment is not currently published.",
         )
 
-    # Validate enrollment and timing
+    # Validate enrollment
     enrollment = (
         db.query(CourseEnrollment)
         .filter(
@@ -426,12 +425,14 @@ def start_session(
         )
         .first()
     )
+
     if not enrollment:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not enrolled in the course for this assessment.",
         )
 
+    # Time check
     now = datetime.now(timezone.utc)
 
     if config.release_time and now < config.release_time:
@@ -462,14 +463,11 @@ def start_session(
             detail="No session found for this assessment. It may not have been released yet.",
         )
 
+    # reverse FK
     pool = config.question_pool
 
     # Handle not_started
     if session.status == "not_started":
-        session.status = "in_progress"
-        session.started_at = now
-        db.flush()
-
         first_question = None
         if pool:
             first_question = (
@@ -485,6 +483,10 @@ def start_session(
                 detail="No active main questions found in the approved pool.",
             )
 
+        session.status = "in_progress"
+        session.started_at = now
+        db.flush()
+
         item = SessionQuestionItem(
             session_id=session.id,
             source_question_id=first_question.id,
@@ -492,6 +494,7 @@ def start_session(
             main_group_no=1,
             followup_no=0,
         )
+
         db.add(item)
         db.flush()
 
@@ -502,6 +505,7 @@ def start_session(
             sequence_no=1,
             content=first_question.question_text,
         )
+
         db.add(msg)
         db.commit()
 
@@ -510,12 +514,10 @@ def start_session(
         return SessionStartResponse(
             session_id=session.id,
             assessment_title=config.title,
-            total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
             expires_at=expires_at,
             current_question=StudentNextQuestionOut(
-                id=item.id,
                 question_text=first_question.question_text,
                 question_kind="main",
                 main_group_no=1,
@@ -543,22 +545,19 @@ def start_session(
                 )
                 .first()
             )
+
             if not last_answer:
-                source_q = db.query(Question).filter(Question.id == last_item.source_question_id).first()
-                q_text = source_q.question_text if source_q else ""
-                if last_item.question_kind == "followup":
-                    followup_msg = (
-                        db.query(TranscriptMessage)
-                        .filter(
-                            TranscriptMessage.session_question_item_id == last_item.id,
-                            TranscriptMessage.message_type == "followup_question",
-                        )
-                        .first()
+                question_msg = (
+                    db.query(TranscriptMessage)
+                    .filter(
+                        TranscriptMessage.session_question_item_id == last_item.id,
+                        TranscriptMessage.message_type.in_(["main_question", "followup_question"]),
                     )
-                    if followup_msg:
-                        q_text = followup_msg.content
+                    .first()
+                )
+                q_text = question_msg.content if question_msg else ""
+
                 current_question = StudentNextQuestionOut(
-                    id=last_item.id,
                     question_text=q_text,
                     question_kind=last_item.question_kind,
                     main_group_no=last_item.main_group_no,
@@ -568,13 +567,11 @@ def start_session(
         started_at = getattr(session, "started_at", None) or now
         expires_at = started_at + timedelta(minutes=config.total_time_minute)
 
-        max_main = config.main_question_num or 0
         all_answered = current_question is None and last_item is not None
 
         return SessionStartResponse(
             session_id=session.id,
             assessment_title=config.title,
-            total_time_minute=config.total_time_minute,
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
             expires_at=expires_at,
@@ -603,6 +600,7 @@ async def submit_response(
 ):
     # Validate session
     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
+
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
@@ -615,7 +613,7 @@ async def submit_response(
     if session.status != "in_progress":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Session is not in progress (current status: {session.status}).",
+            detail=f"Session is not in progress.",
         )
 
     config = (
@@ -624,14 +622,15 @@ async def submit_response(
         .first()
     )
 
-    # Record student answer
-    last_msg = (
-        db.query(TranscriptMessage)
-        .filter(TranscriptMessage.session_id == session_id)
-        .order_by(TranscriptMessage.sequence_no.desc())
-        .first()
-    )
-    next_seq = (last_msg.sequence_no + 1) if last_msg else 1
+    # Time check
+    if session.started_at and config and config.total_time_minute:
+        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The time limit for this assessment has expired.",
+            )
 
     last_question_item = (
         db.query(SessionQuestionItem)
@@ -640,13 +639,46 @@ async def submit_response(
         .first()
     )
 
+    if not last_question_item:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Session is in progress but has no question items.",
+        )
+
+    # Reject duplicate answers for the same item
+    existing_answer = (
+        db.query(TranscriptMessage)
+        .filter(
+            TranscriptMessage.session_question_item_id == last_question_item.id,
+            TranscriptMessage.message_type == "student_answer",
+        )
+        .first()
+    )
+
+    if existing_answer:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This question has already been answered.",
+        )
+
+    # Record student answer
+    last_msg = (
+        db.query(TranscriptMessage)
+        .filter(TranscriptMessage.session_id == session_id)
+        .order_by(TranscriptMessage.sequence_no.desc())
+        .first()
+    )
+
+    next_seq = (last_msg.sequence_no + 1) if last_msg else 1
+
     answer_msg = TranscriptMessage(
         session_id=session_id,
-        session_question_item_id=last_question_item.id if last_question_item else None,
+        session_question_item_id=last_question_item.id,
         message_type="student_answer",
         sequence_no=next_seq,
         content=payload.answer_text,
     )
+
     db.add(answer_msg)
     db.flush()
     next_seq += 1
@@ -659,16 +691,12 @@ async def submit_response(
     max_followups = config.follow_up_num if config else 0
     followup_enabled = max_followups > 0
 
-    if not last_question_item:
-        current_main = 1
-        current_followup = 0
-    else:
-        current_main = last_question_item.main_group_no or 1
-        current_followup = (
-            last_question_item.followup_no or 0
-            if last_question_item.question_kind == "followup"
-            else 0
-        )
+    current_main = last_question_item.main_group_no or 1
+    current_followup = (
+        last_question_item.followup_no or 0
+        if last_question_item.question_kind == "followup"
+        else 0
+    )
 
     # Get the current main question text for follow-up context
     main_item = (
@@ -680,11 +708,20 @@ async def submit_response(
         )
         .first()
     )
+
     main_question_text: str | None = None
     if main_item:
-        source_q = db.query(Question).filter(Question.id == main_item.source_question_id).first()
-        if source_q:
-            main_question_text = source_q.question_text
+        main_msg = (
+            db.query(TranscriptMessage)
+            .filter(
+                TranscriptMessage.session_question_item_id == main_item.id,
+                TranscriptMessage.message_type == "main_question",
+            )
+            .first()
+        )
+        
+        if main_msg:
+            main_question_text = main_msg.content
 
     if followup_enabled and current_followup < max_followups:
         followup_text = await _generate_ai_followup(
@@ -696,11 +733,12 @@ async def submit_response(
 
         item = SessionQuestionItem(
             session_id=session_id,
-            source_question_id=main_item.source_question_id if main_item else last_question_item.source_question_id,
+            source_question_id=main_item.source_question_id,
             question_kind="followup",
             main_group_no=current_main,
             followup_no=current_followup + 1,
         )
+
         db.add(item)
         db.flush()
 
@@ -728,6 +766,7 @@ async def submit_response(
                 main_group_no=next_main_no,
                 followup_no=0,
             )
+
             db.add(item)
             db.flush()
 
@@ -738,10 +777,12 @@ async def submit_response(
                 sequence_no=next_seq,
                 content=next_q.question_text,
             )
+
             db.add(main_msg)
 
             next_question_item = item
             next_question_text = next_q.question_text
+
         else:
             logger.info(
                 "Session %s: question pool exhausted at main %d",
@@ -752,20 +793,10 @@ async def submit_response(
         logger.info("Session %s: all %d main questions answered", session_id, max_main)
 
     db.commit()
-    db.refresh(answer_msg)
-    db.refresh(session)
-    if next_question_item:
-        db.refresh(next_question_item)
 
     return StudentResponseResponse(
-        message_saved=StudentSavedMessageOut(
-            sequence_no=answer_msg.sequence_no,
-            message_type=answer_msg.message_type,
-            content=answer_msg.content,
-        ),
         next_question=(
             StudentNextQuestionOut(
-                id=next_question_item.id,
                 question_text=next_question_text or "",
                 question_kind=next_question_item.question_kind,
                 main_group_no=next_question_item.main_group_no,
@@ -773,7 +804,6 @@ async def submit_response(
             )
             if next_question_item else None
         ),
-        session_status=session.status,
     )
 
 

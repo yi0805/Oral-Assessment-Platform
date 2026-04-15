@@ -69,8 +69,6 @@ function StudentPreviousAssessment() {
           ?.assessment ?? "—")
       : "—";
 
-  console.log(history);
-
   return (
     <div className="min-h-screen">
       <main className="px-8 pb-12 pt-24 md:ml-64">

@@ -49,7 +49,6 @@ class SessionInfoOut(BaseModel):
 class SessionStartResponse(BaseModel):
     session_id: UUID
     assessment_title: str
-    total_time_minute: int
     main_question_num: int
     follow_up_num: int
     expires_at: datetime | None = None
@@ -61,35 +60,24 @@ class SessionStartResponse(BaseModel):
 
 class StudentCourseAssessmentOut(BaseModel):
     assessment_config_id: UUID
-    session_id: UUID
-    session_status: str
     title: str
     description: str | None = None
     total_time_minute: int
     main_question_num: int | None = None
     follow_up_num: int | None = None
-    release_time: datetime | None = None
     due_time: datetime | None = None
 
 class StudentNextQuestionOut(BaseModel):
-    id: UUID
     question_text: str
     question_kind: str
     main_group_no: int
     followup_no: int
 
-class StudentSavedMessageOut(BaseModel):
-    sequence_no: int
-    message_type: str
-    content: str
-
 class StudentResponseRequest(BaseModel):
     answer_text: str
 
 class StudentResponseResponse(BaseModel):
-    message_saved: StudentSavedMessageOut
     next_question: StudentNextQuestionOut | None = None
-    session_status: str
 
 
 # Assessment history

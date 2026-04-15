@@ -1,5 +1,4 @@
 function InstructorFeedback({ assessmentResults }) {
-  console.log(assessmentResults);
   return (
     <section>
       <h3 className="mb-6 text-xl font-bold text-on-surface">

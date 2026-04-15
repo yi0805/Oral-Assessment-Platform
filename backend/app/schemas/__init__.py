@@ -14,7 +14,7 @@ from app.schemas.feedback import (
 from app.schemas.assessment import (
     ReleaseResponse, AssessmentConfigInfoOut, AssessmentHistoryItemOut, AssessmentHistoryOut, AssessmentTitleOut,
     SessionFeedbackOut, SessionInfoOut, PendingReviewOut, StudentInfoOut,
-    TranscriptMessageOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentSavedMessageOut, StudentNextQuestionOut,
+    TranscriptMessageOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse
 )
 

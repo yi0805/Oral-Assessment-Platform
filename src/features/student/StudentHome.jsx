@@ -1,13 +1,15 @@
 import { useState } from "react";
 
+import { useCourses } from "../../hooks/useCourses";
+import { useUser } from "../authentication/useUser";
+
 import SearchCouse from "../../ui/SearchCouse";
 import CourseCard from "../../ui/CourseCard";
-import { useCourses } from "../../hooks/useCourses";
 import Spinner from "../../ui/Spinner";
-import { useUser } from "../authentication/useUser";
 
 export default function StudentHome() {
   const [search, setSearch] = useState("");
+
   const { user, isLoading: isUserLoading } = useUser();
   const { courses, isLoading } = useCourses();
 
@@ -32,6 +34,7 @@ export default function StudentHome() {
               <h2 className="headline-font mb-3 text-2xl font-bold text-primary">
                 Welcome back, {user.full_name}!
               </h2>
+
               <p className="max-w-xl leading-relaxed text-on-surface-variant">
                 Manage your academic journey from one central workspace. Here
                 you can browse your active enrollments, view your assessments,
@@ -41,11 +44,13 @@ export default function StudentHome() {
 
             <div className="absolute -bottom-16 -right-16 h-64 w-64 rounded-full bg-primary-container/30 blur-3xl"></div>
           </div>
+
           <div className="flex flex-col justify-center gap-6 rounded-xl bg-surface-container p-8 lg:col-span-4">
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">
                 Search Curriculum
               </label>
+
               <SearchCouse
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}

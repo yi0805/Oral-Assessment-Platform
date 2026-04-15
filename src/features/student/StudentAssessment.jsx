@@ -2,16 +2,18 @@ import { useNavigate, useParams } from "react-router";
 import { useEffect, useRef, useState } from "react";
 
 import { useStartSession } from "./useStartSession";
-import { getErrorMessage } from "../../utils/getErrorMessage";
 import { useCourses } from "../../hooks/useCourses";
-import { toRoman } from "../../utils/toRomanNumber";
-import Loading from "../../ui/Loading";
 import { useSubmitAnswer } from "./useSubmitAnswer";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 
+import Loading from "../../ui/Loading";
+import { toRoman } from "../../utils/toRomanNumber";
+import { getErrorMessage } from "../../utils/getErrorMessage";
+
 export default function StudentAssessment() {
   const navigate = useNavigate();
+
   const { courseId, assessmentConfigId } = useParams();
 
   const [sessionId, setSessionId] = useState(null);
@@ -24,8 +26,10 @@ export default function StudentAssessment() {
   const [typedAnswer, setTypedAnswer] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [error, setError] = useState(null);
+
   const [canComplete, setCanComplete] = useState(false);
 
   const [maxMainQuestions, setMaxMainQuestions] = useState(0);
@@ -39,6 +43,7 @@ export default function StudentAssessment() {
   const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
   const { completeAssessment } = useCompleteAssessment();
+
   const { logout } = useLogout();
 
   useEffect(() => {
@@ -46,11 +51,8 @@ export default function StudentAssessment() {
 
     async function init() {
       try {
-        // console.log(assessmentConfigId);
         const Response = await startSession({ assessmentConfigId });
         if (cancelled) return;
-
-        console.log(Response);
 
         setSessionId(Response.session_id);
         setAssessmentTitle(Response.assessment_title);
@@ -104,7 +106,8 @@ export default function StudentAssessment() {
         await completeAssessment({ sessionId });
         navigate(`/student/${courseId}`);
       } catch (error) {
-        setError(getErrorMessage(error, "Failed to complete assessment."));
+        hasAutoCompleted.current = false;
+        setError(getErrorMessage(error, "Failed to submit assessment."));
         setIsSubmitting(false);
       }
     }
@@ -133,22 +136,21 @@ export default function StudentAssessment() {
   }
 
   async function handleSubmitAnswer() {
-    console.log(course.id);
     if (!typedAnswer.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
 
     try {
       const response = await submitAnswer({ sessionId, answer: typedAnswer });
+
       setTypedAnswer("");
+
       if (response.next_question) {
         setCurrentQuestion(response.next_question);
       } else {
         setCurrentQuestion(null);
         setCanComplete(true);
       }
-
-      console.log(response);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to submit answer."));
     } finally {
@@ -181,9 +183,6 @@ export default function StudentAssessment() {
     (_, index) => index + 1,
   );
 
-  // console.log(courseId, assessmentConfigId);
-  // console.log(expiresAt, timeLeft);
-
   return (
     <div className="font-body selection:bg-primary-container selection:text-on-primary-container">
       <header className="fixed top-0 z-40 flex h-16 w-full items-center justify-between bg-[#f8f9fa] px-8">
@@ -192,15 +191,18 @@ export default function StudentAssessment() {
             WhereRU
           </span>
         </div>
+
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 text-[#586064]">
             <span className="material-symbols-outlined">timer</span>
+
             <span
               className={`font-label text-sm font-medium ${timeLeft != null && timeLeft < 60 ? "text-error" : ""}`}
             >
               {formatTime(timeLeft)}
             </span>
           </div>
+
           <div className="flex items-center gap-4">
             <span className="material-symbols-outlined cursor-pointer rounded-full p-2 text-[#4f6073] transition-colors hover:bg-[#eaeff1]">
               notifications
@@ -451,6 +453,7 @@ export default function StudentAssessment() {
                   disabled={isSubmitting || !typedAnswer.trim()}
                 >
                   {isSubmitting ? "Submitting..." : "Submit Answer"}
+
                   <span className="material-symbols-outlined text-sm">
                     send
                   </span>

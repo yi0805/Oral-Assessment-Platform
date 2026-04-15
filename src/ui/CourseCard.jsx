@@ -24,38 +24,20 @@ function CourseCard({ courseId, courseCode, courseName, index, description }) {
           data-alt="dramatic close-up of a double helix dna structure glowing in cool blue and violet tones with soft bokeh particles in a laboratory setting"
           src={image}
         />
+
         <div className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary shadow-sm backdrop-blur-md">
           {courseCode}
         </div>
       </div>
+
       <div className="flex flex-grow flex-col p-6">
         <h3 className="headline-font mb-2 text-xl font-bold text-on-surface transition-colors group-hover:text-primary">
           {courseName}
         </h3>
+
         <p className="mb-6 flex-grow text-sm leading-relaxed text-on-surface-variant">
           {description}
         </p>
-        {/* <div className="mt-auto flex items-center justify-between border-t border-surface-container pt-6">
-          <button
-            className="group/btn flex items-center gap-1 text-sm font-semibold text-primary"
-            onClick={() =>
-              navigate(`/student/${courseId}`, {
-                state: {
-                  studentName,
-                  courseId,
-                },
-              })
-            }
-          >
-            View Course
-            <span
-              className="material-symbols-outlined text-[18px] transition-transform group-hover/btn:translate-x-1"
-              data-icon="arrow_forward"
-            >
-              arrow_forward
-            </span>
-          </button>
-        </div> */}
       </div>
     </button>
   );
