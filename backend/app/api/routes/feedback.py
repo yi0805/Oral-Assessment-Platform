@@ -6,38 +6,61 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
-from app.models import AssessmentSession, SessionFeedback, User
-from app.schemas  import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate
+from app.models import AssessmentSession, SessionFeedback, User, AISummary
+from app.schemas import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut
 
 router = APIRouter()
 
+
+# Helpers
+
 def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> AssessmentSession:
-    q = db.query(AssessmentSession).filter(
-        AssessmentSession.id == session_id,
-        AssessmentSession.user_s_id == student_id,
+    sess = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.id == session_id,
+            AssessmentSession.user_s_id == student_id,
+        )
+        .first()
     )
 
-    sess = q.first()
     if not sess:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-    
+
     return sess
 
-def _release_one_result(
-    db: Session,
-    session_id: UUID,
-    student_id: UUID,
-):
+
+def _release_one_result(db: Session, session_id: UUID, student_id: UUID):
     sess = _get_session_or_404(db, session_id, student_id)
 
-    feedback = db.query(SessionFeedback).filter(
-        SessionFeedback.session_id == session_id
-    ).first()
+    if sess.status != "under_review":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"This session's results have already been {sess.status}. "
+                "No further action is needed."
+            ),
+        )
+
+    feedback = (
+        db.query(SessionFeedback)
+        .filter(SessionFeedback.session_id == session_id)
+        .first()
+    )
 
     if not feedback:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No feedback found. Submit instructor feedback before releasing.",
+        )
+
+    if feedback.status != "draft":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"This feedback has already been {feedback.status} "
+                "and cannot be published again."
+            ),
         )
 
     if feedback.final_grade is None:
@@ -47,9 +70,10 @@ def _release_one_result(
         )
 
     feedback.status = "published"
-
     sess.status = "released"
 
+
+# Release one result
 
 @router.put(
     "/sessions/{session_id}/{student_id}/release/session",
@@ -62,11 +86,12 @@ def release_result(
     current_user: User = Depends(require_instructor),
 ):
     _release_one_result(db, session_id, student_id)
-
     db.commit()
-    
-    return {"message": f"Results released to student {student_id} for session {session_id}."}
 
+    return {"message": f"Results released to student."}
+
+
+# Release all results
 
 @router.put(
     "/sessions/release/allSessions",
@@ -91,10 +116,11 @@ def release_all_results(
         )
 
     db.commit()
-    return {
-        "message": "All results released successfully"
-    }
 
+    return {"message": "All results released successfully"}
+
+
+# Update grade
 
 @router.put(
     "/sessions/{session_id}/grade",
@@ -102,7 +128,7 @@ def release_all_results(
 )
 def update_grade(
     session_id: UUID,
-    payload: GradeUpdate, 
+    payload: GradeUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
@@ -110,15 +136,14 @@ def update_grade(
         db.query(AssessmentSession)
         .filter(AssessmentSession.id == session_id)
         .first()
-        )
-   
+    )
+
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found.",
         )
 
-   
     feedback = SessionFeedback(
         session_id=session_id,
         user_i_id=current_user.id,
@@ -127,11 +152,13 @@ def update_grade(
     )
 
     db.add(feedback)
-
     db.commit()
     db.refresh(feedback)
 
-    return {"message": f"Grade updated for session {session_id}."}
+    return {"message": f"Grade updated successfully."}
+
+
+# Upsert instructor review
 
 @router.put("/sessions/{session_id}/review")
 def upsert_review(
@@ -140,12 +167,20 @@ def upsert_review(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
     feedback = (
         db.query(SessionFeedback)
         .filter(SessionFeedback.session_id == session_id)
         .first()
     )
-
 
     if not feedback:
         feedback = SessionFeedback(
@@ -160,18 +195,85 @@ def upsert_review(
         feedback.final_grade = payload.final_grade
         feedback.comments = payload.comments
 
-    session = (
-        db.query(AssessmentSession)
-        .filter(AssessmentSession.id == session_id)
-        .first()
-    )
-
     feedback.status = "published"
-
     session.status = "released"
 
     db.commit()
     db.refresh(feedback)
     db.refresh(session)
 
-    return {"message": f"Instructor review saved for session {session_id}."}
+    return {"message": f"Instructor review saved for session."}
+
+
+# Approve AI score
+
+@router.post(
+    "/sessions/{session_id}/ai-summary/approve",
+    summary="Approve AI grade and release to student in one step",
+)
+def accept_ai_and_release(
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    sess = _get_session_or_404(db, session_id)
+
+    if sess.status not in ("under_review"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Cannot accept AI grade for session with status '{sess.status}'. "
+                "Session must be in 'under_review' state."
+            ),
+        )
+
+    # Require an AI summary to exist
+    ai_summary = (
+        db.query(AISummary)
+        .filter(AISummary.session_id == session_id)
+        .first()
+    )
+
+    if not ai_summary:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No AI summary found for this session.",
+        )
+
+    if ai_summary.suggested_grade is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="AI summary did not produce a valid suggested grade.",
+        )
+
+    existing = (
+        db.query(SessionFeedback)
+        .filter(SessionFeedback.session_id == session_id)
+        .first()
+    )
+
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Feedback already exists for this session.",
+        )
+
+    # Use AI suggested grade as the final grade
+    final_grade = ai_summary.suggested_grade
+    comments = ai_summary.summary_text
+
+    feedback = SessionFeedback(
+        session_id=session_id,
+        user_i_id=current_user.id,
+        final_grade=final_grade,
+        comments=comments,
+        status="published",
+    )
+    db.add(feedback)
+
+    sess.status = "released"
+
+    db.commit()
+    db.refresh(feedback)
+
+    return {"message": f"Results released to student."}

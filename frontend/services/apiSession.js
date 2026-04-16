@@ -42,6 +42,13 @@ export async function updateReviewGrade(sessionId, grade) {
   return response.data;
 }
 
+export async function approveAiSummary(sessionId) {
+  const response = await api.post(
+    `/sessions/${sessionId}/ai-summary/approve`,
+  );
+  return response.data;
+}
+
 export async function upsertReview(sessionId, finalGrade, comments) {
   const response = await api.put(`/sessions/${sessionId}/review`, {
     final_grade: finalGrade,

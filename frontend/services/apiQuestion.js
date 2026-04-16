@@ -1,6 +1,6 @@
 import api from "./api";
 
-export async function updateNow(
+export async function questionGenerate(
   courseId,
   materialId,
   rubricId,
@@ -8,7 +8,7 @@ export async function updateNow(
   totalTime,
   numQuestions,
 ) {
-  const response = await api.post(`/courses/${courseId}/update-now`, {
+  const response = await api.post(`/courses/${courseId}/generate-question`, {
     material_id: materialId,
     material_r_id: rubricId,
     assessment_title: assessmentName,
@@ -25,15 +25,15 @@ export async function updateQuestion(questionId, questionText) {
   return response.data;
 }
 
+export async function deleteQuestion(questionId) {
+  const response = await api.delete(`/questions/${questionId}`);
+
+  return response.data;
+}
+
 export async function publishAssessment(courseId, assessmentConfigId) {
   const response = await api.post(
     `/courses/${courseId}/assessments/${assessmentConfigId}/release`,
   );
-  return response.data;
-}
-
-export async function deleteQuestion(questionId) {
-  const response = await api.delete(`/questions/${questionId}`);
-
   return response.data;
 }

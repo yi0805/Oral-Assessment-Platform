@@ -8,6 +8,7 @@ function SearchCouse({ value, onChange }) {
         onChange={onChange}
         type="text"
       />
+
       <span
         className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant transition-colors group-focus-within:text-primary"
         data-icon="search"

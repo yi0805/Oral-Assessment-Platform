@@ -9,23 +9,26 @@ from app.core.dependencies import require_instructor
 from app.services.question_generator import generate_pool
 
 from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material
-from app.schemas import UpdateNowRequest, QuestionUpdate, QuestionOut, UpdateNowResponse
+from app.schemas import QuestionGenerationRequest, QuestionUpdate, QuestionOut, QuestionGenerationResponse
 
 router = APIRouter()
 
+
+# Generate question pool
+
 @router.post(
-    "/courses/{course_id}/update-now",
-    response_model=UpdateNowResponse,
+    "/courses/{course_id}/generate-question",
+    response_model=QuestionGenerationResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Generate question pool from materials",
-
 )
-async def update_now(
+async def generate_question(
     course_id: UUID,
-    payload: UpdateNowRequest,
+    payload: QuestionGenerationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    # Validate course and instructor
     course = db.query(Course).filter(Course.id == course_id).first()
 
     if not course:
@@ -43,13 +46,31 @@ async def update_now(
     if not enrollment:
         raise HTTPException(status_code=403, detail="You are not an instructor in this course.")
 
-    rubric = db.query(Material).filter(
-        Material.id == payload.material_r_id,
-        Material.material_category == "rubric",
-    ).first()
+    # Validate rubric and material 
+    rubric = (
+        db.query(Material)
+        .filter(
+            Material.id == payload.material_r_id,
+            Material.material_category == "rubric",
+        )
+        .first()
+    )
 
     if not rubric:
         raise HTTPException(status_code=404, detail="Rubric not found")
+    
+
+    material = (
+        db.query(Material)
+        .filter(
+            Material.id == payload.material_id,
+            Material.material_category == "course_material",
+        )
+        .first()
+    )
+
+    if not material:
+        raise HTTPException(status_code=404, detail="Material not found")
 
     published = (
         db.query(AssessmentConfig)
@@ -64,16 +85,13 @@ async def update_now(
     if published:
         raise HTTPException(
             status_code=409,
-            detail=(
-                f"A published assessment titled '{payload.assessment_title}' already exists "
-            ),
+            detail=f"A published assessment titled '{payload.assessment_title}' already exists",
         )
-    
 
+    # Create assessment config and question pool
     config = AssessmentConfig(
         course_id=course_id,
         title=payload.assessment_title,
-        description=payload.description,
         material_r_id=payload.material_r_id,
         total_time_minute=payload.total_time_minutes,
         main_question_num=payload.num_main_questions,
@@ -84,16 +102,16 @@ async def update_now(
     db.add(config)
     db.flush()
 
-
     pool = QuestionPool(
         assessment_config_id=config.id,
         material_id=payload.material_id,
         status="draft",
     )
-    
+
     db.add(pool)
     db.flush()
-    
+
+    #  Run AI generation 
     try:
         pool = await generate_pool(
             db=db,
@@ -101,7 +119,6 @@ async def update_now(
             material_id=payload.material_id,
             rubric_id=payload.material_r_id,
             num_main_questions=payload.num_main_questions,
-            course_id=course_id,
             config_id=config.id,
         )
 
@@ -109,17 +126,16 @@ async def update_now(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     
     except RuntimeError as exc:
-
         raise HTTPException(status_code=502, detail=f"AI generation service error: {exc}") from exc
-
 
     try:
         db.commit()
-
+        
     except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to save assessment.") from exc
 
+    #  Return generated questions 
     questions = (
         db.query(Question)
         .filter(Question.question_pool_id == pool.id)
@@ -127,17 +143,18 @@ async def update_now(
         .all()
     )
 
-    return UpdateNowResponse(
+    return QuestionGenerationResponse(
         assessment_config=config.id,
         questions=[QuestionOut.model_validate(q) for q in questions],
     )
 
 
+# Delete question
+
 @router.delete(
     "/questions/{question_id}",
     status_code=status.HTTP_200_OK,
     summary="Delete a question",
-
 )
 def delete_question(
     question_id: UUID,
@@ -145,20 +162,21 @@ def delete_question(
     current_user: User = Depends(require_instructor),
 ):
     question = db.query(Question).filter(Question.id == question_id).first()
-    
+
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
     db.delete(question)
     db.commit()
+
     return {"message": "Question deleted successfully."}
 
 
+# Update question
 
 @router.put(
     "/questions/{question_id}",
     summary="Update a question",
-
 )
 def update_question(
     question_id: UUID,
@@ -167,13 +185,14 @@ def update_question(
     current_user: User = Depends(require_instructor),
 ):
     question = db.query(Question).filter(Question.id == question_id).first()
+
     if not question:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
-
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(question, field, value)
 
     db.commit()
     db.refresh(question)
+
     return {"message": "Question updated successfully."}

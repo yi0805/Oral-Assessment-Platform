@@ -17,8 +17,9 @@ def _parse_list(raw: str) -> list[str]:
 def create_access_token(user_id: str, role: str, email: str) -> str:
     now = datetime.now(timezone.utc)
     expire = now + timedelta(minutes=settings.jwt_expire_minutes)
+    
     payload = {
-        "sub": str(user_id),
+        "id": str(user_id),
         "role": role,
         "email": email,
         "iat": now,

@@ -1,13 +1,3 @@
-"""
-RAG (Retrieval-Augmented Generation) search service.
-Uses pgvector HNSW cosine similarity to find relevant material chunks.
-
-This is the interface between Bess's data layer and Joanne's AI layer:
-  Input: a natural language query + course_id
-  Output: top-k most relevant text chunks ranked by cosine similarity
-
-Used by: question_generator (Phase 3) and ai_summary_service (Phase 5)
-"""
 import logging
 from uuid import UUID
 from dataclasses import dataclass
@@ -20,10 +10,7 @@ from app.services.embedding_service import embed_text
 logger = logging.getLogger(__name__)
 
 # Minimum cosine similarity to consider a result meaningful.
-# Zero-vector embeddings (stored as fallback when Gemini key is absent or
-# embedding fails) produce cosine distance ≈ 1.0 → similarity ≈ 0.0.
-# Any real embedding will score higher than this threshold.
-_MIN_SCORE = 0.05
+_MIN_SCORE = 0.45
 
 
 @dataclass
@@ -37,29 +24,11 @@ class RAGResult:
 async def search(
     db: Session,
     query_text: str,
-    course_id: UUID,
+    material_id: UUID,
     top_k: int = 5,
-    material_id: UUID | None = None,
     material_category: str | None = "course_material",
 ) -> list[RAGResult]:
-    """
-    Search for the most relevant chunks matching a query within a course.
-
-    1. Embed the query text
-    2. Use pgvector's cosine distance operator (<=>) to find nearest chunks
-    3. Filter to only chunks belonging to materials in the specified course
-       (optionally restricted to a specific subset of material_ids)
-    4. Return top_k results ranked by similarity, excluding zero-vector chunks
-       (those stored as a fallback when Gemini embedding was unavailable)
-
-    Args:
-        material_ids: If provided, restricts search to these specific materials.
-                      If None, searches across all ready materials in the course.
-
-    Returns:
-        List of RAGResult sorted by descending similarity score.
-        Returns an empty list (not raises) when no meaningful results are found.
-    """
+    
     # Step 1: Embed the query
     query_embedding = await embed_text(query_text)
 
@@ -86,13 +55,10 @@ async def search(
         )
         .join(Material, MaterialChunk.material_id == Material.id)
         .filter(
-            Material.course_id == course_id,
+            Material.id == material_id,
             MaterialChunk.embedding.isnot(None),
         )
     )
-
-    if material_id:
-        q = q.filter(Material.id == material_id)
 
     if material_category:
         q = q.filter(Material.material_category == material_category)

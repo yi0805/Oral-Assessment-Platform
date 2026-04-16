@@ -1,23 +1,29 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 
+import { useUpdateReview } from "./useUpdateReview";
 import { useMoveBack } from "../../hooks/useMoveBack";
 import { useTranscript } from "./useTranscript";
+import { useApproveAiGrade } from "./useApproveAiGrade";
+
 import Spinner from "../../ui/Spinner";
 import { buildQuestionBlocks } from "../../utils/buildQuestionBlocks";
-import { useUpdateReview } from "./useUpdateReview";
 
-function Transcipt() {
+function Transcript() {
   const { sessionId } = useParams();
   const location = useLocation();
+
+  const moveback = useMoveBack();
   const navigate = useNavigate();
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+
   const [finalGrade, setFinalGrade] = useState("");
   const [comments, setComments] = useState("");
 
-  const moveback = useMoveBack();
   const { transcript, isLoading } = useTranscript(sessionId);
   const { updateReview } = useUpdateReview();
+
+  const { approveAiGrade, isPending: isApproving } = useApproveAiGrade();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -31,7 +37,7 @@ function Transcipt() {
   }, [transcript]);
 
   useEffect(() => {
-    setCurrentIndex(0);
+    setCurrentQuestionIndex(0);
   }, [sessionId]);
 
   if (isLoading) return <Spinner />;
@@ -40,7 +46,7 @@ function Transcipt() {
   const currentReviewIndex = location.state?.currentReviewIndex ?? -1;
 
   const questionBlocks = buildQuestionBlocks(transcript.transcript) || [];
-  const block = questionBlocks[currentIndex];
+  const block = questionBlocks[currentQuestionIndex];
 
   function handlePrevStudent() {
     if (currentReviewIndex <= 0) return;
@@ -70,6 +76,10 @@ function Transcipt() {
     });
   }
 
+  function handleApproveAi() {
+    approveAiGrade({ sessionId });
+  }
+
   function handleSubmitReview() {
     if (finalGrade === "") return;
 
@@ -79,13 +89,6 @@ function Transcipt() {
       comments: comments,
     });
   }
-
-  // console.log(transcript);
-  // console.log(questionBlocks);
-  // console.log(block);
-  console.log(reviews);
-  // console.log(currentReviewIndex);
-  // console.log(location.state?.from || "no location state");
 
   return (
     <div className="font-body">
@@ -102,6 +105,7 @@ function Transcipt() {
               Back to Reviews
             </span>
           </button>
+
           <div className="mb-12">
             <div className="flex items-end justify-between">
               <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
@@ -116,6 +120,7 @@ function Transcipt() {
                 >
                   Previous
                 </button>
+
                 <button
                   className="rounded-xl px-5 py-2 text-sm font-semibold text-on-surface-variant transition-colors hover:bg-surface-container disabled:opacity-40"
                   onClick={handleNextStudent}
@@ -141,9 +146,11 @@ function Transcipt() {
                       src={transcript.student.image || "/WhereRU.png"}
                     />
                   </div>
+
                   <h2 className="font-headline text-xl font-bold text-on-surface">
                     {transcript.student.full_name || "Known Student"}
                   </h2>
+
                   <p className="mb-4 text-sm text-outline">
                     {transcript.assessment.title || "Unknown Assessment"}
                   </p>
@@ -168,12 +175,13 @@ function Transcipt() {
 
                 <div className="flex items-baseline gap-1">
                   <span className="font-headline text-5xl font-extrabold tracking-tighter text-on-primary-container">
-                    {transcript.ai_summary?.suggested_grade || "Unknown grade"}
+                    {transcript.ai_summary?.suggested_grade ?? "Unknown grade"}
                   </span>
                   <span className="text-lg font-bold text-on-primary-container opacity-60">
-                    /10
+                    /100
                   </span>
                 </div>
+
                 <p className="mt-4 text-xs font-medium leading-snug text-on-primary-container">
                   {transcript.ai_summary?.summary_text ||
                     "No AI summary available for this response."}
@@ -186,21 +194,24 @@ function Transcipt() {
                 <div className="flex items-center gap-4">
                   <button
                     className="flex items-center gap-1 text-sm font-bold text-primary hover:text-primary-dim disabled:cursor-not-allowed disabled:opacity-30"
-                    onClick={() => setCurrentIndex((prev) => prev - 1)}
-                    disabled={questionBlocks.length === 0 || currentIndex <= 0}
+                    onClick={() => setCurrentQuestionIndex((prev) => prev - 1)}
+                    disabled={
+                      questionBlocks.length === 0 || currentQuestionIndex <= 0
+                    }
                   >
                     <span className="material-symbols-outlined text-base">
                       chevron_left
                     </span>
                     PREVIOUS
                   </button>
+
                   <span className="h-4 w-[1px] bg-outline-variant/30"></span>
                   <button
                     className="flex items-center gap-1 text-sm font-bold text-primary hover:text-primary-dim disabled:cursor-not-allowed disabled:opacity-30"
-                    onClick={() => setCurrentIndex((prev) => prev + 1)}
+                    onClick={() => setCurrentQuestionIndex((prev) => prev + 1)}
                     disabled={
                       questionBlocks.length === 0 ||
-                      currentIndex >= questionBlocks.length - 1
+                      currentQuestionIndex >= questionBlocks.length - 1
                     }
                   >
                     NEXT
@@ -212,7 +223,7 @@ function Transcipt() {
 
                 {questionBlocks.length > 0 && (
                   <span className="text-[11px] font-bold uppercase tracking-widest text-outline">
-                    Question {currentIndex + 1} of
+                    Question {currentQuestionIndex + 1} of
                     {questionBlocks.length}
                   </span>
                 )}
@@ -230,6 +241,7 @@ function Transcipt() {
                         <h3 className="mb-2 font-headline text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
                           Main Question
                         </h3>
+
                         <p className="font-body text-lg font-medium leading-relaxed text-on-surface">
                           {block.question}
                         </p>
@@ -285,11 +297,13 @@ function Transcipt() {
                 <h3 className="mb-6 font-headline text-xl font-bold text-on-surface">
                   Instructor Review
                 </h3>
+
                 <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
                   <div className="space-y-4 md:col-span-2">
                     <label className="text-xs font-bold uppercase tracking-widest text-outline">
                       Final Assessment Comments
                     </label>
+
                     <textarea
                       className="h-32 w-full rounded-xl border-outline-variant/30 bg-surface-container-low p-4 font-body text-sm placeholder:text-outline/50 focus:border-primary focus:ring-0"
                       value={comments}
@@ -310,22 +324,42 @@ function Transcipt() {
                           type="number"
                           min="0"
                           max="100"
+                          step="0.5"
                           value={finalGrade}
                           onChange={(e) => setFinalGrade(e.target.value)}
                         />
 
                         <span className="text-lg font-bold text-outline">
-                          / 10
+                          / 100
                         </span>
                       </div>
                     </div>
 
                     <div className="space-y-3">
                       <button
-                        className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98]"
+                        className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
                         onClick={handleSubmitReview}
+                        disabled={finalGrade === ""}
                       >
                         Confirm &amp; Submit Grade
+                      </button>
+
+                      <button
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-tertiary/40 bg-tertiary-container/40 py-3 font-headline text-sm font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+                        onClick={handleApproveAi}
+                        disabled={
+                          isApproving ||
+                          !transcript.ai_summary?.suggested_grade ||
+                          !!transcript.session_feedback
+                        }
+                      >
+                        <span
+                          className="material-symbols-outlined text-base"
+                          style={{ fontVariationSettings: '"FILL" 1' }}
+                        >
+                          auto_awesome
+                        </span>
+                        Accept AI Grade
                       </button>
                     </div>
                   </div>
@@ -341,4 +375,4 @@ function Transcipt() {
   );
 }
 
-export default Transcipt;
+export default Transcript;

@@ -22,7 +22,7 @@ def get_current_user(
     if payload is None:
         raise _CREDENTIALS_EXCEPTION
 
-    user_id: str | None = payload.get("sub")
+    user_id: str | None = payload.get("id")
     user: User | None = db.query(User).filter(User.id == user_id).first()
 
     if user is None:

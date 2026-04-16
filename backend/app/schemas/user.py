@@ -1,11 +1,15 @@
 from uuid import UUID
-from pydantic import BaseModel,ConfigDict
+
+from pydantic import BaseModel, ConfigDict
+
 from app.schemas.enums import UserRole
 
 
+# User
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     id: UUID
     email: str
     full_name: str
@@ -13,6 +17,7 @@ class UserResponse(BaseModel):
     role: UserRole
     image: str | None = None
 
+# Auth
 
 class GoogleLoginResponse(BaseModel):
     user: UserResponse

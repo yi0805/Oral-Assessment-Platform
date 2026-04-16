@@ -22,6 +22,7 @@ passlib[bcrypt]==1.7.4
 boto3==1.35.0
 
 # File processing
+pandas==3.0.2
 python-multipart==0.0.12
 pdfplumber==0.11.4
 python-docx==1.1.2

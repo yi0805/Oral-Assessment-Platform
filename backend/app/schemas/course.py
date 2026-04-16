@@ -1,34 +1,41 @@
 from uuid import UUID
+
 from pydantic import BaseModel, ConfigDict
 
+
+# Course
+
+class CourseInfoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    course_code: str
 
 class CourseOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     course_code: str
-    course_name: str 
-    term: str
+    course_name: str
     description: str
 
 class CourseCreate(BaseModel):
-
-    course_code: str 
+    course_code: str
     course_name: str
     description: str
+
+
+#  Instructor dashboard
 
 class InstructorDashboardStudentRow(BaseModel):
     session_id: UUID
     student_id: UUID
     student_name: str
     student_email: str
-    student_upi: str
     student_image: str | None = None
     ai_suggested_score: int | None = None
     ai_summary: str | None = None
     final_grade: int | None = None
     status: str
-
 
 class InstructorDashboardAssessmentOut(BaseModel):
     course_code: str
@@ -40,13 +47,3 @@ class InstructorDashboardAssessmentOut(BaseModel):
     submitted_count: int
     total_students: int
     students: list[InstructorDashboardStudentRow]
-
-
-class CourseInfoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: UUID
-    course_code: str
-    course_name: str
-    term: str
-    description: str

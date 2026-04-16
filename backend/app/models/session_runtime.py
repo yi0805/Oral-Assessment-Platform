@@ -53,13 +53,13 @@ class TranscriptMessage(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
 
-    session_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assessment_sessions.id", ondelete="CASCADE"), nullable=True, comment=" if not None, this is student answer"
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("assessment_sessions.id", ondelete="CASCADE"), nullable=False, 
     )
-    session_question_item_id: Mapped[uuid.UUID | None] = mapped_column(
+    session_question_item_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("session_question_items.id", ondelete="RESTRICT"),
-        nullable=True,
+        nullable=False,
         comment="if not None, this is question",
     )
 

@@ -3,15 +3,21 @@ import { NavLink, useNavigate, useParams } from "react-router";
 
 import { useCourseAssessments } from "./useCourseAssessments";
 import { useCourses } from "../../hooks/useCourses";
-import Spinner from "../../ui/Spinner";
+
 import { formatDeadline } from "../../utils/formatDeadline";
+import Spinner from "../../ui/Spinner";
 
 export default function StudentCourse() {
   const navigate = useNavigate();
+
   const { courseId } = useParams();
+
   const [isOpen, setIsOpen] = useState(false);
+
   const [assessmentConfigId, setAssessmentConfigId] = useState(null);
+
   const { courses, isLoading } = useCourses();
+
   const { assessments, isLoading: isAssessmentsLoading } =
     useCourseAssessments(courseId);
 
@@ -30,8 +36,6 @@ export default function StudentCourse() {
       ? formatDeadline(sortedAssessments[0].due_time)
       : null;
 
-  console.log(assessments);
-  console.log(course);
   return (
     <>
       <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
@@ -43,6 +47,7 @@ export default function StudentCourse() {
             <span className="material-symbols-outlined mb-5 text-sm transition-transform group-hover:-translate-x-1">
               arrow_back
             </span>
+
             <span className="mb-5 font-body uppercase tracking-widest">
               Back to Courses
             </span>
@@ -51,6 +56,7 @@ export default function StudentCourse() {
           <span className="mb-1 block text-xs font-semibold uppercase tracking-widest text-outline">
             {course.course_code ? course.course_code : "Unknown Course Code"}
           </span>
+
           <h1 className="text-4xl font-extrabold tracking-tight text-on-background">
             {course.course_name ? course.course_name : "Unknown Course Name"}
           </h1>
@@ -64,6 +70,7 @@ export default function StudentCourse() {
                   UPCOMING
                 </button>
               </div>
+
               <div className="text-right">
                 <p className="text-sm font-medium text-on-surface-variant">
                   Next Deadline:
@@ -74,6 +81,7 @@ export default function StudentCourse() {
                 </p>
               </div>
             </div>
+
             <div className="grid grid-cols-12 gap-6">
               {sortedAssessments.map((assessment, index) => {
                 if (index === 0) {
@@ -100,42 +108,52 @@ export default function StudentCourse() {
                           >
                             analytics
                           </span>
+
                           <h2 className="mb-2 text-2xl font-bold text-on-surface">
-                            {assessment.title}
+                            {assessment.title || "Title Not Available."}
                           </h2>
+
                           <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
                             {assessment.description ||
-                              "No instructions provided."}
+                              "Description not available."}
                           </p>
                         </div>
+
                         <div className="mt-12 flex items-center justify-between">
                           <div className="flex gap-8">
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
                                 Duration
                               </span>
+
                               <span className="text-sm font-semibold text-on-surface">
                                 {assessment.total_time_minute} mins
                               </span>
                             </div>
+
                             <div className="flex flex-col">
                               <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
                                 Questions
                               </span>
+
                               <span className="text-sm font-semibold text-on-surface">
                                 {assessment.main_question_num} main •{" "}
                                 {assessment.follow_up_num} each
                               </span>
                             </div>
-                            <div className="flex flex-col">
+
+                            {/* Not showing weight for now  */}
+
+                            {/* <div className="flex flex-col">
                               <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
                                 Weight
                               </span>
                               <span className="text-sm font-semibold text-on-surface">
                                 10% Final Grade
                               </span>
-                            </div>
+                            </div> */}
                           </div>
+
                           <button className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-xs font-bold text-on-primary transition-transform group-hover:translate-x-1">
                             START NOW
                             <span className="material-symbols-outlined text-sm">
@@ -170,22 +188,27 @@ export default function StudentCourse() {
                             <span className="material-symbols-outlined text-2xl text-secondary">
                               database
                             </span>
+
                             <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
                               {formatDeadline(assessment.due_time)}
                             </span>
                           </div>
+
                           <h3 className="mb-2 text-lg font-bold text-on-surface">
-                            {assessment.title}
+                            {assessment.title || "Title Not Available."}
                           </h3>
+
                           <p className="text-xs leading-relaxed text-on-surface-variant">
                             {assessment.description ||
-                              "No instructions provided."}
+                              "Description not available."}
                           </p>
                         </div>
+
                         <div className="mt-8">
                           <div className="mb-4 h-1.5 w-full rounded-full bg-surface-container">
                             <div className="h-1.5 w-0 rounded-full bg-primary transition-all duration-1000"></div>
                           </div>
+
                           <div className="flex items-center justify-between text-[10px] font-bold text-outline"></div>
                         </div>
                       </div>
@@ -206,12 +229,15 @@ export default function StudentCourse() {
                       <span className="material-symbols-outlined mb-4 text-primary">
                         menu_book
                       </span>
+
                       <h3 className="mb-1 font-bold text-on-surface">
-                        {assessment.title}
+                        {assessment.title || "Title Not Available."}
                       </h3>
+
                       <p className="mb-6 text-xs text-on-surface-variant">
-                        {assessment.description || "No instructions provided."}
+                        {assessment.description || "Description not available."}
                       </p>
+
                       <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
                         <span className="material-symbols-outlined text-sm">
                           schedule
@@ -264,41 +290,50 @@ export default function StudentCourse() {
                   timer
                 </span>
               </div>
+
               <h2 className="mb-2 text-2xl font-bold text-on-surface">
                 Ready to begin?
               </h2>
+
               <p className="px-4 text-sm text-on-surface-variant">
                 Once you start the assessment, you will only have one attempt to
                 complete it. Please make sure you have a stable internet
                 connection before starting.
               </p>
             </div>
+
             <div className="mb-10 space-y-4">
               <div className="flex items-center gap-4 rounded-xl bg-surface-container-low p-4">
                 <span className="material-symbols-outlined text-primary">
                   check_circle
                 </span>
+
                 <div className="text-left">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-outline">
                     Attempt No.
                   </p>
+
                   <p className="text-sm font-semibold">1 of 1</p>
                 </div>
               </div>
+
               <div className="flex items-center gap-4 rounded-xl bg-surface-container-low p-4">
                 <span className="material-symbols-outlined text-primary">
                   verified_user
                 </span>
+
                 <div className="text-left">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-outline">
                     Integrity Check
                   </p>
+
                   <p className="text-sm font-semibold">
                     Plagiarism detection enabled
                   </p>
                 </div>
               </div>
             </div>
+
             <div className="flex flex-col gap-3">
               <button
                 className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95"
@@ -308,6 +343,7 @@ export default function StudentCourse() {
               >
                 START ASSESSMENT
               </button>
+
               <button
                 className="w-full rounded-xl bg-transparent py-3 text-sm font-semibold text-outline-variant transition-all hover:bg-surface-container"
                 onClick={() => setIsOpen(false)}

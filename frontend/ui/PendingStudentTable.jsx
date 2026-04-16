@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
+
 import { useReleaseResult } from "../features/instructor/useReleaseResult";
 import { useGrading } from "../features/instructor/useGrading.js";
+import { useApproveAiGrade } from "../features/instructor/useApproveAiGrade";
 
 function PendingStudentTable({
   filteredReviews = [],
@@ -10,10 +12,13 @@ function PendingStudentTable({
   isValidGrade,
 }) {
   const navigate = useNavigate();
+
   const [currentPage, setCurrentPage] = useState(1);
 
-  const { releaseResult } = useReleaseResult();
   const { updateGrade } = useGrading();
+  const { releaseResult } = useReleaseResult();
+
+  const { approveAiGrade, isPending: isApproving } = useApproveAiGrade();
 
   const rowsPerPage = 6;
   const totalPages = Math.ceil(filteredReviews.length / rowsPerPage);
@@ -34,6 +39,19 @@ function PendingStudentTable({
     if (currentPage < totalPages) setCurrentPage(currentPage + 1);
   }
 
+  function handleReview(review) {
+    const reviews = filteredReviews.map((item) => ({
+      sessionId: item.sessionId,
+    }));
+    const currentReviewIndex = filteredReviews.findIndex(
+      (item) => item.sessionId === review.sessionId,
+    );
+
+    navigate(`/instructor/transcript/${review.sessionId}`, {
+      state: { reviews, currentReviewIndex },
+    });
+  }
+
   function handleRelease(sessionId, studentId) {
     releaseResult({ sessionId, studentId });
   }
@@ -44,7 +62,6 @@ function PendingStudentTable({
     updateGrade({ sessionId, grade: Number(grade) });
   }
 
-  console.log(filteredReviews);
   return (
     <>
       <div className="overflow-x-auto">
@@ -83,9 +100,11 @@ function PendingStudentTable({
                     <span className="material-symbols-outlined text-3xl opacity-60">
                       fact_check
                     </span>
+
                     <p className="text-sm font-medium">
                       Nothing to review right now
                     </p>
+
                     <p className="text-xs">
                       New submissions will appear here when they are ready for
                       grading.
@@ -116,6 +135,7 @@ function PendingStudentTable({
                         <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
                       </label>
                     </td>
+
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <img
@@ -133,49 +153,79 @@ function PendingStudentTable({
                         </div>
                       </div>
                     </td>
+
                     <td className="px-6 py-5">
                       <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
                         {review.courseCode || "Unknown Course"}
                       </span>
                     </td>
+
                     <td className="px-6 py-5 text-sm font-medium text-on-surface-variant">
                       {review.title || "Unknown Assessment"}
                     </td>
                     <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
-                      {review.suggestedGrade || 0}/10
+                      {review.suggestedGrade || "-"}/100
                     </td>
+
                     <td className="px-6 py-5 text-center">
                       <input
                         className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
-                        type="text"
+                        type="number"
+                        min={0}
+                        max={100}
+                        step={1}
                         value={currentGrade}
-                        onChange={(e) =>
-                          onGradeChange(review.sessionId, e.target.value)
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+
+                          if (val === "" || /^\d+$/.test(val)) {
+                            onGradeChange(review.sessionId, val);
+                          }
+                        }}
                         onBlur={(e) => {
-                          handleGradeChange(review.sessionId, e.target.value);
+                          const raw = e.target.value;
+
+                          if (raw === "") {
+                            handleGradeChange(review.sessionId, "");
+                            return;
+                          }
+
+                          const val = Math.min(
+                            100,
+                            Math.max(0, parseInt(raw, 10) || 0),
+                          );
+
+                          handleGradeChange(review.sessionId, val);
                         }}
                       />
                     </td>
+
                     <td className="px-6 py-5 text-right">
-                      <button
-                        className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
-                        onClick={() => {
-                          navigate(
-                            `/instructor/transcript/${review.sessionId}`,
-                            {
-                              state: {
-                                reviews: filteredReviews,
-                                currentReviewIndex: filteredReviews.findIndex(
-                                  (item) => item.sessionId === review.sessionId,
-                                ),
-                              },
-                            },
-                          );
-                        }}
-                      >
-                        Review
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-tertiary/30 bg-tertiary-container/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
+                          onClick={() =>
+                            approveAiGrade({ sessionId: review.sessionId })
+                          }
+                          disabled={isApproving || !review.suggestedGrade}
+                          title="Accept AI suggested grade and release"
+                        >
+                          <span
+                            className="material-symbols-outlined text-sm"
+                            style={{ fontVariationSettings: '"FILL" 1' }}
+                          >
+                            auto_awesome
+                          </span>
+                          Accept AI
+                        </button>
+
+                        <button
+                          className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
+                          onClick={() => handleReview(review)}
+                        >
+                          Review
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -184,11 +234,13 @@ function PendingStudentTable({
           </tbody>
         </table>
       </div>
+
       {filteredReviews.length > 0 && (
         <div className="flex items-center justify-between border-t border-outline-variant/10 bg-surface-container-low/20 px-6 py-4">
           <span className="text-xs font-medium text-on-surface-variant">
             Page {currentPage} of {totalPages}
           </span>
+
           <nav className="flex items-center gap-1">
             <button
               className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container-high"

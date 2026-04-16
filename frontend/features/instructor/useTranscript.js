@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+
 import { getTranscript } from "../../services/apiSession";
 
 export function useTranscript(sessionId) {

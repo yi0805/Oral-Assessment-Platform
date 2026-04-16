@@ -1,9 +1,11 @@
 import { NavLink } from "react-router";
-import PendingStudentTable from "../../ui/PendingStudentTable";
 import { useState } from "react";
+
 import { usePendingReviews } from "./usePendingReviews";
-import Spinner from "../../ui/Spinner";
 import { useReleaseAllResults } from "./useReleaseAllResults";
+
+import PendingStudentTable from "../../ui/PendingStudentTable";
+import Spinner from "../../ui/Spinner";
 
 function InstructorPendingGrades() {
   const [searchValue, setSearchValue] = useState("");
@@ -17,11 +19,14 @@ function InstructorPendingGrades() {
   const extractedReviews = pendingReviews.map((review) => {
     const sessionId = review.session.id;
     const studentId = review.session.user_s_id;
+
     const email = review.user.email;
     const fullName = review.user.full_name;
     const image = review.user.image;
+
     const courseCode = review.course.course_code;
     const title = review.assessment_config.title;
+
     const suggestedGrade = review.aisummary?.suggested_grade;
     const instructorGrade = review.session_feedback?.final_grade;
 
@@ -55,11 +60,11 @@ function InstructorPendingGrades() {
   }
 
   function isValidGrade(grade) {
-    if (grade == null || grade.trim() === "") return false;
+    if (grade == null || String(grade).trim() === "") return false;
 
     const numericGrade = Number(grade);
     return (
-      !Number.isNaN(numericGrade) && numericGrade >= 0 && numericGrade <= 100
+      Number.isInteger(numericGrade) && numericGrade >= 0 && numericGrade <= 100
     );
   }
 
@@ -99,6 +104,7 @@ function InstructorPendingGrades() {
           Review Submissions
         </h1>
       </div>
+
       <div className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-[0_4px_24px_rgba(43,52,55,0.04)]">
         <div className="flex flex-col justify-between gap-4 bg-surface-container-low/30 p-6 md:flex-row md:items-center">
           <div className="flex items-center gap-4">
@@ -120,12 +126,14 @@ function InstructorPendingGrades() {
               </span>
               Publish All
             </button>
+
             <div className="text-sm font-medium text-on-surface-variant">
               Showing{" "}
               <span className="text-on-surface">{filteredReviews.length}</span>{" "}
               submissions
             </div>
           </div>
+
           <div className="relative w-full md:w-80">
             <span
               className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-sm text-outline-variant"

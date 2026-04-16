@@ -1,17 +1,16 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
-import { upsertReview } from "../../services/apiSession";
+import { approveAiSummary } from "../../services/apiSession";
 
-export function useUpdateReview() {
+export function useApproveAiGrade() {
   const queryClient = useQueryClient();
 
-  const { mutate: updateReview, isPending } = useMutation({
-    mutationFn: ({ sessionId, finalGrade, comments }) =>
-      upsertReview(sessionId, finalGrade, comments),
+  const { mutate: approveAiGrade, isPending } = useMutation({
+    mutationFn: ({ sessionId }) => approveAiSummary(sessionId),
 
     onSuccess: (data) => {
-      toast.success(data?.message || "Review updated successfully.");
+      toast.success(data?.message || "AI grade approved and released.");
 
       queryClient.invalidateQueries({ queryKey: ["transcript"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -22,11 +21,11 @@ export function useUpdateReview() {
       const message =
         error?.response?.data?.detail ||
         error.message ||
-        "Failed to update review.";
+        "Failed to approve AI grade.";
 
       toast.error(message);
     },
   });
 
-  return { updateReview, isPending };
+  return { approveAiGrade, isPending };
 }
