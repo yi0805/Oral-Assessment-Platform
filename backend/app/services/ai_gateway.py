@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # Pin a specific OpenRouter model rather than the "openrouter/free" auto-router. auto-routing swaps providers per-request, which makes prompt tuning impossible.
-OPENROUTER_MODEL = "openrouter/free"
+OPENROUTER_MODEL = "google/gemini-2.5-flash-lite"
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 

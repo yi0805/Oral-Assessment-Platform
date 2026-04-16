@@ -7,7 +7,7 @@ from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
 from app.models import AssessmentSession, SessionFeedback, User, AISummary
-from app.schemas import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut
+from app.schemas import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut, ApproveAllAiReviews
 
 router = APIRouter()
 
@@ -205,20 +205,22 @@ def upsert_review(
     return {"message": f"Instructor review saved for session."}
 
 
-# Approve AI score
+# Approve AI score helpers
 
-@router.post(
-    "/sessions/{session_id}/ai-summary/approve",
-    summary="Approve AI grade and release to student in one step",
-)
-def accept_ai_and_release(
-    session_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_instructor),
-):
-    sess = _get_session_or_404(db, session_id)
+def _approve_one_ai_grade(db: Session, session_id: UUID, instructor_id: UUID):
+    sess = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
 
-    if sess.status not in ("under_review"):
+    if not sess:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found.",
+        )
+
+    if sess.status != "under_review":
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
@@ -227,7 +229,6 @@ def accept_ai_and_release(
             ),
         )
 
-    # Require an AI summary to exist
     ai_summary = (
         db.query(AISummary)
         .filter(AISummary.session_id == session_id)
@@ -258,22 +259,57 @@ def accept_ai_and_release(
             detail="Feedback already exists for this session.",
         )
 
-    # Use AI suggested grade as the final grade
-    final_grade = ai_summary.suggested_grade
-    comments = ai_summary.summary_text
-
     feedback = SessionFeedback(
         session_id=session_id,
-        user_i_id=current_user.id,
-        final_grade=final_grade,
-        comments=comments,
-        status="published",
+        user_i_id=instructor_id,
+        final_grade=ai_summary.suggested_grade,
+        comments=ai_summary.summary_text,
+        status="draft",
     )
     db.add(feedback)
 
-    sess.status = "released"
+
+# Approve single AI score
+
+@router.post(
+    "/sessions/{session_id}/ai-summary/approve",
+    summary="Approve AI grade for a single session",
+)
+def accept_ai_and_release(
+    session_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    _approve_one_ai_grade(db, session_id, current_user.id)
+    db.commit()
+
+    return {"message": "AI grade approved successfully."}
+
+
+# Approve all AI scores
+
+@router.post(
+    "/sessions/ai-summary/approve/all",
+    summary="Batch approve AI grades",
+)
+def approve_all_ai_grades(
+    payload: ApproveAllAiReviews,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    if not payload.assessments:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No sessions provided.",
+        )
+
+    for assessment in payload.assessments:
+        _approve_one_ai_grade(
+            db=db,
+            session_id=assessment.session_id,
+            instructor_id=current_user.id,
+        )
 
     db.commit()
-    db.refresh(feedback)
 
-    return {"message": f"Results released to student."}
+    return {"message": "All AI grades approved successfully."}

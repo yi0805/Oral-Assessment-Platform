@@ -20,3 +20,24 @@ export async function getDashboard(courseId) {
 
   return response.data;
 }
+
+export async function importStudentsCSV(courseId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await api.post(
+    `/courses/${courseId}/students/import-csv`,
+    formData,
+  );
+
+  return response.data;
+}
+
+export async function exportResultsCSV(courseId, assessmentConfigId) {
+  const response = await api.get(
+    `/courses/${courseId}/assessments/${assessmentConfigId}/export-results`,
+    { responseType: "blob" },
+  );
+
+  return response;
+}

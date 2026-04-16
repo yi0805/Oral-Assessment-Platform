@@ -92,20 +92,18 @@ function Sidebar() {
         )}
         {user.role === "instructor" && (
           <NavLink
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
-              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" : "text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
             }
-            to="/instructor/setting"
-        >
-          <span
-            className="material-symbols-outlined text-[20px]"
-            data-icon="settings"
+            to="/instructor/settings"
           >
-            settings
-          </span>
-          <span>Settings</span>
+            <span
+              className="material-symbols-outlined text-[20px]"
+              data-icon="settings"
+            >
+              settings
+            </span>
+            <span>Settings</span>
           </NavLink>
         )}
       </nav>

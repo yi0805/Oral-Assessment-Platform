@@ -82,7 +82,7 @@ function DashboardTable({
               <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
                 Status
               </th>
-              <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
+              <th className="px-8 py-4 text-center text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
                 Actions
               </th>
             </tr>
@@ -182,7 +182,9 @@ function DashboardTable({
                     <td className="px-8 py-5">
                       {isPublished && (
                         <span className="inline-flex min-w-[3rem] items-center justify-center rounded-lg bg-surface-container px-3 py-1.5 text-sm font-bold text-on-surface shadow-sm">
-                          {student.final_grade ?? "-"}
+                          {student.final_grade != null
+                            ? student.final_grade
+                            : "-"}
                         </span>
                       )}
 
@@ -246,21 +248,22 @@ function DashboardTable({
                       )}
                     </td>
 
-                    <td className="px-8 py-5 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-8 py-5 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
                         {isReview && (
                           <button
-                            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-tertiary/30 bg-tertiary-container/40 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-tertiary/30 bg-tertiary-container/40 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
                             onClick={() =>
                               approveAiGrade({ sessionId: student.session_id })
                             }
                             disabled={
-                              isApproving || !student.ai_suggested_score
+                              isApproving ||
+                              student.ai_suggested_score == null
                             }
                             title="Accept AI suggested grade and release"
                           >
                             <span
-                              className="material-symbols-outlined text-sm"
+                              className="material-symbols-outlined text-xs"
                               style={{ fontVariationSettings: '"FILL" 1' }}
                             >
                               auto_awesome
@@ -271,13 +274,13 @@ function DashboardTable({
 
                         {!isInProgress && (
                           <button
-                            className="flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-outline-variant/30 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-surface-container"
+                            className="flex items-center gap-1 whitespace-nowrap rounded-md border border-outline-variant/30 px-2 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-surface-container"
                             onClick={() => handleViewAnswer(student)}
                           >
-                            <span className="material-symbols-outlined text-sm">
+                            <span className="material-symbols-outlined text-xs">
                               visibility
                             </span>
-                            View Answer
+                            View
                           </button>
                         )}
                       </div>

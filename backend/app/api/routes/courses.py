@@ -1,9 +1,12 @@
 from uuid import UUID
 from io import StringIO
 from datetime import datetime
-
+import csv
+from charset_normalizer import from_bytes
 import pandas as pd
+
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -63,15 +66,44 @@ def import_students_csv(
             detail="You are not an instructor of this course.",
         )
 
+    raw_bytes = file.file.read()
+
+    if not raw_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Uploaded file is empty.",
+        )
+
     try:
-        raw = file.file.read().decode("utf-8-sig")
+        result = from_bytes(raw_bytes).best()
+
+        if result is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Unable to detect file encoding. Please save the CSV as UTF-8.",
+            )
+        
+        raw = str(result)
+
+    except HTTPException:
+        raise
+
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Could not read uploaded file: {exc}",
         ) from exc
 
-    df = pd.read_csv(StringIO(raw))
+    try:
+        df = pd.read_csv(StringIO(raw))
+
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not parse CSV: {exc}",
+        ) from exc
+    
+    df.columns = df.columns.str.strip().str.upper()
 
     if "UPI" not in df.columns:
         raise HTTPException(
@@ -218,6 +250,7 @@ def get_instructor_dashboard(
         .outerjoin(AISummary, AISummary.session_id == AssessmentSession.id)
         .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .filter(AssessmentConfig.course_id == course_id)
+        .filter(AssessmentConfig.status == "published")
         .order_by(User.full_name.asc())
         .all()
     )
@@ -225,6 +258,7 @@ def get_instructor_dashboard(
     assessment_configs = (
         db.query(AssessmentConfig)
         .filter(AssessmentConfig.course_id == course_id)
+        .filter(AssessmentConfig.status == "published")
         .order_by(AssessmentConfig.release_time.asc())
         .all()
     )
@@ -324,3 +358,81 @@ def get_instructor_dashboard(
         )
 
     return response
+
+
+# Export published results as CSV
+
+@router.get(
+    "/{course_id}/assessments/{assessment_config_id}/export-results",
+    summary="Export published assessment results as CSV",
+)
+def export_results_csv(
+    course_id: UUID,
+    assessment_config_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found.",
+        )
+
+    owns = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not owns:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an instructor of this course.",
+        )
+
+    assessment_config = (
+        db.query(AssessmentConfig)
+        .filter(
+            AssessmentConfig.id == assessment_config_id,
+            AssessmentConfig.course_id == course_id,
+        )
+        .first()
+    )
+    if not assessment_config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Assessment not found for this course.",
+        )
+
+    rows = (
+        db.query(User.upi, SessionFeedback.comments, SessionFeedback.final_grade)
+        .join(AssessmentSession, AssessmentSession.user_s_id == User.id)
+        .join(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
+        .filter(
+            AssessmentSession.assessment_config_id == assessment_config_id,
+            AssessmentSession.status == "released",
+            SessionFeedback.status == "published",
+        )
+        .order_by(User.upi)
+        .all()
+    )
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["UPI", "Comments", "Final_Grade"])
+
+    for upi, comments, final_grade in rows:
+        writer.writerow([upi, comments or "", final_grade])
+
+    output.seek(0)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=results_{assessment_config.title.replace(' ', '_')}.csv"
+        },
+    )
