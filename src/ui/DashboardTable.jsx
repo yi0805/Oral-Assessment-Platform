@@ -185,7 +185,9 @@ function DashboardTable({
                     <td className="px-8 py-5">
                       {isPublished && (
                         <span className="inline-flex min-w-[3rem] items-center justify-center rounded-lg bg-surface-container px-3 py-1.5 text-sm font-bold text-on-surface shadow-sm">
-                          {student.final_grade ?? "-"}
+                          {student.final_grade != null
+                            ? student.final_grade
+                            : "-"}
                         </span>
                       )}
 

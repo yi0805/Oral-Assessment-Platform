@@ -175,7 +175,9 @@ function Transcript() {
 
                 <div className="flex items-baseline gap-1">
                   <span className="font-headline text-5xl font-extrabold tracking-tighter text-on-primary-container">
-                    {transcript.ai_summary?.suggested_grade ?? "Unknown grade"}
+                    {transcript.ai_summary?.suggested_grade != null
+                      ? transcript.ai_summary.suggested_grade
+                      : "-"}
                   </span>
                   <span className="text-lg font-bold text-on-primary-container opacity-60">
                     /100

@@ -14,6 +14,7 @@ import InstructorDashboard from "./features/instructor/InstructorDashboard";
 import InstructorPendingGrades from "./features/instructor/InstructorPendingGrades";
 import UpdateMaterial from "./features/instructor/UploadMaterial";
 import Transcript from "./features/instructor/Transcript";
+import InstructorSettings from "./features/instructor/InstructorSettings";
 import ProtectedLayout from "./ui/ProtectedRoute";
 
 const queryClient = new QueryClient({
@@ -57,6 +58,10 @@ function App() {
               <Route
                 path="instructor/transcript/:sessionId"
                 element={<Transcript />}
+              />
+              <Route
+                path="instructor/settings"
+                element={<InstructorSettings />}
               />
             </Route>
 
