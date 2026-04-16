@@ -340,34 +340,7 @@ function UpdateMaterial() {
                         )}
                       </div>
                     </div>
-                    {/* <div className="space-y-2">
-                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                        Timer per Main Question + Follow-up (mins)
-                      </label>
-
-                      <input
-                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                        min={1}
-                        max={10}
-                        step={0.5}
-                        placeholder="e.g. 5"
-                        type="number"
-                        value={timePerQ}
-                        onChange={(e) => setTimePerQuestion(e.target.value)}
-                        onBlur={() =>
-                          setTouched((current) => ({
-                            ...current,
-                            assessmentTime: true,
-                          }))
-                        }
-                      />
-
-                      {touched.assessmentTime && assessmentTimeError && (
-                        <p className="ml-1 text-xs font-medium text-error">
-                          {assessmentTimeError}
-                        </p>
-                      )}
-                    </div> */}
+                    
                   </form>
                 </section>
               </div>

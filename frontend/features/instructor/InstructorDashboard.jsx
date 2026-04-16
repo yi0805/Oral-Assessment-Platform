@@ -82,28 +82,7 @@ export default function InstructorDashboard() {
     releaseAllResults({ assessments });
   }
 
-  // // to fill up all the marks that is not filled personally with AI grade
-  // function handleAcceptAllAI() {
-  //   const newGrades = {};
 
-  //   reviewStudents.map((student) => {
-  //     if (student.status !== "published") {
-  //       newGrades[student.session_id] = student.ai_suggested_score;
-  //     }
-  //   });
-
-  //   setGrades((prev) => {
-  //     const updated = { ...prev };
-      
-  //     reviewStudents.forEach((student) => {
-  //       if (!isValidGrade(updated[student.session_id])) {
-  //         updated[student.session_id] = student.ai_suggested_score;
-  //       }
-  //     });
-
-  //     return updated;
-  //   });
-  // }
 
   return (
     <div className="min-h-screen">
