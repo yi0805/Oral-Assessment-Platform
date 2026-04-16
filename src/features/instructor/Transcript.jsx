@@ -339,19 +339,11 @@ function Transcript() {
 
                     <div className="space-y-3">
                       <button
-                        className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
-                        onClick={handleSubmitReview}
-                        disabled={finalGrade === ""}
-                      >
-                        Confirm &amp; Submit Grade
-                      </button>
-
-                      <button
                         className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-tertiary/40 bg-tertiary-container/40 py-3 font-headline text-sm font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                         onClick={handleApproveAi}
                         disabled={
                           isApproving ||
-                          !transcript.ai_summary?.suggested_grade ||
+                          transcript.ai_summary?.suggested_grade == null ||
                           !!transcript.session_feedback
                         }
                       >
@@ -362,6 +354,14 @@ function Transcript() {
                           auto_awesome
                         </span>
                         Accept AI Grade
+                      </button>
+
+                      <button
+                        className="w-full rounded-xl bg-primary py-4 font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                        onClick={handleSubmitReview}
+                        disabled={finalGrade === ""}
+                      >
+                        Confirm &amp; Submit Grade
                       </button>
                     </div>
                   </div>

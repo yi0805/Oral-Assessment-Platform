@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { usePendingReviews } from "./usePendingReviews";
 import { useReleaseAllResults } from "./useReleaseAllResults";
+import { useApproveAllAiGrades } from "./useApproveAllAiGrades";
 
 import PendingStudentTable from "../../ui/PendingStudentTable";
 import Spinner from "../../ui/Spinner";
@@ -13,6 +14,8 @@ function InstructorPendingGrades() {
 
   const { pendingReviews, isLoading } = usePendingReviews();
   const { releaseAllResults } = useReleaseAllResults();
+  const { approveAllAiGrades, isPending: isApprovingAll } =
+    useApproveAllAiGrades();
 
   if (isLoading) return <Spinner />;
 
@@ -74,6 +77,20 @@ function InstructorPendingGrades() {
       isValidGrade(grades[review.sessionId] ?? ""),
     );
 
+  const reviewsWithAiGrade = filteredReviews.filter(
+    (r) => r.suggestedGrade != null,
+  );
+  const canAcceptAllAi = reviewsWithAiGrade.length > 0;
+
+  function handleAcceptAllAi() {
+    if (!canAcceptAllAi) return;
+
+    const assessments = reviewsWithAiGrade.map((review) => ({
+      session_id: review.sessionId,
+    }));
+    approveAllAiGrades({ assessments });
+  }
+
   function handlePublishAll() {
     if (!canPublishAll) return;
 
@@ -125,6 +142,23 @@ function InstructorPendingGrades() {
                 publish
               </span>
               Publish All
+            </button>
+
+            <button
+              className="flex items-center gap-2 rounded-xl border-2 border-tertiary/40 bg-tertiary-container/40 px-6 py-2.5 font-headline text-sm font-semibold text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:opacity-50"
+              onClick={handleAcceptAllAi}
+              disabled={!canAcceptAllAi || isApprovingAll}
+            >
+              <span
+                className="material-symbols-outlined text-lg"
+                style={{
+                  verticalAlign: "middle",
+                  fontVariationSettings: '"FILL" 1',
+                }}
+              >
+                auto_awesome
+              </span>
+              Accept All AI
             </button>
 
             <div className="text-sm font-medium text-on-surface-variant">

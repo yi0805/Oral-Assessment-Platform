@@ -3,7 +3,6 @@ import { useNavigate } from "react-router";
 
 import { useReleaseResult } from "../features/instructor/useReleaseResult";
 import { useGrading } from "../features/instructor/useGrading.js";
-import { useApproveAiGrade } from "../features/instructor/useApproveAiGrade";
 
 function PendingStudentTable({
   filteredReviews = [],
@@ -18,14 +17,14 @@ function PendingStudentTable({
   const { updateGrade } = useGrading();
   const { releaseResult } = useReleaseResult();
 
-  const { approveAiGrade, isPending: isApproving } = useApproveAiGrade();
-
   const rowsPerPage = 6;
   const totalPages = Math.ceil(filteredReviews.length / rowsPerPage);
 
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
   const currentRows = filteredReviews.slice(startIndex, endIndex);
+
+  console.log(filteredReviews);
 
   function goToPage(page) {
     setCurrentPage(page);
@@ -164,7 +163,10 @@ function PendingStudentTable({
                       {review.title || "Unknown Assessment"}
                     </td>
                     <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
-                      {review.suggestedGrade || "-"}/100
+                      {review.suggestedGrade != null
+                        ? review.suggestedGrade
+                        : "-"}
+                      /100
                     </td>
 
                     <td className="px-6 py-5 text-center">
@@ -201,31 +203,12 @@ function PendingStudentTable({
                     </td>
 
                     <td className="px-6 py-5 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-tertiary/30 bg-tertiary-container/40 px-3 py-2 text-xs font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
-                          onClick={() =>
-                            approveAiGrade({ sessionId: review.sessionId })
-                          }
-                          disabled={isApproving || !review.suggestedGrade}
-                          title="Accept AI suggested grade and release"
-                        >
-                          <span
-                            className="material-symbols-outlined text-sm"
-                            style={{ fontVariationSettings: '"FILL" 1' }}
-                          >
-                            auto_awesome
-                          </span>
-                          Accept AI
-                        </button>
-
-                        <button
-                          className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
-                          onClick={() => handleReview(review)}
-                        >
-                          Review
-                        </button>
-                      </div>
+                      <button
+                        className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
+                        onClick={() => handleReview(review)}
+                      >
+                        Review
+                      </button>
                     </td>
                   </tr>
                 );

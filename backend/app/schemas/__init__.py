@@ -8,7 +8,8 @@ from app.schemas.course import (
 )
 
 from app.schemas.feedback import (
-    ReleaseReview, ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut
+    ReleaseReview, ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut,
+    ApproveAiReview, ApproveAllAiReviews
 )
 
 from app.schemas.assessment import (

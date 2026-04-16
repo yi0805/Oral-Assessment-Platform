@@ -30,3 +30,12 @@ class ReleaseReview(BaseModel):
 
 class ReleaseAllReviews(BaseModel):
     assessments: list[ReleaseReview]
+
+
+# Approve AI grade
+
+class ApproveAiReview(BaseModel):
+    session_id: UUID
+
+class ApproveAllAiReviews(BaseModel):
+    assessments: list[ApproveAiReview]
