@@ -22,3 +22,5 @@ from app.schemas.question import (
    QuestionGenerationRequest, QuestionUpdate, QuestionOut, QuestionGenerationResponse
 )
 
+from app.schemas.rubric import (RubricCriteriaIteam, RubricCreate, RubricOut)
+

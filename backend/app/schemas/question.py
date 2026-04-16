@@ -25,7 +25,7 @@ class QuestionGenerationRequest(BaseModel):
     assessment_title: str
     total_time_minutes: int
     num_main_questions: int
-    max_followups_per_main: int = 3
+    max_followups_per_main: int = 1
 
 class QuestionGenerationResponse(BaseModel):
     assessment_config: UUID
