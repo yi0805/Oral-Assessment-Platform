@@ -23,7 +23,7 @@ class Rubric(Base):
     # [{"title": "Part 1", "description": "...", "ratings": 20}, ...]
     criteria_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
-    assessment_config = relationship("AssessmentConfig", back_populates="rubrics", passive_deletes=True)
+    assessment_config = relationship("AssessmentConfig", back_populates="rubric", passive_deletes=True)
 
     def __repr__(self) -> str:
         return f"<Rubric {self.id} [{self.assessment_config_id}]>"

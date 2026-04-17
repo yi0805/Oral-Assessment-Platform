@@ -65,6 +65,7 @@ class AssessmentConfig(Base):
         "AssessmentSession", back_populates="config",  passive_deletes=True,
     )
     question_pool = relationship("QuestionPool", back_populates="assessment_config", passive_deletes=True, uselist=False)
+    rubric = relationship("Rubric", back_populates="assessment_config", passive_deletes=True, uselist=False)
 
     def __repr__(self) -> str:
         return f"<AssessmentConfig {self.title} [{self.status}]>"

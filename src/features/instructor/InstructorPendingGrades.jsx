@@ -1,5 +1,5 @@
 import { NavLink } from "react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { usePendingReviews } from "./usePendingReviews";
 import { useReleaseAllResults } from "./useReleaseAllResults";
@@ -16,6 +16,22 @@ function InstructorPendingGrades() {
   const { releaseAllResults } = useReleaseAllResults();
   const { approveAllAiGrades, isPending: isApprovingAll } =
     useApproveAllAiGrades();
+
+  useEffect(() => {
+    if (!pendingReviews) return;
+
+    setGrades((prev) => {
+      const next = { ...prev };
+      for (const review of pendingReviews) {
+        const sessionId = review.session.id;
+        const grade = review.session_feedback?.final_grade;
+        if (grade != null) {
+          next[sessionId] = String(grade);
+        }
+      }
+      return next;
+    });
+  }, [pendingReviews]);
 
   if (isLoading) return <Spinner />;
 
