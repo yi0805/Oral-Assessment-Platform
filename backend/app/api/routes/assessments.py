@@ -74,9 +74,12 @@ def release_assessment(
     # Publish config and question pool
     question_pool.status = "published"
 
+    # default release and due time if not stated
     now = datetime.now(timezone.utc)
-    config.release_time = now
-    config.due_time = now + timedelta(days=30)
+    if not config.release_time:
+        config.release_time = now
+    if not config.due_time:
+        config.due_time = now + timedelta(days=30)
     config.status = "published"
 
     # Create sessions for all enrolled students

@@ -8,7 +8,7 @@ import { useExportResults } from "./useExportResults";
 
 import Spinner from "../../ui/Spinner";
 
-export default function InstructorSettings() {
+export default function StudentManagement() {
   const [courseId, setCourseId] = useState("");
 
   const [csvFile, setCsvFile] = useState(null);
@@ -73,7 +73,7 @@ export default function InstructorSettings() {
           </NavLink>
 
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
-            Settings
+            Student Management
           </h1>
 
           <p className="mt-2 text-sm text-on-surface-variant">

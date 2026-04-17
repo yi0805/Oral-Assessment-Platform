@@ -12,6 +12,8 @@ export function useQuestionGenerate() {
       assessmentName,
       numQuestions,
       totalTime,
+      releaseTime,
+      dueTime
     }) =>
       questionGenerateApi(
         courseId,
@@ -20,6 +22,8 @@ export function useQuestionGenerate() {
         assessmentName,
         totalTime,
         numQuestions,
+        releaseTime,
+        dueTime
       ),
 
     onSuccess: (data) => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Spinner from "../../ui/Spinner";
 
-function Setting(){
+export default function Setting(){
 
   return (
     <div className="min-h-screen">
@@ -17,5 +17,3 @@ function Setting(){
     </div>
     );
 }
-
-export default Setting;

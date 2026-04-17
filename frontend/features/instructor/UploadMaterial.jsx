@@ -9,11 +9,13 @@ import { useUpdateQuestion } from "./useUpdateQuestion";
 import { usePublishAssessment } from "./usePublishAssessment";
 
 import Spinner from "../../ui/Spinner";
+import DateTimePicker from "../../ui/DateTimePicker";
+// import { nowInTimeZone } from "react-datepicker/dist/dist/date_utils.js";
 
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);
   const [rubricFile, setRubricFile] = useState(null);
-
+  
   const [courseId, setCourseId] = useState("");
 
   const [assessmentConfigId, setAssessmentConfigId] = useState(null);
@@ -21,8 +23,12 @@ function UpdateMaterial() {
 
   const [numQuestions, setNumQuestions] = useState("");
   const [assessmentTime, setAssessmentTime] = useState("");
-  // const [timePerQ, setTimePerQuestion] = useState("");
 
+  const [show, setShow] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [releaseTime, setReleaseTime] = useState(null);
+  const [dueTime, setDueTime] = useState(null);
+  
   const [touched, setTouched] = useState({
     assessmentName: false,
     numQuestions: false,
@@ -108,6 +114,14 @@ function UpdateMaterial() {
         file: rubricFile,
       });
 
+      console.log({
+        releaseTime,
+        dueTime,
+      });
+
+      const release = releaseTime?.toISOString();
+      const due = dueTime?.toISOString();
+      
       setStatusMessage("Generating questions with AI...");
       const updateResponse = await questionGenerate({
         courseId,
@@ -116,6 +130,8 @@ function UpdateMaterial() {
         assessmentName,
         numQuestions,
         totalTime: time,
+        releaseTime: release,
+        dueTime: due, 
       });
 
       setQuestions(updateResponse.questions);
@@ -284,14 +300,13 @@ function UpdateMaterial() {
                         </p>
                       )}
                     </div>
-                    <div className="grid grid-cols-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <div className="space-y-2">
                         <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                           No. of Questions
                         </label>
                         <input
-                          className="rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                          style={{width: "95%"}}
+                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
                           min={1}
                           max={max_q}
                           step={1}
@@ -339,6 +354,20 @@ function UpdateMaterial() {
                           </p>
                         )}
                       </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 ">
+                      <DateTimePicker
+                        label="Release Date"
+                        value={releaseTime}
+                        onChange={setReleaseTime}
+                      />
+
+                      <DateTimePicker
+                        label="Due date"
+                        value={dueTime}
+                        onChange={setDueTime}
+                        minDate={releaseTime}
+                      />
                     </div>
                     
                   </form>

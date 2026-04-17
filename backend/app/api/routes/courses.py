@@ -353,7 +353,6 @@ def get_instructor_dashboard(
                 submitted_count=group["submitted_count"],
                 total_students=total_students,
                 students=student_rows,
-                total_score=total_score,
             )
         )
 

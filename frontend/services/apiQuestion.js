@@ -7,6 +7,8 @@ export async function questionGenerate(
   assessmentName,
   totalTime,
   numQuestions,
+  releaseTime,
+  dueTime,
 ) {
   const response = await api.post(`/courses/${courseId}/generate-question`, {
     material_id: materialId,
@@ -14,6 +16,8 @@ export async function questionGenerate(
     assessment_title: assessmentName,
     total_time_minutes: totalTime,
     num_main_questions: numQuestions,
+    release_time: releaseTime,
+    due_time: dueTime,
   });
   return response.data;
 }
