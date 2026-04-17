@@ -25,6 +25,22 @@ export default function InstructorDashboard() {
     );
   }, [dashboard]);
 
+  useEffect(() => {
+    if (!dashboard.length) return;
+
+    setGrades((prev) => {
+      const next = { ...prev };
+      for (const assessment of dashboard) {
+        for (const student of assessment.students || []) {
+          if (student.final_grade != null) {
+            next[student.session_id] = String(student.final_grade);
+          }
+        }
+      }
+      return next;
+    });
+  }, [dashboard]);
+
   if (isLoading) return <Spinner />;
 
   const assessment = dashboard.find(
