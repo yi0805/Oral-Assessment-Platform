@@ -109,7 +109,7 @@ async def generate_summary(db: Session, session_id: UUID) -> AISummary:
         .first()
     )
 
-    if config and config.material_r_id:
+    if config and config.rubric_id:
         rubric = db.query(Rubric).filter(
             Rubric.assessment_config_id == config.id,
         ).first()

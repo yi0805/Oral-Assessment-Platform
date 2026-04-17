@@ -10,7 +10,7 @@ from app.core.dependencies import require_instructor
 
 from app.services import s3_client, material_pipeline
 from app.models import Course, CourseEnrollment, Material, User, Rubric, AssessmentConfig
-from app.schemas import RubricCriteriaIteam, RubricCreate, RubricOut
+from app.schemas import RubricCreate, RubricOut
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -145,13 +145,12 @@ async def upload_rubric(
 # Create rubric via form (criteria, rating, points)
 
 @router.post(
-    "/courses/{course_id}/assessments/{assessment_config_id}/rubric",
+    "/courses/{course_id}/rubric",
     response_model=RubricOut,
     status_code=status.HTTP_201_CREATED,
     summary="Create a grading rubric for an assessment",
 )
 def create_rubric(
-    assessment_config_id: UUID,
     course_id: UUID,
     payload: RubricCreate,
     db: Session = Depends(get_db),
@@ -175,13 +174,8 @@ def create_rubric(
             detail="You are not an instructor in this course.",
         )
     
-    assessment_config = db.query(AssessmentConfig).filter(
-        AssessmentConfig.id == assessment_config_id,
-        AssessmentConfig.course_id == course_id
-    ).first()
-    if not assessment_config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-    
+    # rubric_id = uuid4()
+
     # Check total points
     submitted_total = sum(item.max_points for item in payload.criteria_data)
     if submitted_total != payload.total_points:
@@ -191,7 +185,8 @@ def create_rubric(
         )
 
     rubric = Rubric(
-        assessment_config_id=assessment_config_id,
+        # id=rubric_id
+        course_id=course_id,
         total_points=payload.total_points,
         criteria_data=[item.model_dump() for item in payload.criteria_data]
     )
@@ -210,12 +205,11 @@ def create_rubric(
 
 # Retrieve rubric
 @router.get(
-    "/courses/{course_id}/assessments/{assessment_config_id}/rubric",
+    "/assessments/{assessment_config_id}/rubric",
     response_model=RubricOut,
     summary="Get rubric details",
 )
 def get_rubric(
-    course_id: UUID,
     assessment_config_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
@@ -226,7 +220,6 @@ def get_rubric(
             .join(AssessmentConfig)
             .filter(
                 Rubric.assessment_config_id == assessment_config_id,
-                AssessmentConfig.course_id == course_id
             )
             .first()
         )
@@ -238,12 +231,11 @@ def get_rubric(
 
 # Update rubric
 @router.put(
-    "/courses/{course_id}/assessments/{assessment_config_id}/rubric",
+    "/assessments/{assessment_config_id}/rubric",
     response_model=RubricOut,
     summary="Update a rubric",
 )
 def update_rubric(
-    course_id: UUID,
     assessment_config_id: UUID,
     payload: RubricCreate,
     db: Session = Depends(get_db),
@@ -255,7 +247,6 @@ def update_rubric(
             .join(AssessmentConfig)
             .filter(
                 Rubric.assessment_config_id == assessment_config_id,
-                AssessmentConfig.course_id == course_id
             )
             .first()
         )

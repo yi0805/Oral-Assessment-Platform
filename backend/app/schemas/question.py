@@ -21,7 +21,7 @@ class QuestionUpdate(BaseModel):
 
 class QuestionGenerationRequest(BaseModel):
     material_id: UUID
-    material_r_id: UUID
+    rubric_id: UUID
     assessment_title: str
     total_time_minutes: int
     num_main_questions: int

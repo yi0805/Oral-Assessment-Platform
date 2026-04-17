@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useUploadMaterial } from "./useUploadMaterial";
-import { useUploadRubric } from "./useLoadRubric";
+import { useCreateRubric } from "./useCreateRubric";
 import { useQuestionGenerate } from "./useQuestionGenerate";
 import { useDeleteQuestion } from "./useDeleteQuestion";
 import { useUpdateQuestion } from "./useUpdateQuestion";
@@ -12,7 +12,6 @@ import Spinner from "../../ui/Spinner";
 
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);
-  const [rubricFile, setRubricFile] = useState(null);
 
   const [courseId, setCourseId] = useState("");
 
@@ -39,10 +38,34 @@ function UpdateMaterial() {
 
   const [sessionsCreated, setSessionsCreated] = useState(0);
 
+  const [rubricRows, setRubricRows] = useState([
+    { title: "", description: "", max_points: 0 }
+  ]);
+  const totalPoints = rubricRows.reduce(
+    (sum, row) => sum + (Number(row.max_points) || 0), 0
+  );
+
+  const handleAddRow = () => {
+  setRubricRows([...rubricRows, { title: "", description: "", max_points: 0 }]);
+};
+
+  const handleRemoveRow = (index) => {
+    if (rubricRows.length > 1) {
+      setRubricRows(rubricRows.filter((_, i) => i !== index));
+    }
+  };
+
+  const handleRowChange = (index, field, value) => {
+    const updatedRows = rubricRows.map((row, i) => 
+      i === index ? { ...row, [field]: value } : row
+    );
+    setRubricRows(updatedRows);
+  };
+
   const { courses, isLoading } = useCourses();
 
   const { uploadMaterial } = useUploadMaterial();
-  const { uploadRubric } = useUploadRubric();
+  const { createRubric } = useCreateRubric();
 
   const { questionGenerate } = useQuestionGenerate();
 
@@ -82,12 +105,14 @@ function UpdateMaterial() {
           ? "Must be between 5 and 90."
           : "";
 
+  const isRubricValid = 
+    rubricRows.every(r => r.title && r.max_points > 0);
+
   const isValid =
     !numQuestionsError &&
     !assessmentTimeError &&
     !assessmentNameError &&
-    materialFile &&
-    rubricFile;
+    materialFile;
 
   async function handleSubmit() {
     try {
@@ -99,11 +124,20 @@ function UpdateMaterial() {
         file: materialFile,
       });
 
-      setStatusMessage("Uploading rubric...");
-      const RubricId = await uploadRubric({
+      setStatusMessage("Creating rubric...");
+      const rubricPayload = {
+        total_points: totalPoints,
+        criteria_data: rubricRows.map(row => ({
+          title: row.title,
+          description: row.description,
+          max_points: Number(row.max_points)
+        }))
+      };
+      const rubricResponse = await createRubric({
         courseId,
-        file: rubricFile,
+        rubricPayload
       });
+      const RubricId = rubricResponse.id;
 
       setStatusMessage("Generating questions with AI...");
       const updateResponse = await questionGenerate({
@@ -643,30 +677,83 @@ function UpdateMaterial() {
 
           <div className="mt-6 grid grid-cols-12 gap-6">
             <div className="col-span-12">
-              <div className="flex h-full items-center gap-6 rounded-xl bg-surface-container p-6">
-                <img
-                  alt="AI Assistant Placeholder"
-                  className="h-12 w-12 rounded-lg object-cover opacity-60 grayscale"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVCGVyyQqfO-19vp2pmD6AID9Ui4jZyVdFBJC4Dd9xIwyi_Wq3zmfIrzALaNCanKTKzb69Zw80EoWXyNplx9aPxwuzrUKam9awbyqcrNcNnR607gF_8jVGD_WYOsOIV3Ykxl4NHG7Tk3vrvrnqBcQZ7wnwI3tZRmk2UYvJtFtsfSxcI5ynho1SQgebXGpy91RN9qpxIAh6BVWjZf3s_99wKYtTr9KAPOWeND0i8Rn0e2imsnCp5pNpUGQw_mXdGzzUlxtInB2-xVVj"
-                />
-
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-on-surface">
-                    Curator's Tip
-                  </h4>
-
-                  <p className="text-xs leading-relaxed text-on-surface-variant">
-                    Ensure clear headings and objectives to improve AI results
-                    from OCR-processed documents.
-                  </p>
+              <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="flex items-center gap-2 text-xl font-bold">
+                    <span className="material-symbols-outlined text-secondary">
+                      assignment
+                    </span>
+                    Grading Rubric
+                  </h2>
+                  
+                  {/* show total points */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-on-surface-variant">
+                      Total Points: <span className="font-bold text-primary">{totalPoints}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddRow}
+                      className="flex items-center gap-1 rounded-lg bg-secondary/10 px-4 py-2 text-sm font-bold text-secondary transition-all hover:bg-secondary/20"
+                    >
+                      <span className="material-symbols-outlined text-sm">add</span>
+                      Add Criterion
+                    </button>
+                  </div>
                 </div>
 
-                {/* implement guide modal later */}
-
-                {/* <button className="shrink-0 rounded-lg px-4 py-2 text-xs font-bold text-primary transition-all hover:bg-white">
-                  View Guide
-                </button> */}
-              </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-xs font-bold uppercase tracking-wider text-outline">
+                        <th className="pb-4 pr-4">Criterion Title</th>
+                        <th className="pb-4 pr-4">Description</th>
+                        <th className="w-24 pb-4 pr-4 text-center">Points</th>
+                        <th className="w-12 pb-4"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-outline-variant/10">
+                      {rubricRows.map((row, index) => (
+                        <tr key={index} className="group">
+                          <td className="py-4 pr-4 align-top w-1/4">
+                            <input
+                              className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
+                              placeholder="e.g. Accuracy"
+                              value={row.title}
+                              onChange={(e) => handleRowChange(index, "title", e.target.value)}
+                            />
+                          </td>
+                          <td className="py-4 pr-4 align-top">
+                            <textarea
+                              className="min-h-[44px] w-full resize-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
+                              placeholder="Describe what a perfect score looks like..."
+                              rows={1}
+                              value={row.description}
+                              onChange={(e) => handleRowChange(index, "description", e.target.value)}
+                            />
+                          </td>
+                          <td className="py-4 pr-4 align-top">
+                            <input
+                              className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-center text-sm font-bold transition-all focus:ring-2 focus:ring-secondary/20"
+                              type="number"
+                              value={row.max_points}
+                              onChange={(e) => handleRowChange(index, "max_points", e.target.value)}
+                            />
+                          </td>
+                          <td className="py-4 align-top text-right">
+                            <button
+                              onClick={() => handleRemoveRow(index)}
+                              className="mt-2 text-outline transition-colors hover:text-error group-hover:opacity-100 md:opacity-0"
+                            >
+                              <span className="material-symbols-outlined text-lg">delete</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </div>
           </div>
         </div>
