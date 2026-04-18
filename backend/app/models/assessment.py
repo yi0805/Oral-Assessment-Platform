@@ -26,9 +26,9 @@ class AssessmentConfig(Base):
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    material_r_id: Mapped[uuid.UUID] = mapped_column(
+    rubric_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("materials.id", ondelete="RESTRICT"),
+        ForeignKey("rubrics.id", ondelete="RESTRICT"),
         nullable=False,
     )
 
@@ -65,7 +65,6 @@ class AssessmentConfig(Base):
         "AssessmentSession", back_populates="config",  passive_deletes=True,
     )
     question_pool = relationship("QuestionPool", back_populates="assessment_config", passive_deletes=True, uselist=False)
-    rubric = relationship("Rubric", back_populates="assessment_config", passive_deletes=True, uselist=False)
 
     def __repr__(self) -> str:
         return f"<AssessmentConfig {self.title} [{self.status}]>"

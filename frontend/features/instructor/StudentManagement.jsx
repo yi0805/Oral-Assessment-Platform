@@ -98,7 +98,7 @@ export default function StudentManagement() {
               Course
             </label>
 
-            <div className="group relative max-w-md">
+            <div className="group relative max-w-lg">
               <select
                 className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
                 value={courseId}

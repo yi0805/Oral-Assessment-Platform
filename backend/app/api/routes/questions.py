@@ -8,7 +8,7 @@ from app.core.database import get_db
 from app.core.dependencies import require_instructor
 from app.services.question_generator import generate_pool
 
-from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material
+from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material, Rubric
 from app.schemas import QuestionGenerationRequest, QuestionUpdate, QuestionOut, QuestionGenerationResponse
 
 router = APIRouter()
@@ -20,7 +20,7 @@ router = APIRouter()
     "/courses/{course_id}/generate-question",
     response_model=QuestionGenerationResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Generate question pool from materials",
+    summary="Generate question pool from material and rubric",
 )
 async def generate_question(
     course_id: UUID,
@@ -48,10 +48,9 @@ async def generate_question(
 
     # Validate rubric and material 
     rubric = (
-        db.query(Material)
+        db.query(Rubric)
         .filter(
-            Material.id == payload.material_r_id,
-            Material.material_category == "rubric",
+            Rubric.id == payload.rubric_id,
         )
         .first()
     )
@@ -92,7 +91,7 @@ async def generate_question(
     config = AssessmentConfig(
         course_id=course_id,
         title=payload.assessment_title,
-        material_r_id=payload.material_r_id,
+        rubric_id=payload.rubric_id,
         total_time_minute=payload.total_time_minutes,
         main_question_num=payload.num_main_questions,
         follow_up_num=payload.max_followups_per_main,
@@ -119,7 +118,7 @@ async def generate_question(
             db=db,
             pool_id=pool.id,
             material_id=payload.material_id,
-            rubric_id=payload.material_r_id,
+            rubric_id=payload.rubric_id,
             num_main_questions=payload.num_main_questions,
             config_id=config.id,
         )
