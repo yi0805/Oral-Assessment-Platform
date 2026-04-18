@@ -10,7 +10,6 @@ import { usePublishAssessment } from "./usePublishAssessment";
 
 import Spinner from "../../ui/Spinner";
 import DateTimePicker from "../../ui/DateTimePicker";
-// import { nowInTimeZone } from "react-datepicker/dist/dist/date_utils.js";
 
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);

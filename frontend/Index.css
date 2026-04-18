@@ -103,92 +103,89 @@ h3 {
 }
 
 /* overwrite the calender UI design */
-/* =========================
-   BASE CALENDAR CONTAINER
-========================= */
 .react-datepicker {
-  background-color: #1f2937 !important;
-  border: none !important;
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
   border-radius: 16px !important;
   overflow: hidden !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
   font-family: inherit;
 }
 
-/* =========================
-   HEADERS (MONTH + TIME)
-========================= */
-.react-datepicker__header,
-.react-datepicker-time__header {
-  background-color: #111827 !important;
-  border-bottom: none !important;
+/* Month */
+.react-datepicker__header
+ {
+  background-color: #f9fafb !important;
+  border-bottom: 1px solid #e5e7eb !important;
 
   min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
 
-  color: white !important;
+  color: #111827 !important;
   font-weight: 600;
   margin: 0;
 }
 
-/* Month title */
+.react-datepicker__navigation {
+  padding: 8px 2px !important;
+}
+
 .react-datepicker__current-month {
-  color: white !important;
+  color: #111827 !important;
 }
 
-/* =========================
-   DAY LABELS
-========================= */
 .react-datepicker__day-name {
-  color: #9ca3af !important;
+  color: #6b7280 !important;
 }
 
-/* Normal day */
 .react-datepicker__day {
-  color: white !important;
+  color: #111827 !important;
   border-radius: 10px;
 }
 
-/* Hover */
 .react-datepicker__day:hover {
-  background-color: #374151 !important;
+  background-color: #f3f4f6 !important;
 }
 
-/* Selected day */
 .react-datepicker__day--selected {
   background-color: #2563eb !important;
-  color: white !important;
+  color: #ffffff !important;
   border-radius: 10px;
 }
 
-/* Today */
 .react-datepicker__day--today {
-  border: 1px solid #60a5fa !important;
+  border: 1px solid #93c5fd !important;
 }
 
-/* =========================
-   TIME PANEL
-========================= */
+.react-datepicker__day--outside-month {
+  color: #d1d5db !important;
+}
+
+/* time */
+.react-datepicker-time__header{
+  padding: 0px 5px !important;
+}
+
 .react-datepicker__time-container {
-  background-color: #1f2937 !important;
-  border-left: 1px solid #374151 !important;
+  background-color: #ffffff !important;
+  border-left: 1px solid #e5e7eb !important;
 }
 
-/* Time items */
 .react-datepicker__time-list-item {
-  color: white !important;
+  color: #111827 !important;
 }
 
-/* Selected time */
+.react-datepicker__time-list-item:hover {
+  background-color: #f3f4f6 !important;
+}
+
 .react-datepicker__time-list-item--selected {
   background-color: #2563eb !important;
+  color: #ffffff !important;
 }
 
-/* =========================
-   EXTRA SAFETY
-========================= */
 .react-datepicker-popper {
   z-index: 9999;
 }
