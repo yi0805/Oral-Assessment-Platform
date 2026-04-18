@@ -12,7 +12,6 @@ from app.models import Material, MaterialChunk
 from app.services import s3_client
 from app.services.embedding_service import embed_batch
 
-from app.utils.audio_transcriber import is_audio_extension, transcribe_audio_from_s3
 from app.utils.pdf_extractor import extract_text_from_bytes
 from app.utils.text_chunker import chunk_text
 
@@ -120,30 +119,6 @@ def _stage_extract(material_id: UUID) -> str | None:
             logger.error("Material %s not found during extraction", material_id)
             return None
 
-        file_type = _file_type_from_filename(material.filename)
-
-        # Audio files are transcribed directly from S3 (no local download needed)
-        if is_audio_extension(file_type):
-            try:
-                result = transcribe_audio_from_s3(material.storage_key, file_type)
-                extracted_text = result.text
-
-            except Exception as exc:
-                logger.error(
-                    "Material %s: audio transcription error (%s): %s: %s",
-                    material_id, file_type, type(exc).__name__, exc,
-                )
-                return None
-
-            if not extracted_text or not extracted_text.strip():
-                logger.error("Material %s: transcription returned empty text", material_id)
-                return None
-
-            logger.info(
-                "Material %s: audio transcribed (%d chars)", material_id, len(extracted_text),
-            )
-            return extracted_text
-
         try:
             file_bytes = s3_client.download_file(material.storage_key)
 
@@ -157,6 +132,8 @@ def _stage_extract(material_id: UUID) -> str | None:
         except Exception as exc:
             logger.error("Material %s: storage download error: %s", material_id, exc)
             return None
+
+        file_type = _file_type_from_filename(material.filename)
 
         try:
             if file_type == "pdf":

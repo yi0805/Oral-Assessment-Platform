@@ -19,15 +19,6 @@ MIME_MAP = {
     "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "txt": "text/plain",
-    # Audio (transcribed via AWS Transcribe)
-    "mp3": "audio/mpeg",
-    "mp4": "audio/mp4",
-    "m4a": "audio/mp4",
-    "wav": "audio/wav",
-    "flac": "audio/flac",
-    "ogg": "audio/ogg",
-    "webm": "audio/webm",
-    "amr": "audio/amr",
 }
 
 
