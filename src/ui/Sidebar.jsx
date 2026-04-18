@@ -19,7 +19,7 @@ function Sidebar() {
           {user.role === "instructor" ? (
             <div>
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
-                Curator Portal
+                Instructor Portal
               </h2>
               <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                 Academic Management
@@ -28,7 +28,7 @@ function Sidebar() {
           ) : (
             <div>
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
-                Portal
+                Student Portal
               </h2>
               <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Academic Engagement
@@ -97,7 +97,7 @@ function Sidebar() {
             >
               settings
             </span>
-            <span>Settings</span>
+            <span>Student Management</span>
           </NavLink>
         )}
       </nav>

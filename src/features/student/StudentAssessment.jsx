@@ -498,7 +498,7 @@ export default function StudentAssessment() {
                 <span className="material-symbols-outlined text-sm">info</span>
 
                 <span className="text-xs font-bold uppercase tracking-wider">
-                  Curator's Tip
+                  Instructor's Tip
                 </span>
               </div>
 

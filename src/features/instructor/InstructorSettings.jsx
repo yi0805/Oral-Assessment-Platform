@@ -73,7 +73,7 @@ export default function InstructorSettings() {
           </NavLink>
 
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
-            Settings
+            Student Management
           </h1>
 
           <p className="mt-2 text-sm text-on-surface-variant">
@@ -98,7 +98,7 @@ export default function InstructorSettings() {
               Course
             </label>
 
-            <div className="group relative max-w-md">
+            <div className="group relative max-w-lg">
               <select
                 className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
                 value={courseId}
