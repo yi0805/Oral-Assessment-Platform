@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { createRubric as createRubricApi } from "../../services/apiRubrics";
 
 export function useCreateRubric() {
-  const { mutateAsync: cretaeRubric, isPending } = useMutation({
+  const { mutateAsync: createRubric, isPending } = useMutation({
     mutationFn: ({ courseId, rubricPayload }) => createRubricApi(courseId, rubricPayload),
 
     onSuccess: (data) => {

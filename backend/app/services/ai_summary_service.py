@@ -111,7 +111,7 @@ async def generate_summary(db: Session, session_id: UUID) -> AISummary:
 
     if config and config.rubric_id:
         rubric = db.query(Rubric).filter(
-            Rubric.assessment_config_id == config.id,
+            Rubric.id == config.rubric_id,
         ).first()
         
     rubric_text = rubric_to_text(rubric)

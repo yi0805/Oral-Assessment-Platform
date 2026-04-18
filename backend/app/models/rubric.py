@@ -20,4 +20,4 @@ class Rubric(Base):
     criteria_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
     def __repr__(self) -> str:
-        return f"<Rubric {self.id} [{self.assessment_config_id}]>"
+        return f"<Rubric {self.id} [{self.course_id}]>"

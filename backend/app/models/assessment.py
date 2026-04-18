@@ -28,7 +28,7 @@ class AssessmentConfig(Base):
 
     rubric_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("materials.id", ondelete="RESTRICT"),
+        ForeignKey("rubrics.id", ondelete="RESTRICT"),
         nullable=False,
     )
 

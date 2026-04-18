@@ -16,7 +16,7 @@ class RubricCreate(BaseModel):
 # Rubric Form Response
 class RubricOut(RubricCreate):
     id: UUID
-    assessment_config_id: UUID
+    course_id: UUID
 
     class Config:
         from_attributes = True

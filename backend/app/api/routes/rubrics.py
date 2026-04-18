@@ -145,7 +145,7 @@ async def upload_rubric(
 # Create rubric via form (criteria, rating, points)
 
 @router.post(
-    "/courses/{course_id}/rubric",
+    "/courses/{course_id}/rubrics",
     response_model=RubricOut,
     status_code=status.HTTP_201_CREATED,
     summary="Create a grading rubric for an assessment",
@@ -173,8 +173,6 @@ def create_rubric(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not an instructor in this course.",
         )
-    
-    # rubric_id = uuid4()
 
     # Check total points
     submitted_total = sum(item.max_points for item in payload.criteria_data)
@@ -185,7 +183,6 @@ def create_rubric(
         )
 
     rubric = Rubric(
-        # id=rubric_id
         course_id=course_id,
         total_points=payload.total_points,
         criteria_data=[item.model_dump() for item in payload.criteria_data]

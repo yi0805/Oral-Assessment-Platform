@@ -45,23 +45,6 @@ function UpdateMaterial() {
     (sum, row) => sum + (Number(row.max_points) || 0), 0
   );
 
-  const handleAddRow = () => {
-  setRubricRows([...rubricRows, { title: "", description: "", max_points: 0 }]);
-};
-
-  const handleRemoveRow = (index) => {
-    if (rubricRows.length > 1) {
-      setRubricRows(rubricRows.filter((_, i) => i !== index));
-    }
-  };
-
-  const handleRowChange = (index, field, value) => {
-    const updatedRows = rubricRows.map((row, i) => 
-      i === index ? { ...row, [field]: value } : row
-    );
-    setRubricRows(updatedRows);
-  };
-
   const { courses, isLoading } = useCourses();
 
   const { uploadMaterial } = useUploadMaterial();
@@ -106,13 +89,18 @@ function UpdateMaterial() {
           : "";
 
   const isRubricValid = 
-    rubricRows.every(r => r.title && r.max_points > 0);
+    rubricRows.every(r => 
+      r.title.trim() !== "" && 
+      r.description.trim() !== "" && 
+      r.max_points > 0
+    );
 
   const isValid =
     !numQuestionsError &&
     !assessmentTimeError &&
     !assessmentNameError &&
-    materialFile;
+    materialFile&&
+    isRubricValid;
 
   async function handleSubmit() {
     try {
@@ -198,6 +186,34 @@ function UpdateMaterial() {
       setStatusMessage("");
       setLoading(false);
     }
+  }
+
+  function handleAddRow() {
+    setRubricRows([
+      ...rubricRows,
+      { title: "", description: "", maxpoints: 0 },
+    ]);
+  }
+
+  function handleRemoveRow(index) {
+    if (rubricRows.length > 1) {
+      setRubricRows(rubricRows.filter((_, i) => i !== index));
+    }
+  }
+
+  function handleRowChange(index, field, value) {
+    const updatedRows = rubricRows.map((row, i) => {
+      if (i === index) {
+        if (field === "max_points") {
+          if (value === "") return { ...row, [field]: 0 };
+          const numericValue = parseFloat(value);
+          return { ...row, [field]: Math.max(0, numericValue) };
+        }
+        return { ...row, [field]: value };
+      }
+      return row;
+    });
+    setRubricRows(updatedRows);
   }
 
   return (
@@ -452,7 +468,7 @@ function UpdateMaterial() {
                     </div>
                   </section>
 
-                  <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
+                  {/* <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
                     <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
                       <span
                         className="material-symbols-outlined text-2xl text-secondary"
@@ -516,7 +532,7 @@ function UpdateMaterial() {
                         </div>
                       </label>
                     </div>
-                  </section>
+                  </section> */}
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
@@ -675,87 +691,90 @@ function UpdateMaterial() {
             </div>
           )}
 
-          <div className="mt-6 grid grid-cols-12 gap-6">
-            <div className="col-span-12">
-              <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-                <div className="mb-6 flex items-center justify-between">
-                  <h2 className="flex items-center gap-2 text-xl font-bold">
-                    <span className="material-symbols-outlined text-secondary">
-                      assignment
-                    </span>
-                    Grading Rubric
-                  </h2>
-                  
-                  {/* show total points */}
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-medium text-on-surface-variant">
-                      Total Points: <span className="font-bold text-primary">{totalPoints}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleAddRow}
-                      className="flex items-center gap-1 rounded-lg bg-secondary/10 px-4 py-2 text-sm font-bold text-secondary transition-all hover:bg-secondary/20"
-                    >
-                      <span className="material-symbols-outlined text-sm">add</span>
-                      Add Criterion
-                    </button>
+          {phase === "setup" && (
+            <div className="mt-6 grid grid-cols-12 gap-6">
+              <div className="col-span-12">
+                <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+                  <div className="mb-6 flex items-center justify-between">
+                    <h2 className="flex items-center gap-2 text-xl font-bold">
+                      <span className="material-symbols-outlined text-secondary">
+                        assignment
+                      </span>
+                      Grading Rubric
+                    </h2>
+                    
+                    {/* show total points */}
+                    <div className="flex items-center gap-4">
+                      <span className="text-sm font-medium text-on-surface-variant">
+                        Total Points: <span className="font-bold text-primary">{totalPoints}</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAddRow}
+                        className="flex items-center gap-1 rounded-lg bg-secondary/10 px-4 py-2 text-sm font-bold text-secondary transition-all hover:bg-secondary/20"
+                      >
+                        <span className="material-symbols-outlined text-sm">add</span>
+                        Add Criterion
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="text-xs font-bold uppercase tracking-wider text-outline">
-                        <th className="pb-4 pr-4">Criterion Title</th>
-                        <th className="pb-4 pr-4">Description</th>
-                        <th className="w-24 pb-4 pr-4 text-center">Points</th>
-                        <th className="w-12 pb-4"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-outline-variant/10">
-                      {rubricRows.map((row, index) => (
-                        <tr key={index} className="group">
-                          <td className="py-4 pr-4 align-top w-1/4">
-                            <input
-                              className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
-                              placeholder="e.g. Accuracy"
-                              value={row.title}
-                              onChange={(e) => handleRowChange(index, "title", e.target.value)}
-                            />
-                          </td>
-                          <td className="py-4 pr-4 align-top">
-                            <textarea
-                              className="min-h-[44px] w-full resize-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
-                              placeholder="Describe what a perfect score looks like..."
-                              rows={1}
-                              value={row.description}
-                              onChange={(e) => handleRowChange(index, "description", e.target.value)}
-                            />
-                          </td>
-                          <td className="py-4 pr-4 align-top">
-                            <input
-                              className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-center text-sm font-bold transition-all focus:ring-2 focus:ring-secondary/20"
-                              type="number"
-                              value={row.max_points}
-                              onChange={(e) => handleRowChange(index, "max_points", e.target.value)}
-                            />
-                          </td>
-                          <td className="py-4 align-top text-right">
-                            <button
-                              onClick={() => handleRemoveRow(index)}
-                              className="mt-2 text-outline transition-colors hover:text-error group-hover:opacity-100 md:opacity-0"
-                            >
-                              <span className="material-symbols-outlined text-lg">delete</span>
-                            </button>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-xs font-bold uppercase tracking-wider text-outline">
+                          <th className="pb-4 pr-4">Criterion Title</th>
+                          <th className="pb-4 pr-4">Description</th>
+                          <th className="w-24 pb-4 pr-4 text-center">Points</th>
+                          <th className="w-12 pb-4"></th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant/10">
+                        {rubricRows.map((row, index) => (
+                          <tr key={index} className="group">
+                            <td className="py-4 pr-4 align-top w-1/4">
+                              <input
+                                className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
+                                placeholder="e.g. Accuracy"
+                                value={row.title}
+                                onChange={(e) => handleRowChange(index, "title", e.target.value)}
+                              />
+                            </td>
+                            <td className="py-4 pr-4 align-top">
+                              <textarea
+                                className="min-h-[44px] w-full resize-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
+                                placeholder="Describe what a perfect score looks like..."
+                                rows={4}
+                                value={row.description}
+                                onChange={(e) => handleRowChange(index, "description", e.target.value)}
+                              />
+                            </td>
+                            <td className="py-4 pr-4 align-top">
+                              <input
+                                className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-center text-sm font-bold transition-all focus:ring-2 focus:ring-secondary/20"
+                                type="number"
+                                min="0"
+                                value={row.max_points}
+                                onChange={(e) => handleRowChange(index, "max_points", e.target.value)}
+                              />
+                            </td>
+                            <td className="py-4 align-top text-right">
+                              <button
+                                onClick={() => handleRemoveRow(index)}
+                                className="mt-2 text-outline transition-colors hover:text-error group-hover:opacity-100 md:opacity-0"
+                              >
+                                <span className="material-symbols-outlined text-lg">delete</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
             </div>
-          </div>
+          )}  
         </div>
       </main>
     </div>

@@ -20,7 +20,7 @@ router = APIRouter()
     "/courses/{course_id}/generate-question",
     response_model=QuestionGenerationResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Generate question pool from materials",
+    summary="Generate question pool from material and rubric",
 )
 async def generate_question(
     course_id: UUID,
