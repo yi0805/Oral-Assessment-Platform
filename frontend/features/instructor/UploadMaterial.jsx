@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { NavLink } from "react-router";
+import toast from "react-hot-toast";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useUploadMaterial } from "./useUploadMaterial";
@@ -213,6 +215,10 @@ function UpdateMaterial() {
     }
   }
 
+  function handleSave() {
+    
+  }
+
   function handleAddRow() {
     setRubricRows([
       ...rubricRows,
@@ -291,8 +297,8 @@ function UpdateMaterial() {
           )}
 
           {phase === "setup" && (
-            <div className="grid grid-cols-12 items-start gap-6">
-              <div className="col-span-12 space-y-6 lg:col-span-5">
+            <div className="grid grid-cols-12 items-start gap-5">
+              <div className="col-span-12 space-y-6 lg:col-span-6">
                 <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
                   <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
                     <span
@@ -433,9 +439,9 @@ function UpdateMaterial() {
                 </section>
               </div>
 
-              <div className="col-span-12 space-y-6 lg:col-span-7">
+              <div className="col-span-12 space-y-6 lg:col-span-6">
                 <section className="flex h-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-10 text-center transition-colors hover:border-primary/40">
-                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-container-lowest shadow-sm">
+                  <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-surface-container-lowest shadow-sm">
                     <span
                       className="material-symbols-outlined text-3xl text-primary"
                       data-icon="upload_file"
@@ -445,11 +451,11 @@ function UpdateMaterial() {
                     </span>
                   </div>
 
-                  <h3 className="mb-2 text-xl font-bold text-on-surface">
+                  <h3 className="mb-3 mt-3 text-xl font-bold text-on-surface">
                     Assessment Material
                   </h3>
 
-                  <p className="mb-8 max-w-sm text-sm text-on-surface-variant">
+                  <p className="mb-8 max-w-xs text-sm text-on-surface-variant">
                     Upload a PDF of the source material — we&apos;ll use it to
                     generate every question.
                   </p>
@@ -507,7 +513,7 @@ function UpdateMaterial() {
                       </div>
                     </label>
 
-                    <p className="text-[11px] text-outline">
+                    <p className="text-[12px] text-outline">
                       PDF only · Max 50 MB
                     </p>
                   </div>
@@ -786,14 +792,26 @@ function UpdateMaterial() {
                 <h2 className="text-2xl font-bold text-on-surface">
                   Review Generated Questions ({questions.length})
                 </h2>
-
-                <button
-                  className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
-                  onClick={handlePublish}
-                  disabled={loading || questions.length === 0}
-                >
-                  {loading ? "Working..." : "Publish Assessment"}
-                </button>
+                <div className="flex-row-reverse">
+                  <NavLink
+                    className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                    to="/home"
+                    onClick={() => {
+                      toast.success("Assessment saved successfully.");
+                    }}
+                  >
+                    <span>
+                      Save 
+                    </span>
+                  </NavLink>                  
+                  <button
+                    className="ml-3 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                    onClick={handlePublish}
+                    disabled={loading || questions.length === 0}
+                  >
+                    {loading ? "Working..." : "Publish & Release"}
+                  </button>
+                </div>
               </div>
 
               <p className="text-sm text-on-surface-variant">
