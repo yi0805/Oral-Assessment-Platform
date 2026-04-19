@@ -11,7 +11,7 @@ from app.services._prompt_safety import (
     sanitize_untrusted,
     truncate_for_prompt,
 )
-from app.services.ai_gateway import chat_complete
+from app.services.ai_gateway import chat_complete, chat_complete_bedrock
 
 
 from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk, Rubric

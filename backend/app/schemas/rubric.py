@@ -3,7 +3,7 @@ from typing import List
 from uuid import UUID
 
 # Single criteria 
-class RubricCriteriaIteam(BaseModel):
+class RubricCriteriaItem(BaseModel):
     title: str
     description: str
     max_points: int
@@ -11,7 +11,7 @@ class RubricCriteriaIteam(BaseModel):
 # Rubric Form Request
 class RubricCreate(BaseModel):
     total_points: int = 100
-    criteria_data: List[RubricCriteriaIteam] # Contains multiple criteria
+    criteria_data: List[RubricCriteriaItem] # Contains multiple criteria
 
 # Rubric Form Response
 class RubricOut(RubricCreate):

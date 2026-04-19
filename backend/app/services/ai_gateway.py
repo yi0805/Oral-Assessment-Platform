@@ -4,6 +4,8 @@ import asyncio
 import json as _json
 import logging
 import httpx
+import boto3
+import os
 
 from typing import Any
 
@@ -37,6 +39,7 @@ GEMINI_BATCH_EMBED_URL = (
 EMBEDDING_DIMENSIONS = 768    #(pgvector HNSW max is 2000)
 _ZERO_VECTOR: list[float] = [0.0] * EMBEDDING_DIMENSIONS  # 768 zeros 
 
+AWS_BEDROCK_MODEL = "anthropic.claude-3-haiku-20240307-v1:0"
 
 # ---------------------------------------------------------------------------
 # Public embedding interface
@@ -275,3 +278,43 @@ async def chat_complete(
             raise RuntimeError(f"OpenRouter chat error: {exc}") from exc
 
     raise RuntimeError(f"OpenRouter chat failed after {max_attempts} attempts")
+
+# ---------------------------------------------------------------------------
+# AWS Bedrock chat
+# ---------------------------------------------------------------------------
+
+session = boto3.Session(profile_name=os.getenv("AWS_PROFILE_NAME"))
+bedrock_client = session.client(
+    service_name='bedrock-runtime', 
+    region_name=os.getenv("AWS_REGION", "ap-southeast-2")
+)
+
+async def chat_complete_bedrock(system_prompt: str, user_prompt: str) -> str:
+    
+    payload = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": 1024,
+        "temperature": 0.7,
+        "system": system_prompt, # Claude 3 支持独立的 system prompt
+        "messages": [
+            {"role": "user", "content": user_prompt}
+        ],
+    }
+    
+
+    loop = asyncio.get_event_loop()
+    try:
+        response = await loop.run_in_executor(
+            None, 
+            lambda: bedrock_client.invoke_model(
+                modelId=AWS_BEDROCK_MODEL,
+                body=_json.dumps(payload)
+            )
+        )
+        
+        response_body = _json.loads(response.get('body').read())
+        return response_body['content'][0]['text']
+        
+    except Exception as e:
+        logger.error(f"[AI Gateway] Bedrock error: {e}")
+        raise RuntimeError(f"Bedrock call failed: {e}")

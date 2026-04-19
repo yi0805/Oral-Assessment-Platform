@@ -214,10 +214,8 @@ def get_rubric(
 
     rubric = (
             db.query(Rubric)
-            .join(AssessmentConfig)
-            .filter(
-                Rubric.assessment_config_id == assessment_config_id,
-            )
+            .join(AssessmentConfig, AssessmentConfig.rubric_id == Rubric.id)
+            .filter(AssessmentConfig.id == assessment_config_id)
             .first()
         )
 
@@ -241,16 +239,14 @@ def update_rubric(
    
     rubric = (
             db.query(Rubric)
-            .join(AssessmentConfig)
-            .filter(
-                Rubric.assessment_config_id == assessment_config_id,
-            )
+            .join(AssessmentConfig, AssessmentConfig.rubric_id == Rubric.id)
+            .filter(AssessmentConfig.id == assessment_config_id)
             .first()
         )
-   
+
     if not rubric:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
-
+    
     update_rubric = payload.model_dump(exclude_unset=True)
     for field, value in update_rubric.items():
         setattr(rubric, field, value)
