@@ -7,8 +7,8 @@ export function useCreateRubric() {
   const { mutateAsync: createRubric, isPending } = useMutation({
     mutationFn: ({ courseId, rubricPayload }) => createRubricApi(courseId, rubricPayload),
 
-    onSuccess: (data) => {
-      toast.success(data?.message || "Rubric saved successfully.");
+    onSuccess: () => {
+      toast.success("Rubric saved successfully.");
     },
 
     onError: (error) => {
