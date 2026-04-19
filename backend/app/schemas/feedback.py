@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 #  AI summary
@@ -39,3 +39,21 @@ class ApproveAiReview(BaseModel):
 
 class ApproveAllAiReviews(BaseModel):
     assessments: list[ApproveAiReview]
+
+class _SummaryLLMOutput(BaseModel):
+    summary_text: str = Field(min_length=1)
+    suggested_grade: int = Field(ge=0, le=100)
+
+    @field_validator("suggested_grade", mode="before")
+    @classmethod
+    def _coerce_grade(cls, v: object) -> int:
+        if v is None:
+            return 0
+        
+        try:
+            grade = int(v)
+
+        except (TypeError, ValueError):
+            return 0
+        
+        return max(0, min(100, grade))

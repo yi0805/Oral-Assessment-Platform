@@ -283,22 +283,29 @@ async def chat_complete(
 # AWS Bedrock chat
 # ---------------------------------------------------------------------------
 
-session = boto3.Session(profile_name=os.getenv("AWS_PROFILE_NAME"))
+session = boto3.Session(profile_name=settings.aws_profile_name)
 bedrock_client = session.client(
     service_name='bedrock-runtime', 
-    region_name=os.getenv("AWS_REGION", "ap-southeast-2")
+    region_name=settings.aws_region
 )
 
-async def chat_complete_bedrock(system_prompt: str, user_prompt: str) -> str:
+async def chat_complete_bedrock(
+        messages: list[dict[str, str]],
+        system_prompt: str, 
+        temperature: float = 0.7,
+        max_tokens: int = 1500,
+        ) -> str:
+    
+    if not settings.aws_bearer_token_bedrock:
+        logger.warning("[AI Gateway] AWS_BEARER_TOKEN_BEDROCK not set — returning placeholder (dev mode)")
+        return "[AI response placeholder — set AWS_BEARER_TOKEN_BEDROCK in .env to enable live AI]"
     
     payload = {
         "anthropic_version": "bedrock-2023-05-31",
-        "max_tokens": 1024,
-        "temperature": 0.7,
-        "system": system_prompt, # Claude 3 支持独立的 system prompt
-        "messages": [
-            {"role": "user", "content": user_prompt}
-        ],
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "system": system_prompt, # Claude 3 support independent system prompt
+        "messages": messages
     }
     
 
@@ -318,3 +325,42 @@ async def chat_complete_bedrock(system_prompt: str, user_prompt: str) -> str:
     except Exception as e:
         logger.error(f"[AI Gateway] Bedrock error: {e}")
         raise RuntimeError(f"Bedrock call failed: {e}")
+    
+# ---------------------------------------------------------------------------
+# Smart chat
+# ---------------------------------------------------------------------------
+
+async def smart_chat_complete(
+    messages: list[dict[str, str]],
+    system_prompt: str | None = None,
+    temperature: float = 0.7,
+    max_tokens: int = 1500,
+) -> str:
+    """
+    Primary: AWS Bedrock; Fallback: OpenRouter
+    """
+    # 1. Attempt Bedrock first
+    if settings.aws_profile_name:
+        try:
+            logger.info("[AI Gateway] Attempting Bedrock (Claude 3 Haiku)...")
+            return await chat_complete_bedrock(
+                messages=messages,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+        except Exception as exc:
+            logger.warning(f"[AI Gateway] Bedrock failed: {exc}. Falling back to OpenRouter...")
+
+    # 2. OpenRouter as a redundant backup
+    try:
+        logger.info("[AI Gateway] Using OpenRouter fallback...")
+        return await chat_complete(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+    except Exception as exc:
+        logger.error(f"[AI Gateway] Both AI providers failed: {exc}")
+        raise RuntimeError("All AI providers exhausted.") from exc
