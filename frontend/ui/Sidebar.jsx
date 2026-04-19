@@ -74,6 +74,24 @@ function Sidebar() {
         )}
         {user.role === "instructor" && (
           <NavLink
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
+              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+            }
+            to="/instructor/studentManagement"
+            >
+            <span
+              className="material-symbols-outlined text-[20px]"
+              data-icon="people"
+              >
+              people
+            </span>
+            <span>Student Management</span>
+          </NavLink>
+        )}
+        {user.role === "instructor" && (
+          <NavLink
             className={({ isActive }) =>
             `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
               isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
@@ -83,9 +101,9 @@ function Sidebar() {
           >
             <span
               className="material-symbols-outlined text-[20px]"
-              data-icon="edit_note"
+              data-icon="add"
             >
-              edit_note
+              add
             </span>
             <span>Generate Assessment</span>
           </NavLink>
@@ -97,15 +115,15 @@ function Sidebar() {
               isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
               : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
           }
-            to="/instructor/studentManagement"
+            to="/instructor/editAssessment"
           >
             <span
               className="material-symbols-outlined text-[20px]"
-              data-icon="people"
+              data-icon="edit_note"
             >
-              people
+              edit_note
             </span>
-            <span>Student Management</span>
+            <span>Edit Assessment</span>
           </NavLink>
         )}
         <NavLink

@@ -531,7 +531,7 @@ function UpdateMaterial() {
                         <h2 className="text-xl font-bold text-on-surface">
                           Grading Rubric
                         </h2>
-                        <p className="mt-1 max-w-md text-xs text-on-surface-variant">
+                        <p className="mt-1 max-w-lg text-xs text-on-surface-variant">
                           Define how the AI evaluates responses. Each
                           criterion&apos;s points act as its percentage weight —
                           must total {RUBRIC_TOTAL_POINTS}.
