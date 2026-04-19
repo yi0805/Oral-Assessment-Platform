@@ -200,7 +200,7 @@ def create_course(
     enrollment = CourseEnrollment(
         course_id=course.id,
         user_id=current_user.id,
-        upi=current_user.upi,
+        upi = current_user.upi,
     )
     db.add(enrollment)
     db.commit()

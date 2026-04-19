@@ -2,7 +2,7 @@ function CourseSelector({ courses, selectedCourse, onChange }) {
   return (
     <div className="relative flex max-w-xs items-center">
       <select
-        className="w-full cursor-pointer appearance-none rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-2.5 pl-4 pr-10 text-sm font-semibold text-on-surface transition-colors hover:border-outline focus:outline-none focus:ring-1 focus:ring-primary/20"
+        className="w-full min-w-60 cursor-pointer appearance-none rounded-lg border border-outline-variant/30 bg-surface-container-lowest py-2.5 pl-4 pr-10 text-sm font-semibold text-on-surface transition-colors hover:border-outline focus:outline-none focus:ring-1 focus:ring-primary/20"
         value={selectedCourse}
         onChange={(e) => onChange(e.target.value)}
       >

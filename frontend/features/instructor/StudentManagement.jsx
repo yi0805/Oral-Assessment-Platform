@@ -8,7 +8,7 @@ import { useExportResults } from "./useExportResults";
 
 import Spinner from "../../ui/Spinner";
 
-export default function InstructorSettings() {
+export default function StudentManagement() {
   const [courseId, setCourseId] = useState("");
 
   const [csvFile, setCsvFile] = useState(null);

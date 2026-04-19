@@ -98,6 +98,8 @@ export default function InstructorDashboard() {
     releaseAllResults({ assessments });
   }
 
+
+
   return (
     <div className="min-h-screen">
       <main className="ml-64 px-10 pb-12 pt-24">
@@ -156,8 +158,8 @@ export default function InstructorDashboard() {
           </div>
         </div>
 
-        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-4">
-          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 shadow-sm md:col-span-2">
+        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
             <div className="relative z-10">
               <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
                 Score Overview
@@ -263,12 +265,11 @@ export default function InstructorDashboard() {
           <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
             <div>
               <p className="mb-2 text-xs font-bold uppercase tracking-wider text-outline-variant">
-                Publication Status
+                Pending Markings
               </p>
 
               <p className="font-body text-sm leading-relaxed text-on-surface-variant">
-                {reviewStudents.length} scores pending manual review before
-                release.
+                {reviewStudents.length} students' scores pending for manual review before release.
               </p>
             </div>
 
@@ -283,8 +284,20 @@ export default function InstructorDashboard() {
                 handlePublishAll();
               }}
             >
-              Publish All Scores
+              Release All Scores
             </button>
+
+            {/* <button
+              className={`mt-4 w-full rounded-xl py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 
+                  ? "bg-secondary text-on-secondary hover:bg-secondary-dim"
+                  : "cursor-not-allowed bg-surface-container text-outline"
+              }`}
+              onClick={() => {
+                handleAcceptAllAI();
+              }}
+            >
+              Accept AI Score
+            </button> */}
           </div>
         </div>
 

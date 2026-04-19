@@ -9,6 +9,7 @@ function PendingStudentTable({
   grades,
   onGradeChange,
   isValidGrade,
+  acceptAllAiGrade,
 }) {
   const navigate = useNavigate();
 
@@ -61,6 +62,8 @@ function PendingStudentTable({
     updateGrade({ sessionId, grade: Number(grade) });
   }
 
+
+
   return (
     <>
       <div className="overflow-x-auto">
@@ -85,7 +88,7 @@ function PendingStudentTable({
               <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Final Score
               </th>
-              <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Action
               </th>
             </tr>
@@ -113,7 +116,7 @@ function PendingStudentTable({
               </tr>
             ) : (
               currentRows.map((review) => {
-                const currentGrade = grades[review.sessionId] ?? "";
+                const currentGrade = grades[review.sessionId] ?? review.suggestedGrade ?? "";
                 const canPublish = isValidGrade(currentGrade);
 
                 return (
@@ -121,6 +124,7 @@ function PendingStudentTable({
                     className="group transition-colors hover:bg-surface-container-low/30"
                     key={review.sessionId}
                   >
+                    {/* Publish */}
                     <td className="px-6 py-5">
                       <label className="relative inline-flex cursor-pointer items-center">
                         <input
@@ -135,6 +139,7 @@ function PendingStudentTable({
                       </label>
                     </td>
 
+                    {/* Student */}
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <img
@@ -152,16 +157,19 @@ function PendingStudentTable({
                         </div>
                       </div>
                     </td>
-
+                    
+                    {/* Course */}
                     <td className="px-6 py-5">
                       <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
                         {review.courseCode || "Unknown Course"}
                       </span>
                     </td>
 
+                    {/* Assignment Name */}
                     <td className="px-6 py-5 text-sm font-medium text-on-surface-variant">
                       {review.title || "Unknown Assessment"}
                     </td>
+                    {/* AI Score */}
                     <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
                       {review.suggestedGrade != null
                         ? review.suggestedGrade
@@ -169,6 +177,7 @@ function PendingStudentTable({
                       /100
                     </td>
 
+                    {/* Final Score */}
                     <td className="px-6 py-5 text-center">
                       <input
                         className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
@@ -201,7 +210,7 @@ function PendingStudentTable({
                         }}
                       />
                     </td>
-
+                    {/* Action */}
                     <td className="px-6 py-5 text-right">
                       <button
                         className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
@@ -212,6 +221,7 @@ function PendingStudentTable({
                     </td>
                   </tr>
                 );
+                
               })
             )}
           </tbody>
