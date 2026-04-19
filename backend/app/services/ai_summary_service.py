@@ -109,13 +109,19 @@ async def generate_summary(db: Session, session_id: UUID) -> AISummary:
         .first()
     )
 
+    rubric = None
     if config and config.rubric_id:
         rubric = db.query(Rubric).filter(
             Rubric.id == config.rubric_id,
         ).first()
-        
-    rubric_text = rubric_to_text(rubric)
-    rubric_total_points = rubric.total_points
+
+    if rubric:
+        rubric_text = rubric_to_text(rubric)
+        rubric_total_points = rubric.total_points
+    else:
+        rubric_text = ""
+        # Rubrics are fixed at 100 points
+        rubric_total_points = 100
 
     if rubric_text.strip():
         rubric_section = truncate_for_prompt(sanitize_untrusted(rubric_text))
@@ -201,9 +207,11 @@ def _parse_summary_response(raw: str) -> _SummaryLLMOutput:
 
 # Transfrom JSON list to text for ai prompt
 def rubric_to_text(rubric):
-    
+    if rubric is None or not rubric.criteria_data:
+        return ""
+
     text_for_ai = "Please grade based on these criteria:\n"
     for item in rubric.criteria_data:
         text_for_ai += f"- {item['title']}: {item['description']} ({item['max_points']} points)\n"
-    
+
     return text_for_ai

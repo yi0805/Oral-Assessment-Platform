@@ -25,6 +25,7 @@ function UpdateMaterial() {
     assessmentName: false,
     numQuestions: false,
     assessmentTime: false,
+    rubric: false,
   });
 
   const [phase, setPhase] = useState("setup");
@@ -38,12 +39,16 @@ function UpdateMaterial() {
 
   const [sessionsCreated, setSessionsCreated] = useState(0);
 
+  const RUBRIC_TOTAL_POINTS = 100;
+
   const [rubricRows, setRubricRows] = useState([
-    { title: "", description: "", max_points: 0 }
+    { title: "", description: "", max_points: 0 },
   ]);
   const totalPoints = rubricRows.reduce(
-    (sum, row) => sum + (Number(row.max_points) || 0), 0
+    (sum, row) => sum + (Number(row.max_points) || 0),
+    0,
   );
+  const totalPointsValid = totalPoints === RUBRIC_TOTAL_POINTS;
 
   const { courses, isLoading } = useCourses();
 
@@ -88,18 +93,21 @@ function UpdateMaterial() {
           ? "Must be between 5 and 90."
           : "";
 
-  const isRubricValid = 
-    rubricRows.every(r => 
-      r.title.trim() !== "" && 
-      r.description.trim() !== "" && 
-      r.max_points > 0
-    );
+  const rubricRowErrors = rubricRows.map((row) => ({
+    title: row.title.trim() === "" ? "Required." : "",
+    description: row.description.trim() === "" ? "Required." : "",
+    max_points: !(Number(row.max_points) > 0) ? "Must be greater than 0." : "",
+  }));
+
+  const isRubricValid =
+    totalPointsValid &&
+    rubricRowErrors.every((e) => !e.title && !e.description && !e.max_points);
 
   const isValid =
     !numQuestionsError &&
     !assessmentTimeError &&
     !assessmentNameError &&
-    materialFile&&
+    materialFile &&
     isRubricValid;
 
   async function handleSubmit() {
@@ -115,15 +123,15 @@ function UpdateMaterial() {
       setStatusMessage("Creating rubric...");
       const rubricPayload = {
         total_points: totalPoints,
-        criteria_data: rubricRows.map(row => ({
+        criteria_data: rubricRows.map((row) => ({
           title: row.title,
           description: row.description,
-          max_points: Number(row.max_points)
-        }))
+          max_points: Number(row.max_points),
+        })),
       };
       const rubricResponse = await createRubric({
         courseId,
-        rubricPayload
+        rubricPayload,
       });
       const RubricId = rubricResponse.id;
 
@@ -191,7 +199,7 @@ function UpdateMaterial() {
   function handleAddRow() {
     setRubricRows([
       ...rubricRows,
-      { title: "", description: "", maxpoints: 0 },
+      { title: "", description: "", max_points: 0 },
     ]);
   }
 
@@ -206,9 +214,12 @@ function UpdateMaterial() {
       if (i === index) {
         if (field === "max_points") {
           if (value === "") return { ...row, [field]: 0 };
-          const numericValue = parseFloat(value);
+
+          const numericValue = parseInt(value, 10);
+          if (!Number.isFinite(numericValue)) return row;
           return { ...row, [field]: Math.max(0, numericValue) };
         }
+
         return { ...row, [field]: value };
       }
       return row;
@@ -394,147 +405,317 @@ function UpdateMaterial() {
               </div>
 
               <div className="col-span-12 space-y-6 lg:col-span-7">
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
-                      <span
-                        className="material-symbols-outlined text-2xl text-primary"
-                        data-icon="upload_file"
-                        style={{ verticalAlign: "middle" }}
-                      >
-                        upload_file
-                      </span>
-                    </div>
+                <section className="flex h-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-10 text-center transition-colors hover:border-primary/40">
+                  <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-container-lowest shadow-sm">
+                    <span
+                      className="material-symbols-outlined text-3xl text-primary"
+                      data-icon="upload_file"
+                      style={{ verticalAlign: "middle" }}
+                    >
+                      upload_file
+                    </span>
+                  </div>
 
-                    <h3 className="mb-1 text-base font-bold">Assessment PDF</h3>
+                  <h3 className="mb-2 text-xl font-bold text-on-surface">
+                    Assessment Material
+                  </h3>
 
-                    <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
-                      Upload the source material or a previous assessment to
-                      refine your questions.
-                    </p>
+                  <p className="mb-8 max-w-sm text-sm text-on-surface-variant">
+                    Upload a PDF of the source material — we&apos;ll use it to
+                    generate every question.
+                  </p>
 
-                    <div className="w-full space-y-3">
-                      {materialFile && (
-                        <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-error/10 text-error">
-                            <span
-                              className="material-symbols-outlined text-xl"
-                              data-icon="picture_as_pdf"
-                              style={{ verticalAlign: "middle" }}
-                            >
-                              picture_as_pdf
-                            </span>
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">
-                              {materialFile.name}
-                            </p>
-
-                            <p className="text-[9px] text-outline">
-                              {(materialFile.size / 1024 / 1024).toFixed(1)} MB
-                            </p>
-                          </div>
-
-                          <button
-                            className="text-on-surface-variant transition-colors hover:text-error"
-                            onClick={() => setMaterialFile(null)}
+                  <div className="w-full max-w-md space-y-4">
+                    {materialFile && (
+                      <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 text-left shadow-sm">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
+                          <span
+                            className="material-symbols-outlined text-2xl"
+                            data-icon="picture_as_pdf"
+                            style={{ verticalAlign: "middle" }}
                           >
-                            <span
-                              className="material-symbols-outlined text-lg"
-                              data-icon="close"
-                              style={{ verticalAlign: "middle" }}
-                            >
-                              close
-                            </span>
-                          </button>
+                            picture_as_pdf
+                          </span>
                         </div>
-                      )}
 
-                      <label className="block cursor-pointer">
-                        <input
-                          className="hidden"
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) =>
-                            setMaterialFile(e.target.files[0] || null)
-                          }
-                        />
-
-                        <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
-                          Browse Files
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-on-surface">
+                            {materialFile.name}
+                          </p>
+                          <p className="text-xs text-outline">
+                            {(materialFile.size / 1024 / 1024).toFixed(1)} MB
+                          </p>
                         </div>
-                      </label>
-                    </div>
-                  </section>
 
-                  {/* <section className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-6 text-center">
-                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
-                      <span
-                        className="material-symbols-outlined text-2xl text-secondary"
-                        data-icon="rule"
-                        style={{ verticalAlign: "middle" }}
-                      >
-                        rule
-                      </span>
-                    </div>
-
-                    <h3 className="mb-1 text-base font-bold">
-                      Assessment Rubrics
-                    </h3>
-
-                    <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
-                      Upload evaluation criteria for precise grading.
-                    </p>
-
-                    <div className="w-full space-y-3">
-                      {rubricFile && (
-                        <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-secondary/10 text-secondary">
-                            <span className="material-symbols-outlined text-xl">
-                              picture_as_pdf
-                            </span>
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">
-                              {rubricFile.name}
-                            </p>
-
-                            <p className="text-[9px] text-outline">
-                              {(rubricFile.size / 1024 / 1024).toFixed(1)} MB
-                            </p>
-                          </div>
-
-                          <button
-                            className="text-on-surface-variant transition-colors hover:text-error"
-                            onClick={() => setRubricFile(null)}
+                        <button
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error"
+                          onClick={() => setMaterialFile(null)}
+                          aria-label="Remove file"
+                        >
+                          <span
+                            className="material-symbols-outlined text-lg"
+                            data-icon="close"
+                            style={{ verticalAlign: "middle" }}
                           >
-                            <span className="material-symbols-outlined text-lg">
-                              close
-                            </span>
-                          </button>
-                        </div>
-                      )}
+                            close
+                          </span>
+                        </button>
+                      </div>
+                    )}
 
-                      <label className="block cursor-pointer">
-                        <input
-                          className="hidden"
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) =>
-                            setRubricFile(e.target.files[0] || null)
-                          }
-                        />
+                    <label className="block cursor-pointer">
+                      <input
+                        className="hidden"
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) =>
+                          setMaterialFile(e.target.files[0] || null)
+                        }
+                      />
 
-                        <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
-                          Browse Files
-                        </div>
-                      </label>
+                      <div className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 text-center text-sm font-bold text-primary shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5">
+                        {materialFile ? "Replace File" : "Browse PDF"}
+                      </div>
+                    </label>
+
+                    <p className="text-[11px] text-outline">
+                      PDF only · Max 50 MB
+                    </p>
+                  </div>
+                </section>
+              </div>
+
+              <div className="col-span-12">
+                <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+                  <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          data-icon="assignment"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          assignment
+                        </span>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-on-surface">
+                          Grading Rubric
+                        </h2>
+                        <p className="mt-1 max-w-md text-xs text-on-surface-variant">
+                          Define how the AI evaluates responses. Each
+                          criterion&apos;s points act as its percentage weight —
+                          must total {RUBRIC_TOTAL_POINTS}.
+                        </p>
+                      </div>
                     </div>
-                  </section> */}
-                </div>
 
+                    <div className="flex items-center gap-5 rounded-xl border border-outline-variant/10 bg-surface-container-low px-5 py-3">
+                      <div className="flex items-baseline gap-1">
+                        <span
+                          className={`font-headline text-3xl font-extrabold leading-none tracking-tight ${
+                            totalPointsValid
+                              ? "text-primary"
+                              : totalPoints > RUBRIC_TOTAL_POINTS
+                                ? "text-error"
+                                : "text-on-surface"
+                          }`}
+                        >
+                          {totalPoints}
+                        </span>
+                        <span className="text-sm font-bold text-outline">
+                          / {RUBRIC_TOTAL_POINTS}
+                        </span>
+                      </div>
+
+                      <div className="h-9 w-px bg-outline-variant/30" />
+
+                      <div className="min-w-[132px]">
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
+                          <div
+                            className={`h-full rounded-full transition-all duration-300 ${
+                              totalPointsValid
+                                ? "bg-primary"
+                                : totalPoints > RUBRIC_TOTAL_POINTS
+                                  ? "bg-error"
+                                  : "bg-primary/50"
+                            }`}
+                            style={{
+                              width: `${Math.min(
+                                100,
+                                (totalPoints / RUBRIC_TOTAL_POINTS) * 100,
+                              )}%`,
+                            }}
+                          />
+                        </div>
+                        <p
+                          className={`mt-1.5 text-[10px] font-bold uppercase tracking-widest ${
+                            totalPointsValid
+                              ? "text-primary"
+                              : totalPoints > RUBRIC_TOTAL_POINTS
+                                ? "text-error"
+                                : "text-on-surface-variant"
+                          }`}
+                        >
+                          {totalPointsValid
+                            ? "Ready"
+                            : totalPoints > RUBRIC_TOTAL_POINTS
+                              ? `${totalPoints - RUBRIC_TOTAL_POINTS} over`
+                              : `${RUBRIC_TOTAL_POINTS - totalPoints} remaining`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {rubricRows.map((row, index) => {
+                      const rowErrors = rubricRowErrors[index];
+                      const showErrors = touched.rubric;
+                      const hasAnyError =
+                        showErrors &&
+                        (rowErrors.title ||
+                          rowErrors.description ||
+                          rowErrors.max_points);
+
+                      return (
+                        <div
+                          key={index}
+                          className={`group relative rounded-xl border p-5 transition-all ${
+                            hasAnyError
+                              ? "border-error/30 bg-error/[0.02]"
+                              : "border-outline-variant/15 hover:border-outline-variant/40"
+                          }`}
+                        >
+                          <div className="flex items-start gap-4">
+                            <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
+
+                            <div className="min-w-0 flex-1 space-y-3">
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                                <div className="min-w-0 flex-1">
+                                  <input
+                                    className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-all placeholder:font-normal placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                                    placeholder="Criterion title (e.g. Accuracy)"
+                                    value={row.title}
+                                    onChange={(e) =>
+                                      handleRowChange(
+                                        index,
+                                        "title",
+                                        e.target.value,
+                                      )
+                                    }
+                                    onBlur={() =>
+                                      setTouched((current) => ({
+                                        ...current,
+                                        rubric: true,
+                                      }))
+                                    }
+                                  />
+
+                                  {showErrors && rowErrors.title && (
+                                    <p className="ml-1 mt-1 text-xs font-medium text-error">
+                                      {rowErrors.title}
+                                    </p>
+                                  )}
+                                </div>
+
+                                <div className="sm:w-36">
+                                  <div className="flex items-center gap-0 rounded-xl bg-surface-container-low pr-3 transition-all focus-within:ring-2 focus-within:ring-primary/20">
+                                    <input
+                                      className="w-full min-w-0 rounded-xl border-none bg-transparent px-4 py-3 text-right text-sm font-bold text-on-surface focus:outline-none"
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      value={row.max_points}
+                                      onChange={(e) =>
+                                        handleRowChange(
+                                          index,
+                                          "max_points",
+                                          e.target.value,
+                                        )
+                                      }
+                                      onBlur={() =>
+                                        setTouched((current) => ({
+                                          ...current,
+                                          rubric: true,
+                                        }))
+                                      }
+                                    />
+
+                                    <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                                      pts
+                                    </span>
+                                  </div>
+
+                                  {showErrors && rowErrors.max_points && (
+                                    <p className="ml-1 mt-1 text-xs font-medium text-error">
+                                      {rowErrors.max_points}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div>
+                                <textarea
+                                  className="min-h-[72px] w-full resize-y rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm leading-relaxed text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                                  placeholder="Describe what a perfect answer looks like. What should the student demonstrate?"
+                                  rows={2}
+                                  value={row.description}
+                                  onChange={(e) =>
+                                    handleRowChange(
+                                      index,
+                                      "description",
+                                      e.target.value,
+                                    )
+                                  }
+                                  onBlur={() =>
+                                    setTouched((current) => ({
+                                      ...current,
+                                      rubric: true,
+                                    }))
+                                  }
+                                />
+
+                                {showErrors && rowErrors.description && (
+                                  <p className="ml-1 mt-1 text-xs font-medium text-error">
+                                    {rowErrors.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRow(index)}
+                              disabled={rubricRows.length === 1}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-outline transition-all hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-20 md:opacity-0 md:group-hover:opacity-100"
+                              aria-label="Remove criterion"
+                            >
+                              <span className="material-symbols-outlined text-lg">
+                                delete
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddRow}
+                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant/30 bg-transparent py-3.5 text-sm font-bold text-on-surface-variant transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+                  >
+                    <span className="material-symbols-outlined text-base">
+                      add
+                    </span>
+                    Add criterion
+                  </button>
+                </section>
+              </div>
+
+              <div className="col-span-12">
                 <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
                   <div className="flex items-center gap-4">
                     <div className="rounded-lg bg-primary/10 p-3 text-primary">
@@ -690,91 +871,6 @@ function UpdateMaterial() {
               )}
             </div>
           )}
-
-          {phase === "setup" && (
-            <div className="mt-6 grid grid-cols-12 gap-6">
-              <div className="col-span-12">
-                <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-                  <div className="mb-6 flex items-center justify-between">
-                    <h2 className="flex items-center gap-2 text-xl font-bold">
-                      <span className="material-symbols-outlined text-secondary">
-                        assignment
-                      </span>
-                      Grading Rubric
-                    </h2>
-                    
-                    {/* show total points */}
-                    <div className="flex items-center gap-4">
-                      <span className="text-sm font-medium text-on-surface-variant">
-                        Total Points: <span className="font-bold text-primary">{totalPoints}</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleAddRow}
-                        className="flex items-center gap-1 rounded-lg bg-secondary/10 px-4 py-2 text-sm font-bold text-secondary transition-all hover:bg-secondary/20"
-                      >
-                        <span className="material-symbols-outlined text-sm">add</span>
-                        Add Criterion
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="text-xs font-bold uppercase tracking-wider text-outline">
-                          <th className="pb-4 pr-4">Criterion Title</th>
-                          <th className="pb-4 pr-4">Description</th>
-                          <th className="w-24 pb-4 pr-4 text-center">Points</th>
-                          <th className="w-12 pb-4"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-outline-variant/10">
-                        {rubricRows.map((row, index) => (
-                          <tr key={index} className="group">
-                            <td className="py-4 pr-4 align-top w-1/4">
-                              <input
-                                className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
-                                placeholder="e.g. Accuracy"
-                                value={row.title}
-                                onChange={(e) => handleRowChange(index, "title", e.target.value)}
-                              />
-                            </td>
-                            <td className="py-4 pr-4 align-top">
-                              <textarea
-                                className="min-h-[44px] w-full resize-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm transition-all focus:ring-2 focus:ring-secondary/20"
-                                placeholder="Describe what a perfect score looks like..."
-                                rows={4}
-                                value={row.description}
-                                onChange={(e) => handleRowChange(index, "description", e.target.value)}
-                              />
-                            </td>
-                            <td className="py-4 pr-4 align-top">
-                              <input
-                                className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-center text-sm font-bold transition-all focus:ring-2 focus:ring-secondary/20"
-                                type="number"
-                                min="0"
-                                value={row.max_points}
-                                onChange={(e) => handleRowChange(index, "max_points", e.target.value)}
-                              />
-                            </td>
-                            <td className="py-4 align-top text-right">
-                              <button
-                                onClick={() => handleRemoveRow(index)}
-                                className="mt-2 text-outline transition-colors hover:text-error group-hover:opacity-100 md:opacity-0"
-                              >
-                                <span className="material-symbols-outlined text-lg">delete</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </section>
-              </div>
-            </div>
-          )}  
         </div>
       </main>
     </div>
