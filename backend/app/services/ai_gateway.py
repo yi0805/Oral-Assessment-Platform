@@ -4,12 +4,11 @@ import asyncio
 import json as _json
 import logging
 import httpx
-import boto3
-import os
 
 from typing import Any
 
 from app.core.config import settings
+from app.services.aws_clients import get_bedrock_client
 
 # Retry policy for transient OpenRouter failures. Backoffs are in seconds.
 _CHAT_RETRY_BACKOFFS: tuple[float, ...] = (1.0, 3.0)
@@ -179,7 +178,7 @@ async def get_embeddings_batch(
 
 async def chat_complete(
     messages: list[dict[str, str]],
-    system_prompt: str | None = None,
+    system_prompt: str,
     temperature: float = 0.7,
     max_tokens: int = 1500,
     model: str | None = None,
@@ -283,23 +282,13 @@ async def chat_complete(
 # AWS Bedrock chat
 # ---------------------------------------------------------------------------
 
-session = boto3.Session(profile_name=settings.aws_profile_name)
-bedrock_client = session.client(
-    service_name='bedrock-runtime', 
-    region_name=settings.aws_region
-)
-
 async def chat_complete_bedrock(
         messages: list[dict[str, str]],
-        system_prompt: str, 
+        system_prompt: str,
         temperature: float = 0.7,
         max_tokens: int = 1500,
         ) -> str:
-    
-    if not settings.aws_bearer_token_bedrock:
-        logger.warning("[AI Gateway] AWS_BEARER_TOKEN_BEDROCK not set — returning placeholder (dev mode)")
-        return "[AI response placeholder — set AWS_BEARER_TOKEN_BEDROCK in .env to enable live AI]"
-    
+
     payload = {
         "anthropic_version": "bedrock-2023-05-31",
         "max_tokens": max_tokens,
@@ -311,20 +300,21 @@ async def chat_complete_bedrock(
 
     loop = asyncio.get_event_loop()
     try:
+        client = get_bedrock_client()
         response = await loop.run_in_executor(
             None, 
-            lambda: bedrock_client.invoke_model(
+            lambda: client.invoke_model(
                 modelId=AWS_BEDROCK_MODEL,
                 body=_json.dumps(payload)
             )
         )
-        
+
         response_body = _json.loads(response.get('body').read())
         return response_body['content'][0]['text']
-        
+
     except Exception as e:
         logger.error(f"[AI Gateway] Bedrock error: {e}")
-        raise RuntimeError(f"Bedrock call failed: {e}")
+        raise RuntimeError(f"Bedrock call failed: {e}") from e
     
 # ---------------------------------------------------------------------------
 # Smart chat
@@ -332,7 +322,7 @@ async def chat_complete_bedrock(
 
 async def smart_chat_complete(
     messages: list[dict[str, str]],
-    system_prompt: str | None = None,
+    system_prompt: str,
     temperature: float = 0.7,
     max_tokens: int = 1500,
 ) -> str:
@@ -340,7 +330,7 @@ async def smart_chat_complete(
     Primary: AWS Bedrock; Fallback: OpenRouter
     """
     # 1. Attempt Bedrock first
-    if settings.aws_profile_name:
+    if settings.aws_bearer_token_bedrock:
         try:
             logger.info("[AI Gateway] Attempting Bedrock (Claude 3 Haiku)...")
             return await chat_complete_bedrock(

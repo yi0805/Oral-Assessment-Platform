@@ -25,6 +25,7 @@ from app.schemas import (
     StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
 )
+from backend.app.services.ai_gateway import smart_chat_complete
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -74,7 +75,6 @@ async def _generate_ai_followup(
     current_main: int,
     current_followup: int,
 ) -> str:
-    from app.services.ai_gateway import chat_complete
 
     rows = (
         db.query(TranscriptMessage, SessionQuestionItem)
@@ -145,7 +145,7 @@ async def _generate_ai_followup(
     )
 
     try:
-        result = await chat_complete(
+        result = await smart_chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
             system_prompt=FOLLOWUP_SYSTEM_PROMPT,
             temperature=0.2,
