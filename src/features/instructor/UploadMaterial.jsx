@@ -217,6 +217,7 @@ function UpdateMaterial() {
 
           const numericValue = parseInt(value, 10);
           if (!Number.isFinite(numericValue)) return row;
+
           return { ...row, [field]: Math.max(0, numericValue) };
         }
 
@@ -224,6 +225,7 @@ function UpdateMaterial() {
       }
       return row;
     });
+
     setRubricRows(updatedRows);
   }
 
@@ -498,10 +500,12 @@ function UpdateMaterial() {
                           assignment
                         </span>
                       </div>
+
                       <div>
                         <h2 className="text-xl font-bold text-on-surface">
                           Grading Rubric
                         </h2>
+
                         <p className="mt-1 max-w-md text-xs text-on-surface-variant">
                           Define how the AI evaluates responses. Each
                           criterion&apos;s points act as its percentage weight —
@@ -523,6 +527,7 @@ function UpdateMaterial() {
                         >
                           {totalPoints}
                         </span>
+
                         <span className="text-sm font-bold text-outline">
                           / {RUBRIC_TOTAL_POINTS}
                         </span>
@@ -548,6 +553,7 @@ function UpdateMaterial() {
                             }}
                           />
                         </div>
+
                         <p
                           className={`mt-1.5 text-[10px] font-bold uppercase tracking-widest ${
                             totalPointsValid
