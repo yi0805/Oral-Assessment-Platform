@@ -144,11 +144,6 @@ function UpdateMaterial() {
       });
       const RubricId = rubricResponse.id;
 
-      console.log({
-        releaseTime,
-        dueTime,
-      });
-
       const release = releaseTime?.toISOString();
       const due = dueTime?.toISOString();
       

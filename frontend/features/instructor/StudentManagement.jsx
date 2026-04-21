@@ -6,6 +6,7 @@ import { useDashboard } from "./useDashboard";
 import { useImportStudents } from "./useImportStudents";
 import { useExportResults } from "./useExportResults";
 import { useEnrolUser } from "./useEnrolUser";
+import { useDeleteEnrolment } from "./useDeleteEnrolment";
 
 import Spinner from "../../ui/Spinner";
 
@@ -19,19 +20,17 @@ export default function StudentManagement() {
   const [selectedAssessment, setSelectedAssessment] = useState("");
 
   const [upi, setUPI] = useState("");
+  const [upiD, setUpiD] = useState("");
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
   const { importStudents, isPending: isImporting } = useImportStudents();
   const { exportResults, isPending: isExporting } = useExportResults();
-  const { enrolUser, isPending: isEnroling} = useEnrolUser();
+  const { enrolUser, isPending: isEnroling } = useEnrolUser();
+  const { deleteEnrolment, isPending: isDeleting } = useDeleteEnrolment();
 
   const { dashboard = [], isLoading: isDashboardLoading } =
     useDashboard(courseId);
-
-  const [touched, setTouched] = useState({
-    upi: false,
-  })
 
   useEffect(() => {
     if (courses.length > 0 && !courseId) {
@@ -65,8 +64,9 @@ export default function StudentManagement() {
     exportResults({ courseId, assessmentConfigId: selectedAssessment });
   }
 
-  const emptyError = 
-    upi.trim() === "" ? "Required to be filled." : "";
+  function emptyError(upi) {
+    return upi.trim() === "" ? "Required to be filled." : "";
+  } 
 
   function handleAdd() {
     if (!courseId) return;
@@ -75,6 +75,17 @@ export default function StudentManagement() {
       setStatusMessage("Enroling instructor to course...");
       enrolUser( {courseId, upi: upi});
     }finally {
+      setLoading(false);
+    }
+  }
+
+  function handleDelete() {
+    if (!courseId) return;
+    try {
+      setLoading(true);
+      setStatusMessage("Deleting user enrolment in...")
+      deleteEnrolment({course_id: courseId, upi: upiD});
+    } finally {
       setLoading(false);
     }
   }
@@ -273,19 +284,7 @@ export default function StudentManagement() {
                   type="text"
                   value={upi}
                   onChange={(e) => setUPI(e.target.value)}
-                  onBlur={() =>
-                    setTouched((current) => ({
-                      ...current,
-                      upi: true,
-                    }))
-                  }
                 />
-
-                {touched.upi && emptyError && (
-                  <p className="ml-1 text-xs font-medium text-error">
-                    {emptyError}
-                  </p>
-                )}
               </div>
               <button 
                 onClick={() => handleAdd()}
@@ -298,13 +297,32 @@ export default function StudentManagement() {
               <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
                 <span
                   className="material-symbols-outlined text-primary"
-                  data-icon="rubbish_bin"
+                  data-icon="delete"
                   style={{ verticalAlign: "middle" }}
                 >
-                  rubbish_bin
+                  delete
                 </span>
-                Delete Student
+                Delete Enrolment 
               </h2>
+              <div className="space-y-2">
+                <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                  Email (before @)
+                </label>
+
+                <input
+                  className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                  placeholder="e.g. john.doe of john.doe@gmail.com"
+                  type="text"
+                  value={upiD}
+                  onChange={(e) => setUpiD(e.target.value)}
+                />
+              </div>
+              <button 
+                onClick={() => handleDelete()}
+                className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
+              >
+                Disconnect User to course
+              </button>
             </div>
           </section>
         </div>

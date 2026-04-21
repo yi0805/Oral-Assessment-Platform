@@ -17,8 +17,8 @@ class UserResponse(BaseModel):
     role: UserRole
     image: str | None = None
 
-class EnrolUser(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class Userupi(BaseModel):
+    # model_config = ConfigDict(from_attributes=True)
 
     upi: str
 

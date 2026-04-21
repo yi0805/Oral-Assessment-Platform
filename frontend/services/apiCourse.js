@@ -33,6 +33,15 @@ export async function importStudentsCSV(courseId, file) {
   return response.data;
 }
 
+export async function exportResultsCSV(courseId, assessmentConfigId) {
+  const response = await api.get(
+    `/courses/${courseId}/assessments/${assessmentConfigId}/export-results`,
+    { responseType: "blob" },
+  );
+  
+  return response;
+}
+
 export async function enrolUser(courseId, upi) {
   const response = await api.post(
     `/courses/${courseId}/enroluser`, {
@@ -42,11 +51,11 @@ export async function enrolUser(courseId, upi) {
   return response.data;
 }
 
-export async function exportResultsCSV(courseId, assessmentConfigId) {
-  const response = await api.get(
-    `/courses/${courseId}/assessments/${assessmentConfigId}/export-results`,
-    { responseType: "blob" },
-  );
+export async function deleteEnrolment(course_id, upi) {
+  const response = await api.delete(
+    `/courses/${course_id}/delete-enrolment`, {
+      data: { upi }
+  });
 
-  return response;
+  return response.data;
 }

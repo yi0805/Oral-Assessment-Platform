@@ -13,7 +13,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 
 from app.models import Course, CourseEnrollment, AISummary, SessionFeedback, User, AssessmentConfig, AssessmentSession
-from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, EnrolUser
+from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, Userupi
 
 from app.schemas.enums import UserRole
 
@@ -44,11 +44,10 @@ def dashboard_status(session_status: str) -> str:
 )
 def enrol_user(
     course_id: UUID,
-    payload: EnrolUser,
+    payload: Userupi,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    print("email before " + payload.upi)
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
@@ -75,7 +74,7 @@ def enrol_user(
         new_user.role = UserRole.instructor
     else:
         db.add(CourseEnrollment(course_id=course_id, upi=payload.upi))
-        db.commit()
+    db.commit()
 
     return {"message": f"Instructor '{payload.upi}' connected successfully '{course.course_code}'."}
 
@@ -480,3 +479,44 @@ def export_results_csv(
             "Content-Disposition": f"attachment; filename=results_{assessment_config.title.replace(' ', '_')}.csv"
         },
     )
+
+# Unenrol user from the course
+@router.delete(
+    "/{course_id}/delete-enrolment",
+    summary="Delete student enrolment"
+)
+def delete_enrolment(
+    course_id: UUID,
+    payload: Userupi,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor)
+):
+    print("deleting enrolment " + payload.upi)
+    enrolment = db.query(CourseEnrollment).filter(
+        CourseEnrollment.course_id == course_id,
+        CourseEnrollment.user_id == current_user.id
+    ).first()
+    if not enrolment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an instructor of this course.",
+    )
+
+    enrolment = (
+        db.query(CourseEnrollment).filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.upi == payload.upi
+            ).first()
+        )   
+    
+    if not enrolment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrolment not found")
+    
+    try: 
+        db.delete(enrolment)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database deletion failed")
+
+    return {"message": "Enrolment deleted successfully."}
