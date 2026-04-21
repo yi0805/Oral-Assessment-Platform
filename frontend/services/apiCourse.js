@@ -33,6 +33,15 @@ export async function importStudentsCSV(courseId, file) {
   return response.data;
 }
 
+export async function enrolUser(courseId, upi) {
+  const response = await api.post(
+    `/courses/${courseId}/enroluser`, {
+    upi: upi
+  });
+
+  return response.data;
+}
+
 export async function exportResultsCSV(courseId, assessmentConfigId) {
   const response = await api.get(
     `/courses/${courseId}/assessments/${assessmentConfigId}/export-results`,

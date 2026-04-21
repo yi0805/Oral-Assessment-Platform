@@ -5,6 +5,7 @@ import { useCourses } from "../../hooks/useCourses";
 import { useDashboard } from "./useDashboard";
 import { useImportStudents } from "./useImportStudents";
 import { useExportResults } from "./useExportResults";
+import { useEnrolUser } from "./useEnrolUser";
 
 import Spinner from "../../ui/Spinner";
 
@@ -17,11 +18,20 @@ export default function StudentManagement() {
   const { courses, isLoading } = useCourses();
   const [selectedAssessment, setSelectedAssessment] = useState("");
 
+  const [upi, setUPI] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
+
   const { importStudents, isPending: isImporting } = useImportStudents();
   const { exportResults, isPending: isExporting } = useExportResults();
+  const { enrolUser, isPending: isEnroling} = useEnrolUser();
 
   const { dashboard = [], isLoading: isDashboardLoading } =
     useDashboard(courseId);
+
+  const [touched, setTouched] = useState({
+    upi: false,
+  })
 
   useEffect(() => {
     if (courses.length > 0 && !courseId) {
@@ -53,6 +63,20 @@ export default function StudentManagement() {
     if (!courseId || !selectedAssessment) return;
 
     exportResults({ courseId, assessmentConfigId: selectedAssessment });
+  }
+
+  const emptyError = 
+    upi.trim() === "" ? "Required to be filled." : "";
+
+  function handleAdd() {
+    if (!courseId) return;
+    try {
+      setLoading(true);
+      setStatusMessage("Enroling instructor to course...");
+      enrolUser( {courseId, upi: upi});
+    }finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -121,111 +145,169 @@ export default function StudentManagement() {
             </div>
           </div>
         </section>
-
-        <section className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-          <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
-            <span
-              className="material-symbols-outlined text-primary"
-              data-icon="upload_file"
-              style={{ verticalAlign: "middle" }}
-            >
-              upload_file
-            </span>
-            Import Students
-          </h2>
-
-          <p className="mb-6 text-sm text-on-surface-variant">
-            Upload a CSV file with a <strong>UPI</strong> column to bulk-enrol
-            students into the selected course.
-          </p>
-
-          <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-8 text-center">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
+        <div className="grid grid-cols-2 gap-4">
+          <section className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+            <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
               <span
-                className="material-symbols-outlined text-2xl text-primary"
-                data-icon="csv"
+                className="material-symbols-outlined text-primary"
+                data-icon="upload_file"
                 style={{ verticalAlign: "middle" }}
               >
-                csv
+                upload_file
               </span>
-            </div>
+              Import Students (Group)
+            </h2>
 
-            <h3 className="mb-1 text-base font-bold">Student CSV</h3>
-
-            <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
-              CSV must contain a single &quot;UPI&quot; column with student
-              identifiers.
+            <p className="mb-6 text-sm text-on-surface-variant">
+              Upload a CSV file with a <strong>UPI</strong> column to bulk-enrol
+              students into the selected course.
             </p>
 
-            <div className="w-full max-w-xs space-y-3">
-              {csvFile && (
-                <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-tertiary/10 text-tertiary">
-                    <span
-                      className="material-symbols-outlined text-xl"
-                      data-icon="description"
-                      style={{ verticalAlign: "middle" }}
+            <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-8 text-center">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-surface-container-lowest shadow-sm">
+                <span
+                  className="material-symbols-outlined text-2xl text-primary"
+                  data-icon="csv"
+                  style={{ verticalAlign: "middle" }}
+                >
+                  csv
+                </span>
+              </div>
+
+              <h3 className="mb-1 text-base font-bold">Student CSV</h3>
+
+              <p className="mb-4 px-2 text-[11px] text-on-surface-variant">
+                CSV must contain a single &quot;UPI&quot; column with student
+                identifiers.
+              </p>
+
+              <div className="w-full max-w-xs space-y-3">
+                {csvFile && (
+                  <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-3 text-left shadow-sm">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-tertiary/10 text-tertiary">
+                      <span
+                        className="material-symbols-outlined text-xl"
+                        data-icon="description"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        description
+                      </span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {csvFile.name}
+                      </p>
+
+                      <p className="text-[9px] text-outline">
+                        {(csvFile.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+
+                    <button
+                      className="text-on-surface-variant transition-colors hover:text-error"
+                      onClick={() => {
+                        setCsvFile(null);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                      }}
                     >
-                      description
-                    </span>
+                      <span
+                        className="material-symbols-outlined text-lg"
+                        data-icon="close"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        close
+                      </span>
+                    </button>
                   </div>
+                )}
 
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">
-                      {csvFile.name}
-                    </p>
+                <label className="block cursor-pointer">
+                  <input
+                    ref={fileInputRef}
+                    className="hidden"
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => setCsvFile(e.target.files[0] || null)}
+                  />
 
-                    <p className="text-[9px] text-outline">
-                      {(csvFile.size / 1024).toFixed(1)} KB
-                    </p>
+                  <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
+                    Browse Files
                   </div>
+                </label>
+              </div>
 
-                  <button
-                    className="text-on-surface-variant transition-colors hover:text-error"
-                    onClick={() => {
-                      setCsvFile(null);
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
-                  >
-                    <span
-                      className="material-symbols-outlined text-lg"
-                      data-icon="close"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      close
-                    </span>
-                  </button>
-                </div>
-              )}
+              <button
+                className={`mt-6 rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
+                  csvFile && courseId && !isImporting
+                    ? "bg-primary text-on-primary hover:bg-primary-dim"
+                    : "cursor-not-allowed bg-surface-container text-outline"
+                }`}
+                disabled={!csvFile || !courseId || isImporting}
+                onClick={handleImport}
+              >
+                {isImporting ? "Importing..." : "Import Students"}
+              </button>
+            </div>
+          </section>
+          <section>
+            <div className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+              <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
+                <span
+                  className="material-symbols-outlined text-primary"
+                  data-icon="add"
+                  style={{ verticalAlign: "middle" }}
+                >
+                  add
+                </span>
+                Add Instructors to Course
+              </h2>
+              <div className="space-y-2">
+                <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                  Email (before @)
+                </label>
 
-              <label className="block cursor-pointer">
                 <input
-                  ref={fileInputRef}
-                  className="hidden"
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setCsvFile(e.target.files[0] || null)}
+                  className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                  placeholder="e.g. john.doe of john.doe@gmail.com"
+                  type="text"
+                  value={upi}
+                  onChange={(e) => setUPI(e.target.value)}
+                  onBlur={() =>
+                    setTouched((current) => ({
+                      ...current,
+                      upi: true,
+                    }))
+                  }
                 />
 
-                <div className="w-full rounded-xl border border-outline-variant/20 bg-white py-2.5 text-center text-xs font-bold text-primary transition-all hover:bg-primary/5">
-                  Browse Files
-                </div>
-              </label>
+                {touched.upi && emptyError && (
+                  <p className="ml-1 text-xs font-medium text-error">
+                    {emptyError}
+                  </p>
+                )}
+              </div>
+              <button 
+                onClick={() => handleAdd()}
+                className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
+              >
+                Connect User!
+              </button>
             </div>
-
-            <button
-              className={`mt-6 rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
-                csvFile && courseId && !isImporting
-                  ? "bg-primary text-on-primary hover:bg-primary-dim"
-                  : "cursor-not-allowed bg-surface-container text-outline"
-              }`}
-              disabled={!csvFile || !courseId || isImporting}
-              onClick={handleImport}
-            >
-              {isImporting ? "Importing..." : "Import Students"}
-            </button>
-          </div>
-        </section>
+            <div className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+              <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
+                <span
+                  className="material-symbols-outlined text-primary"
+                  data-icon="rubbish_bin"
+                  style={{ verticalAlign: "middle" }}
+                >
+                  rubbish_bin
+                </span>
+                Delete Student
+              </h2>
+            </div>
+          </section>
+        </div>
 
         <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
           <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">

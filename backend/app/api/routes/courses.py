@@ -13,7 +13,9 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 
 from app.models import Course, CourseEnrollment, AISummary, SessionFeedback, User, AssessmentConfig, AssessmentSession
-from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut
+from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, EnrolUser
+
+from app.schemas.enums import UserRole
 
 router = APIRouter()
 
@@ -33,6 +35,49 @@ def dashboard_status(session_status: str) -> str:
     if session_status == "under_review":
         return "review"
     return "inprogress"
+
+# Add student/instructor individually
+@router.post(
+    "/{course_id}/enroluser",
+    status_code=status.HTTP_200_OK,
+    summary="Individually add users (student or instructor to course)",
+)
+def enrol_user(
+    course_id: UUID,
+    payload: EnrolUser,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    print("email before " + payload.upi)
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
+    
+    enrolment = db.query(CourseEnrollment).filter(
+        CourseEnrollment.course_id == course_id,
+        CourseEnrollment.user_id == current_user.id
+    ).first()
+    if not enrolment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an instructor of this course.",
+    )
+   
+    new_user = db.query(User).filter(User.upi == payload.upi).first()
+    if new_user:
+        existing = db.query(CourseEnrollment).filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == new_user.upi
+        ).first()
+        if existing:
+            raise HTTPException(400, "User already enrolled")
+    elif new_user:
+        new_user.role = UserRole.instructor
+    else:
+        db.add(CourseEnrollment(course_id=course_id, upi=payload.upi))
+        db.commit()
+
+    return {"message": f"Instructor '{payload.upi}' connected successfully '{course.course_code}'."}
 
 
 # Import students via CSV
