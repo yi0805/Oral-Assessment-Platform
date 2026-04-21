@@ -39,8 +39,10 @@ def _upsert_user(db: Session, email: str, full_name: str, upi: str, image: str |
     if user:
         user.full_name = full_name
         user.image = image
+
         db.commit()
         db.refresh(user)
+        
         return user
 
     role = resolve_role_for_new_user(email)
