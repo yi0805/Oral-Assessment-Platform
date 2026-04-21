@@ -8,6 +8,7 @@ import httpx
 from typing import Any
 
 from app.core.config import settings
+from app.services.aws_clients import get_bedrock_client
 
 # Retry policy for transient OpenRouter failures. Backoffs are in seconds.
 _CHAT_RETRY_BACKOFFS: tuple[float, ...] = (1.0, 3.0)
@@ -37,6 +38,7 @@ GEMINI_BATCH_EMBED_URL = (
 EMBEDDING_DIMENSIONS = 768    #(pgvector HNSW max is 2000)
 _ZERO_VECTOR: list[float] = [0.0] * EMBEDDING_DIMENSIONS  # 768 zeros 
 
+AWS_BEDROCK_MODEL = "anthropic.claude-3-haiku-20240307-v1:0"
 
 # ---------------------------------------------------------------------------
 # Public embedding interface
@@ -176,7 +178,7 @@ async def get_embeddings_batch(
 
 async def chat_complete(
     messages: list[dict[str, str]],
-    system_prompt: str | None = None,
+    system_prompt: str,
     temperature: float = 0.7,
     max_tokens: int = 1500,
     model: str | None = None,
@@ -275,3 +277,80 @@ async def chat_complete(
             raise RuntimeError(f"OpenRouter chat error: {exc}") from exc
 
     raise RuntimeError(f"OpenRouter chat failed after {max_attempts} attempts")
+
+# ---------------------------------------------------------------------------
+# AWS Bedrock chat
+# ---------------------------------------------------------------------------
+
+async def chat_complete_bedrock(
+        messages: list[dict[str, str]],
+        system_prompt: str,
+        temperature: float = 0.7,
+        max_tokens: int = 1500,
+        ) -> str:
+
+    payload = {
+        "anthropic_version": "bedrock-2023-05-31",
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "system": system_prompt, # Claude 3 support independent system prompt
+        "messages": messages
+    }
+    
+
+    loop = asyncio.get_event_loop()
+    try:
+        client = get_bedrock_client()
+        response = await loop.run_in_executor(
+            None, 
+            lambda: client.invoke_model(
+                modelId=AWS_BEDROCK_MODEL,
+                body=_json.dumps(payload)
+            )
+        )
+
+        response_body = _json.loads(response.get('body').read())
+        return response_body['content'][0]['text']
+
+    except Exception as e:
+        logger.error(f"[AI Gateway] Bedrock error: {e}")
+        raise RuntimeError(f"Bedrock call failed: {e}") from e
+    
+# ---------------------------------------------------------------------------
+# Smart chat
+# ---------------------------------------------------------------------------
+
+async def smart_chat_complete(
+    messages: list[dict[str, str]],
+    system_prompt: str,
+    temperature: float = 0.7,
+    max_tokens: int = 1500,
+) -> str:
+    """
+    Primary: AWS Bedrock; Fallback: OpenRouter
+    """
+    # 1. Attempt Bedrock first
+    if settings.aws_bearer_token_bedrock:
+        try:
+            logger.info("[AI Gateway] Attempting Bedrock (Claude 3 Haiku)...")
+            return await chat_complete_bedrock(
+                messages=messages,
+                system_prompt=system_prompt,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+        except Exception as exc:
+            logger.warning(f"[AI Gateway] Bedrock failed: {exc}. Falling back to OpenRouter...")
+
+    # 2. OpenRouter as a redundant backup
+    try:
+        logger.info("[AI Gateway] Using OpenRouter fallback...")
+        return await chat_complete(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+    except Exception as exc:
+        logger.error(f"[AI Gateway] Both AI providers failed: {exc}")
+        raise RuntimeError("All AI providers exhausted.") from exc

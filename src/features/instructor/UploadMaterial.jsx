@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useUploadMaterial } from "./useUploadMaterial";
+import { useUploadGithubRepo } from "./useUploadGithubRepo";
 import { useCreateRubric } from "./useCreateRubric";
 import { useQuestionGenerate } from "./useQuestionGenerate";
 import { useDeleteQuestion } from "./useDeleteQuestion";
@@ -13,8 +14,16 @@ import { usePublishAssessment } from "./usePublishAssessment";
 import Spinner from "../../ui/Spinner";
 import DateTimePicker from "../../ui/DateTimePicker";
 
+const GITHUB_URL_RE = /^https?:\/\/github\.com\/[^/\s]+\/[^/\s#?]+/i;
+const isValidGithubUrl = (u) => GITHUB_URL_RE.test((u || "").trim());
+
 function UpdateMaterial() {
   const [materialFile, setMaterialFile] = useState(null);
+
+  const [source, setSource] = useState("pdf");
+  const [githubUrl, setGithubUrl] = useState("");
+  const [githubRef, setGithubRef] = useState("");
+
   const [courseId, setCourseId] = useState("");
 
   const [assessmentConfigId, setAssessmentConfigId] = useState(null);
@@ -33,6 +42,7 @@ function UpdateMaterial() {
     numQuestions: false,
     assessmentTime: false,
     rubric: false,
+    githubUrl: false,
   });
 
   const [phase, setPhase] = useState("setup");
@@ -60,6 +70,7 @@ function UpdateMaterial() {
   const { courses, isLoading } = useCourses();
 
   const { uploadMaterial } = useUploadMaterial();
+  const { uploadGithubRepo } = useUploadGithubRepo();
   const { createRubric } = useCreateRubric();
 
   const { questionGenerate } = useQuestionGenerate();
@@ -112,22 +123,42 @@ function UpdateMaterial() {
     totalPointsValid &&
     rubricRowErrors.every((e) => !e.title && !e.description && !e.max_points);
 
+  const githubUrlError =
+    source === "github" && githubUrl && !isValidGithubUrl(githubUrl)
+      ? "Must be a github.com HTTPS URL."
+      : "";
+
+  const materialReady =
+    (source === "pdf" && !!materialFile) ||
+    (source === "github" && isValidGithubUrl(githubUrl));
+
   const isValid =
     !numQuestionsError &&
     !assessmentTimeError &&
     !assessmentNameError &&
-    materialFile &&
+    materialReady &&
     isRubricValid;
 
   async function handleSubmit() {
     try {
       setLoading(true);
-      setStatusMessage("Uploading material...");
+      setStatusMessage(
+        source === "github"
+          ? "Importing GitHub repository..."
+          : "Uploading material...",
+      );
 
-      const MaterialId = await uploadMaterial({
-        courseId,
-        file: materialFile,
-      });
+      const MaterialId =
+        source === "pdf"
+          ? await uploadMaterial({
+              courseId,
+              file: materialFile,
+            })
+          : await uploadGithubRepo({
+              courseId,
+              url: githubUrl.trim(),
+              ref: githubRef.trim() || null,
+            });
 
       setStatusMessage("Creating rubric...");
       const rubricPayload = {
@@ -235,6 +266,7 @@ function UpdateMaterial() {
 
           const numericValue = parseInt(value, 10);
           if (!Number.isFinite(numericValue)) return row;
+
           return { ...row, [field]: Math.max(0, numericValue) };
         }
 
@@ -242,6 +274,7 @@ function UpdateMaterial() {
       }
       return row;
     });
+
     setRubricRows(updatedRows);
   }
 
@@ -292,8 +325,8 @@ function UpdateMaterial() {
           )}
 
           {phase === "setup" && (
-            <div className="grid grid-cols-12 items-start gap-5">
-              <div className="col-span-12 space-y-6 lg:col-span-6">
+            <div className="grid grid-cols-12 items-start gap-6">
+              <div className="col-span-12 space-y-6 lg:col-span-5">
                 <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
                   <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
                     <span
@@ -434,85 +467,208 @@ function UpdateMaterial() {
                 </section>
               </div>
 
-              <div className="col-span-12 space-y-6 lg:col-span-6">
-                <section className="flex h-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-10 text-center transition-colors hover:border-primary/40">
-                  <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-surface-container-lowest shadow-sm">
-                    <span
-                      className="material-symbols-outlined text-3xl text-primary"
-                      data-icon="upload_file"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      upload_file
+              <div className="col-span-12 flex h-full flex-col gap-2 lg:col-span-7">
+                <div
+                  className="flex rounded-xl bg-surface-container-low p-1"
+                  role="tablist"
+                  aria-label="Material source"
+                >
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={source === "pdf"}
+                    onClick={() => setSource("pdf")}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+                      source === "pdf"
+                        ? "bg-surface-container-lowest text-primary shadow-sm"
+                        : "text-on-surface-variant hover:text-on-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      picture_as_pdf
                     </span>
-                  </div>
+                    PDF Upload
+                  </button>
 
-                  <h3 className="mb-3 mt-3 text-xl font-bold text-on-surface">
-                    Assessment Material
-                  </h3>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={source === "github"}
+                    onClick={() => setSource("github")}
+                    className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-all ${
+                      source === "github"
+                        ? "bg-surface-container-lowest text-primary shadow-sm"
+                        : "text-on-surface-variant hover:text-on-surface"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg">
+                      code
+                    </span>
+                    GitHub Repo
+                  </button>
+                </div>
 
-                  <p className="mb-8 max-w-xs text-sm text-on-surface-variant">
-                    Upload a PDF of the source material — we&apos;ll use it to
-                    generate every question.
-                  </p>
+                {source === "pdf" ? (
+                  <section className="flex flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-10 text-center transition-colors hover:border-primary/40">
+                    <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-container-lowest shadow-sm">
+                      <span
+                        className="material-symbols-outlined text-3xl text-primary"
+                        data-icon="upload_file"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        upload_file
+                      </span>
+                    </div>
 
-                  <div className="w-full max-w-md space-y-4">
-                    {materialFile && (
-                      <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 text-left shadow-sm">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
-                          <span
-                            className="material-symbols-outlined text-2xl"
-                            data-icon="picture_as_pdf"
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            picture_as_pdf
-                          </span>
-                        </div>
+                    <h3 className="mb-2 text-xl font-bold text-on-surface">
+                      Assessment Material
+                    </h3>
 
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-on-surface">
-                            {materialFile.name}
-                          </p>
-                          <p className="text-xs text-outline">
-                            {(materialFile.size / 1024 / 1024).toFixed(1)} MB
-                          </p>
-                        </div>
-
-                        <button
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error"
-                          onClick={() => setMaterialFile(null)}
-                          aria-label="Remove file"
-                        >
-                          <span
-                            className="material-symbols-outlined text-lg"
-                            data-icon="close"
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            close
-                          </span>
-                        </button>
-                      </div>
-                    )}
-
-                    <label className="block cursor-pointer">
-                      <input
-                        className="hidden"
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) =>
-                          setMaterialFile(e.target.files[0] || null)
-                        }
-                      />
-
-                      <div className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 text-center text-sm font-bold text-primary shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5">
-                        {materialFile ? "Replace File" : "Browse PDF"}
-                      </div>
-                    </label>
-
-                    <p className="text-[12px] text-outline">
-                      PDF only · Max 50 MB
+                    <p className="mb-8 max-w-sm text-sm text-on-surface-variant">
+                      Upload a PDF of the source material — we&apos;ll use it
+                      to generate every question.
                     </p>
-                  </div>
-                </section>
+
+                    <div className="w-full max-w-md space-y-4">
+                      {materialFile && (
+                        <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 text-left shadow-sm">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
+                            <span
+                              className="material-symbols-outlined text-2xl"
+                              data-icon="picture_as_pdf"
+                              style={{ verticalAlign: "middle" }}
+                            >
+                              picture_as_pdf
+                            </span>
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-on-surface">
+                              {materialFile.name}
+                            </p>
+                            <p className="text-xs text-outline">
+                              {(materialFile.size / 1024 / 1024).toFixed(1)} MB
+                            </p>
+                          </div>
+
+                          <button
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error"
+                            onClick={() => setMaterialFile(null)}
+                            aria-label="Remove file"
+                          >
+                            <span
+                              className="material-symbols-outlined text-lg"
+                              data-icon="close"
+                              style={{ verticalAlign: "middle" }}
+                            >
+                              close
+                            </span>
+                          </button>
+                        </div>
+                      )}
+
+                      <label className="block cursor-pointer">
+                        <input
+                          className="hidden"
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) =>
+                            setMaterialFile(e.target.files[0] || null)
+                          }
+                        />
+
+                        <div className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 text-center text-sm font-bold text-primary shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5">
+                          {materialFile ? "Replace File" : "Browse PDF"}
+                        </div>
+                      </label>
+
+                      <p className="text-[11px] text-outline">
+                        PDF only · Max 50 MB
+                      </p>
+                    </div>
+                  </section>
+                ) : (
+                  <section className="flex flex-1 flex-col rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+                    <div className="mb-6 flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          data-icon="hub"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          hub
+                        </span>
+                      </div>
+
+                      <div>
+                        <h3 className="text-xl font-bold text-on-surface">
+                          GitHub Repository
+                        </h3>
+
+                        <p className="mt-1 max-w-md text-xs text-on-surface-variant">
+                          Paste a public GitHub repo URL — we&apos;ll import
+                          its markdown, docs, and source files to generate
+                          questions.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                          Repository URL
+                        </label>
+
+                        <input
+                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                          type="url"
+                          inputMode="url"
+                          autoComplete="off"
+                          spellCheck="false"
+                          placeholder="https://github.com/owner/repo"
+                          value={githubUrl}
+                          onChange={(e) => setGithubUrl(e.target.value)}
+                          onBlur={() =>
+                            setTouched((current) => ({
+                              ...current,
+                              githubUrl: true,
+                            }))
+                          }
+                        />
+
+                        {touched.githubUrl && githubUrlError && (
+                          <p className="ml-1 text-xs font-medium text-error">
+                            {githubUrlError}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                          Branch{" "}
+                          <span className="font-normal text-outline">
+                            (optional)
+                          </span>
+                        </label>
+
+                        <input
+                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                          type="text"
+                          autoComplete="off"
+                          spellCheck="false"
+                          placeholder="main"
+                          value={githubRef}
+                          onChange={(e) => setGithubRef(e.target.value)}
+                        />
+                      </div>
+
+                      <p className="text-[11px] text-outline">
+                        Public repos only · Up to 2 MB of text (markdown,
+                        docs, source)
+                      </p>
+                    </div>
+                  </section>
+                )}
               </div>
 
               <div className="col-span-12">
@@ -528,11 +684,13 @@ function UpdateMaterial() {
                           assignment
                         </span>
                       </div>
+
                       <div>
                         <h2 className="text-xl font-bold text-on-surface">
                           Grading Rubric
                         </h2>
-                        <p className="mt-1 max-w-lg text-xs text-on-surface-variant">
+
+                        <p className="mt-1 max-w-md text-xs text-on-surface-variant">
                           Define how the AI evaluates responses. Each
                           criterion&apos;s points act as its percentage weight —
                           must total {RUBRIC_TOTAL_POINTS}.
@@ -553,6 +711,7 @@ function UpdateMaterial() {
                         >
                           {totalPoints}
                         </span>
+
                         <span className="text-sm font-bold text-outline">
                           / {RUBRIC_TOTAL_POINTS}
                         </span>
@@ -578,6 +737,7 @@ function UpdateMaterial() {
                             }}
                           />
                         </div>
+
                         <p
                           className={`mt-1.5 text-[10px] font-bold uppercase tracking-widest ${
                             totalPointsValid

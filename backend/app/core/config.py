@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     aws_profile_name: str 
 
     gemini_api_key: str
-    openrouter_api_key: str 
+    openrouter_api_key: str
+    aws_bearer_token_bedrock: str
 
     google_instructor_domains: str
     google_instructor_allowlist: str

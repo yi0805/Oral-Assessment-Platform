@@ -11,3 +11,12 @@ export async function uploadMaterial(courseId, file) {
 
   return response.data;
 }
+
+export async function uploadGithubRepo(courseId, url, ref) {
+  const response = await api.post(
+    `/courses/${courseId}/materials/github`,
+    { url, ref },
+  );
+
+  return response.data;
+}

@@ -74,6 +74,7 @@ def enrol_user(
         new_user.role = UserRole.instructor
     else:
         db.add(CourseEnrollment(course_id=course_id, upi=payload.upi))
+        
     db.commit()
 
     return {"message": f"Instructor '{payload.upi}' connected successfully '{course.course_code}'."}
@@ -244,7 +245,7 @@ def create_course(
     enrollment = CourseEnrollment(
         course_id=course.id,
         user_id=current_user.id,
-        upi = current_user.upi,
+        upi=current_user.upi,
     )
     db.add(enrollment)
     db.commit()
@@ -491,7 +492,6 @@ def delete_enrolment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor)
 ):
-    print("deleting enrolment " + payload.upi)
     enrolment = db.query(CourseEnrollment).filter(
         CourseEnrollment.course_id == course_id,
         CourseEnrollment.user_id == current_user.id

@@ -91,7 +91,7 @@ function DashboardTable({
           <tbody className="divide-y divide-surface-container">
             {currentRows.length > 0 ? (
               currentRows.map((student) => {
-                const currentGrade = grades[student.session_id] ?? student.ai_suggested_score ?? "";
+                const currentGrade = grades[student.session_id] ?? "";
                 const canPublish = isValidGrade(currentGrade);
 
                 const isPublished = student.status === "published";
@@ -248,7 +248,7 @@ function DashboardTable({
                     </td>
 
                       {/* Action */}
-                    <td className="px-8 py-5 text-right">
+                    <td className="px-8 py-5 text-center">
                       <div className="flex items-center justify-end gap-2">
                         {isReview && (
                           <button

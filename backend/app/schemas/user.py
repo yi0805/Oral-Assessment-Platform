@@ -18,9 +18,8 @@ class UserResponse(BaseModel):
     image: str | None = None
 
 class Userupi(BaseModel):
-    # model_config = ConfigDict(from_attributes=True)
-
     upi: str
+    # role: str | None
 
 # Auth
 

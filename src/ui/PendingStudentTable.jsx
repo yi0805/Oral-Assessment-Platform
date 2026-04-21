@@ -8,8 +8,7 @@ function PendingStudentTable({
   filteredReviews = [],
   grades,
   onGradeChange,
-  isValidGrade,
-  acceptAllAiGrade,
+  isValidGrade,  
 }) {
   const navigate = useNavigate();
 
@@ -88,7 +87,7 @@ function PendingStudentTable({
               <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Final Score
               </th>
-              <th className="px-6 py-4 text-center text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              <th className="px-6 py-4 text-right text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Action
               </th>
             </tr>
@@ -116,7 +115,7 @@ function PendingStudentTable({
               </tr>
             ) : (
               currentRows.map((review) => {
-                const currentGrade = grades[review.sessionId] ?? review.suggestedGrade ?? "";
+                const currentGrade = grades[review.sessionId] ?? "";
                 const canPublish = isValidGrade(currentGrade);
 
                 return (

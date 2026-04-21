@@ -11,7 +11,7 @@ from app.services._prompt_safety import (
     sanitize_untrusted,
     truncate_for_prompt,
 )
-from app.services.ai_gateway import chat_complete
+from app.services.ai_gateway import smart_chat_complete
 
 
 from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk, Rubric
@@ -192,7 +192,7 @@ async def generate_pool(
     )
 
     try:
-        raw_response = await chat_complete(
+        raw_response = await smart_chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
             system_prompt=_SYSTEM_PROMPT,
             temperature=0.7,
@@ -255,7 +255,7 @@ async def _generate_description(
     )
 
     try:
-        return await chat_complete(
+        return await smart_chat_complete(
             messages=[{"role": "user", "content": prompt}],
             system_prompt=(
                 "You are a university educator. Write a brief, clear assessment "

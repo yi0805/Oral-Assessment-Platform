@@ -87,7 +87,7 @@ function Sidebar() {
               >
               people
             </span>
-            <span>Student Management</span>
+            <span>Users & Records</span>
           </NavLink>
         )}
         {user.role === "instructor" && (

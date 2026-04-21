@@ -23,9 +23,9 @@ class AISummary(Base):
     )
 
     summary_text: Mapped[str] = mapped_column(Text, nullable=False)
-    suggested_grade: Mapped[int | None] = mapped_column(
-        Integer, nullable=True,
-        comment="Advisory numeric score suggested by the AI (0-100). Never auto-assigned.",
+    suggested_grade: Mapped[int] = mapped_column(
+        Integer, nullable=False,
+        comment="Advisory numeric score suggested by the AI (0-100).",
     )
 
     session = relationship("AssessmentSession", back_populates="ai_summary")

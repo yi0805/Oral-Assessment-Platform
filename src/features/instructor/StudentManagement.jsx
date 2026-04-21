@@ -21,13 +21,14 @@ export default function StudentManagement() {
 
   const [upi, setUPI] = useState("");
   const [upiD, setUpiD] = useState("");
+  const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
 
   const { importStudents, isPending: isImporting } = useImportStudents();
   const { exportResults, isPending: isExporting } = useExportResults();
-  const { enrolUser, isPending: isEnroling } = useEnrolUser();
-  const { deleteEnrolment, isPending: isDeleting } = useDeleteEnrolment();
+  const { enrolUser } = useEnrolUser();
+  const { deleteEnrolment } = useDeleteEnrolment();
 
   const { dashboard = [], isLoading: isDashboardLoading } =
     useDashboard(courseId);
@@ -72,7 +73,7 @@ export default function StudentManagement() {
     if (!courseId) return;
     try {
       setLoading(true);
-      setStatusMessage("Enroling instructor to course...");
+      // setStatusMessage("Enroling instructor to course...");
       enrolUser( {courseId, upi: upi});
     }finally {
       setLoading(false);
@@ -83,7 +84,7 @@ export default function StudentManagement() {
     if (!courseId) return;
     try {
       setLoading(true);
-      setStatusMessage("Deleting user enrolment in...")
+      // setStatusMessage("Deleting user enrolment in...")
       deleteEnrolment({course_id: courseId, upi: upiD});
     } finally {
       setLoading(false);
@@ -262,7 +263,7 @@ export default function StudentManagement() {
             </div>
           </section>
           <section>
-            <div className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+            <div className="mb-4 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
               <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
                 <span
                   className="material-symbols-outlined text-primary"
@@ -271,28 +272,49 @@ export default function StudentManagement() {
                 >
                   add
                 </span>
-                Add Instructors to Course
+                Enrol User to Course (Individual)
               </h2>
-              <div className="space-y-2">
-                <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                  Email (before @)
-                </label>
+              <div className="grid grid-cols-5 gap-2">
+                <div className="space-y-2 mb-2 lg:col-span-2">
+                  <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                    Enrol as:
+                  </label>
 
-                <input
-                  className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                  placeholder="e.g. john.doe of john.doe@gmail.com"
-                  type="text"
-                  value={upi}
-                  onChange={(e) => setUPI(e.target.value)}
-                />
+                  <select
+                    className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    <option value="student">Student</option>
+                    <option value="instructor">Instructor</option>
+                  </select>
+                </div>
+                <div className="space-y-2 mb-2 lg:col-span-3">
+                  <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                    Email (before @)
+                  </label>
+
+                  <input
+                    className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                    placeholder="e.g. john.doe of john.doe@gmail.com"
+                    type="text"
+                    value={upi}
+                    onChange={(e) => setUPI(e.target.value)}
+                  />
+                </div>
               </div>
+
               <button 
-                onClick={() => handleAdd()}
-                className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
+                onClick={handleAdd}
+                className={`rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
+                  upi && courseId && emptyError(upi)
+                    ? "bg-primary text-on-primary hover:bg-primary-dim"
+                    : "cursor-not-allowed bg-surface-container text-outline"
+                }`}
               >
                 Connect User!
               </button>
-            </div>
+              </div>
             <div className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
               <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
                 <span
@@ -318,10 +340,14 @@ export default function StudentManagement() {
                 />
               </div>
               <button 
-                onClick={() => handleDelete()}
-                className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
+                onClick={handleDelete}
+                className={`mt-2 rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
+                  upiD && courseId && emptyError(upiD)
+                    ? "bg-primary text-on-primary hover:bg-primary-dim"
+                    : "cursor-not-allowed bg-surface-container text-outline"
+                }`}
               >
-                Disconnect User to course
+                Delete Enrolment
               </button>
             </div>
           </section>

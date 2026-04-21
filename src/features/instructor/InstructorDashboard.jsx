@@ -158,8 +158,8 @@ export default function InstructorDashboard() {
           </div>
         </div>
 
-        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-3">
-          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
+        <div className="mb-12 grid grid-cols-1 gap-6 md:grid-cols-4">
+          <div className="relative overflow-hidden rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 shadow-sm md:col-span-2">
             <div className="relative z-10">
               <p className="mb-4 text-xs font-bold uppercase tracking-wider text-outline-variant">
                 Score Overview
@@ -286,18 +286,6 @@ export default function InstructorDashboard() {
             >
               Release All Scores
             </button>
-
-            {/* <button
-              className={`mt-4 w-full rounded-xl py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 
-                  ? "bg-secondary text-on-secondary hover:bg-secondary-dim"
-                  : "cursor-not-allowed bg-surface-container text-outline"
-              }`}
-              onClick={() => {
-                handleAcceptAllAI();
-              }}
-            >
-              Accept AI Score
-            </button> */}
           </div>
         </div>
 

@@ -9,7 +9,7 @@ from app.schemas.course import (
 
 from app.schemas.feedback import (
     ReleaseReview, ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut,
-    ApproveAiReview, ApproveAllAiReviews
+    ApproveAiReview, ApproveAllAiReviews, _SummaryLLMOutput
 )
 
 from app.schemas.assessment import (
@@ -25,3 +25,4 @@ from app.schemas.question import (
 
 from app.schemas.rubric import (RubricCriteriaItem, RubricCreate, RubricOut)
 
+from app.schemas.material import (GithubImportBody)
