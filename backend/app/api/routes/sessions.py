@@ -25,7 +25,11 @@ from app.schemas import (
     StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
 )
+<<<<<<< HEAD
 from backend.app.services.ai_gateway import smart_chat_complete
+=======
+from app.services.ai_gateway import smart_chat_complete
+>>>>>>> 3d9d31174b09c28a2c5bf04470bf548ebdf54f78
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

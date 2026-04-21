@@ -25,3 +25,4 @@ from app.schemas.question import (
 
 from app.schemas.rubric import (RubricCriteriaItem, RubricCreate, RubricOut)
 
+from app.schemas.material import (GithubImportBody)
