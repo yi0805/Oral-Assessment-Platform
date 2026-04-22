@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { NavLink } from "react-router";
+import toast from "react-hot-toast";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useUploadMaterial } from "./useUploadMaterial";
@@ -10,6 +12,7 @@ import { useUpdateQuestion } from "./useUpdateQuestion";
 import { usePublishAssessment } from "./usePublishAssessment";
 
 import Spinner from "../../ui/Spinner";
+import DateTimePicker from "../../ui/DateTimePicker";
 
 const GITHUB_URL_RE = /^https?:\/\/github\.com\/[^/\s]+\/[^/\s#?]+/i;
 const isValidGithubUrl = (u) => GITHUB_URL_RE.test((u || "").trim());
@@ -29,6 +32,11 @@ function UpdateMaterial() {
   const [numQuestions, setNumQuestions] = useState("");
   const [assessmentTime, setAssessmentTime] = useState("");
 
+  const [show, setShow] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [releaseTime, setReleaseTime] = useState(null);
+  const [dueTime, setDueTime] = useState(null);
+  
   const [touched, setTouched] = useState({
     assessmentName: false,
     numQuestions: false,
@@ -80,7 +88,9 @@ function UpdateMaterial() {
   if (isLoading) return <Spinner />;
 
   const num = Number(numQuestions);
+  const max_q = 50
   const time = Number(assessmentTime);
+  const max_time = 120
 
   const assessmentNameError =
     assessmentName.trim() === "" ? "Assessment name is required." : "";
@@ -90,8 +100,8 @@ function UpdateMaterial() {
       ? "Number of questions is required."
       : !Number.isInteger(num)
         ? "Must be a whole number."
-        : num < 1 || num > 15
-          ? "Must be between 1 and 15."
+        : num < 1 || num > max_q
+          ? "Must be between 1 and " + str(max_q) + "."
           : "";
 
   const assessmentTimeError =
@@ -99,8 +109,8 @@ function UpdateMaterial() {
       ? "Assessment time is required."
       : !Number.isFinite(time)
         ? "Must be a number."
-        : time < 5 || time > 90
-          ? "Must be between 5 and 90."
+        : time < 1 || time > max_time
+          ? "Must be between 1 and " + str(max_time) + "."
           : "";
 
   const rubricRowErrors = rubricRows.map((row) => ({
@@ -165,6 +175,9 @@ function UpdateMaterial() {
       });
       const RubricId = rubricResponse.id;
 
+      const release = releaseTime?.toISOString();
+      const due = dueTime?.toISOString();
+      
       setStatusMessage("Generating questions with AI...");
       const updateResponse = await questionGenerate({
         courseId,
@@ -173,6 +186,8 @@ function UpdateMaterial() {
         assessmentName,
         numQuestions,
         totalTime: time,
+        releaseTime: release,
+        dueTime: due, 
       });
 
       setQuestions(updateResponse.questions);
@@ -224,6 +239,10 @@ function UpdateMaterial() {
       setStatusMessage("");
       setLoading(false);
     }
+  }
+
+  function handleSave() {
+    
   }
 
   function handleAddRow() {
@@ -374,69 +393,81 @@ function UpdateMaterial() {
                         </p>
                       )}
                     </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
+                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                          No. of Questions
+                        </label>
+                        <input
+                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                          min={1}
+                          max={max_q}
+                          step={1}
+                          placeholder="e.g. 15"
+                          type="number"
+                          value={numQuestions}
+                          onChange={(e) => setNumQuestions(e.target.value)}
+                          onBlur={() =>
+                            setTouched((current) => ({
+                              ...current,
+                              numQuestions: true,
+                            }))
+                          }
+                        />
+                        {touched.numQuestions && numQuestionsError && (
+                          <p className="ml-1 text-xs font-medium text-error">
+                            {numQuestionsError}
+                          </p>
+                        )}
+                      </div>
 
-                    <div className="space-y-2">
-                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                        Number of Questions
-                      </label>
-
-                      <input
-                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                        min={1}
-                        max={30}
-                        step={1}
-                        placeholder="e.g. 15"
-                        type="number"
-                        value={numQuestions}
-                        onChange={(e) => setNumQuestions(e.target.value)}
-                        onBlur={() =>
-                          setTouched((current) => ({
-                            ...current,
-                            numQuestions: true,
-                          }))
-                        }
+                      <div className="space-y-2">
+                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                          Total Timer (mins)
+                        </label>
+                        <input
+                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                          min={1}
+                          max={max_time}
+                          step={0.5}
+                          placeholder="e.g. 30"
+                          type="number"
+                          value={assessmentTime}
+                          onChange={(e) => setAssessmentTime(e.target.value)}
+                          onBlur={() =>
+                            setTouched((current) => ({
+                              ...current,
+                              assessmentTime: true,
+                            }))
+                          }
+                        />
+                        {touched.assessmentTime && assessmentTimeError && (
+                          <p className="ml-1 text-xs font-medium text-error">
+                            {assessmentTimeError}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 ">
+                      <DateTimePicker
+                        label="Release Date"
+                        value={releaseTime}
+                        onChange={setReleaseTime}
                       />
 
-                      {touched.numQuestions && numQuestionsError && (
-                        <p className="ml-1 text-xs font-medium text-error">
-                          {numQuestionsError}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                        Assessment Time (minutes)
-                      </label>
-
-                      <input
-                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                        min={1}
-                        max={60}
-                        step={0.5}
-                        placeholder="e.g. 30"
-                        type="number"
-                        value={assessmentTime}
-                        onChange={(e) => setAssessmentTime(e.target.value)}
-                        onBlur={() =>
-                          setTouched((current) => ({
-                            ...current,
-                            assessmentTime: true,
-                          }))
-                        }
+                      <DateTimePicker
+                        label="Due date"
+                        value={dueTime}
+                        onChange={setDueTime}
+                        minDate={releaseTime}
                       />
-
-                      {touched.assessmentTime && assessmentTimeError && (
-                        <p className="ml-1 text-xs font-medium text-error">
-                          {assessmentTimeError}
-                        </p>
-                      )}
                     </div>
+                    
                   </form>
                 </section>
               </div>
 
-              <div className="col-span-12 flex h-full flex-col gap-4 lg:col-span-7">
+              <div className="col-span-12 flex h-full flex-col gap-2 lg:col-span-7">
                 <div
                   className="flex rounded-xl bg-surface-container-low p-1"
                   role="tablist"
@@ -916,14 +947,26 @@ function UpdateMaterial() {
                 <h2 className="text-2xl font-bold text-on-surface">
                   Review Generated Questions ({questions.length})
                 </h2>
-
-                <button
-                  className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
-                  onClick={handlePublish}
-                  disabled={loading || questions.length === 0}
-                >
-                  {loading ? "Working..." : "Publish Assessment"}
-                </button>
+                <div className="flex-row-reverse">
+                  <NavLink
+                    className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                    to="/home"
+                    onClick={() => {
+                      toast.success("Assessment saved successfully.");
+                    }}
+                  >
+                    <span>
+                      Save 
+                    </span>
+                  </NavLink>                  
+                  <button
+                    className="ml-3 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                    onClick={handlePublish}
+                    disabled={loading || questions.length === 0}
+                  >
+                    {loading ? "Working..." : "Publish & Release"}
+                  </button>
+                </div>
               </div>
 
               <p className="text-sm text-on-surface-variant">

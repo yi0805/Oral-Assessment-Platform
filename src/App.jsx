@@ -14,8 +14,10 @@ import InstructorDashboard from "./features/instructor/InstructorDashboard";
 import InstructorPendingGrades from "./features/instructor/InstructorPendingGrades";
 import UpdateMaterial from "./features/instructor/UploadMaterial";
 import Transcript from "./features/instructor/Transcript";
-import InstructorSettings from "./features/instructor/InstructorSettings";
+import StudentManagement from "./features/instructor/StudentManagement";
 import ProtectedLayout from "./ui/ProtectedRoute";
+import Setting from "./features/instructor/Setting";
+import EditAssessment from "./features/instructor/EditAssessment"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -60,9 +62,17 @@ function App() {
                 element={<Transcript />}
               />
               <Route
-                path="instructor/settings"
-                element={<InstructorSettings />}
-              />
+                path="instructor/studentManagement"
+                element={<StudentManagement/>}
+              />    
+              <Route
+                path="instructor/setting"
+                element={<Setting />}
+              />          
+              <Route
+                path="instructor/editAssessment"
+                element={<EditAssessment />}
+              />  
             </Route>
 
             <Route

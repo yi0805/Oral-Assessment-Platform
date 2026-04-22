@@ -19,7 +19,7 @@ function Spinner() {
           </div>
           <div className="space-y-4">
             <h1 className="font-headline text-2xl font-bold tracking-tight text-on-surface">
-              Curating your data...
+              Loading your data...
             </h1>
           </div>
 
