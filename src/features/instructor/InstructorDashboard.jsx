@@ -98,6 +98,8 @@ export default function InstructorDashboard() {
     releaseAllResults({ assessments });
   }
 
+
+
   return (
     <div className="min-h-screen">
       <main className="ml-64 px-10 pb-12 pt-24">
@@ -263,12 +265,11 @@ export default function InstructorDashboard() {
           <div className="flex flex-col justify-between rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-6 shadow-sm md:col-span-1">
             <div>
               <p className="mb-2 text-xs font-bold uppercase tracking-wider text-outline-variant">
-                Publication Status
+                Pending Markings
               </p>
 
               <p className="font-body text-sm leading-relaxed text-on-surface-variant">
-                {reviewStudents.length} scores pending manual review before
-                release.
+                {reviewStudents.length} students' scores pending for manual review before release.
               </p>
             </div>
 
@@ -283,7 +284,7 @@ export default function InstructorDashboard() {
                 handlePublishAll();
               }}
             >
-              Publish All Scores
+              Release All Scores
             </button>
           </div>
         </div>

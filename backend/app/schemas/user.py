@@ -17,6 +17,10 @@ class UserResponse(BaseModel):
     role: UserRole
     image: str | None = None
 
+class Userupi(BaseModel):
+    upi: str
+    # role: str | None
+
 # Auth
 
 class GoogleLoginResponse(BaseModel):

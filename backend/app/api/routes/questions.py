@@ -96,6 +96,8 @@ async def generate_question(
         main_question_num=payload.num_main_questions,
         follow_up_num=payload.max_followups_per_main,
         status="draft",
+        release_time=payload.release_time | None,
+        due_time=payload.due_time | None,
     )
 
     db.add(config)
