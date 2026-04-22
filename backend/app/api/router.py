@@ -9,6 +9,7 @@ from app.api.routes import (
     questions,
     rubrics,
     sessions,
+    users
 )
 
 # swagger ui display and url prefix for each router
@@ -23,3 +24,4 @@ api_router.include_router(questions.router,   prefix="",         tags=["Question
 api_router.include_router(assessments.router, prefix="",         tags=["Assessments"])
 api_router.include_router(sessions.router,    prefix="",         tags=["Sessions"])
 api_router.include_router(feedback.router,    prefix="",         tags=["Feedback"])
+api_router.include_router(users.router,       prefix="/users",   tags=["Users"])
