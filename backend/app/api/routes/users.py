@@ -1,6 +1,8 @@
-from app.models.user import User
+from __future__ import annotations
 
-from uuid import UUID
+import logging
+from pathlib import Path
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.exc import SQLAlchemyError
@@ -8,7 +10,11 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.services import  s3_client
+from app.services import s3_client
+
+from app.models import User
+
+logger = logging.getLogger(__name__)
 
 MIME_MAP = {
     "pdf": "application/pdf",
@@ -22,15 +28,14 @@ router = APIRouter()
 @router.put("/updateUsername",
             summary = "Change the current users full name.")
 def update_user_name(new_username: str,
-                    user: User = Depends(get_current_user), 
+                    user: User = Depends(get_current_user),
                     db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.id == user.id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
     user.full_name = new_username
+
     db.commit()
     db.refresh(user)
-    return {"message": "User updated", "user": {"id": user.id, "name": user.full_name}}
+
+    return {"message": "User updated successfully"}
 
 
 @router.put("/updatePicture", summary="Change the current users profile picture")
@@ -40,13 +45,12 @@ async def update_picture(
     db: Session = Depends(get_db)
 ):
 
-    if not file.content_type.startswith("image/"):
+    if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
-    exists = db.query(User).filter(User.id == user.id).first()
-    if not exists:
-        raise HTTPException(status_code=404, detail="User not found")
+    
     filename = file.filename or "unknown"
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
     file_bytes = await file.read()
 
     if not file_bytes:
@@ -54,40 +58,53 @@ async def update_picture(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The uploaded file is empty.",
         )
-    image_id = UUID.uuid4()
-    storage_key = s3_client.generate_key(user.id, image_id, filename)
+    
+    image_id = uuid4()
+
+    safe_filename = Path(filename).name
+    storage_key = f"users/{user.id}/images/{image_id}/{safe_filename}"
+    
     content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
+
     try:
         s3_client.upload_file(
-        file_bytes,
-        storage_key,
-        content_type,
-        metadata={
+            file_bytes,
+            storage_key,
+            content_type=content_type,
+            metadata={
                 "user_id": str(user.id),
                 "image_id": str(image_id),
                 "filename": filename,
-            }
-    )
-    except RuntimeError as exc:
+            },
+        )
+
+    except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Storage upload failed: {exc}",
-        ) from exc
+            detail=f"Storage upload failed: {e}",
+        ) from e
 
     try:
         user.image = storage_key
         db.commit()
         db.refresh(user)
-    
-    except SQLAlchemyError as exc:
+
+    except SQLAlchemyError as e:
         db.rollback()
-        s3_client.delete_file(storage_key)
+
+        try:
+            s3_client.delete_file(storage_key)
+
+        except RuntimeError:
+            logger.exception(
+                "Failed to clean up S3 object %s after DB error", storage_key
+            )
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Material metadata could not be saved.",
-        ) from exc
+            detail="Profile picture could not be saved.",
+        ) from e
 
     return {
-        "message": "Profile picture updated",
-        "key": storage_key
+        "message": "Profile picture updated successfully",
     }

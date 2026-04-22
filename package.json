@@ -15,10 +15,12 @@
     "@tanstack/react-query-devtools": "^4.44.0",
     "axios": "^1.14.0",
     "react": "^19.2.4",
+    "react-datepicker": "^9.1.0",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
     "react-router": "^7.13.1",
-    "recharts": "^3.8.1"
+    "recharts": "^3.8.1",
+    "tailwind-datepicker-react": "^1.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
