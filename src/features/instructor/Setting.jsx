@@ -1,8 +1,4 @@
-import { useEffect, useState } from "react";
-import Spinner from "../../ui/Spinner";
-
-export default function Setting(){
-
+export default function Setting() {
   return (
     <div className="min-h-screen">
       <main className="ml-64 min-h-screen pt-16">
@@ -15,5 +11,5 @@ export default function Setting(){
         </div>
       </main>
     </div>
-    );
+  );
 }
