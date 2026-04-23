@@ -38,23 +38,22 @@ export async function exportResultsCSV(courseId, assessmentConfigId) {
     `/courses/${courseId}/assessments/${assessmentConfigId}/export-results`,
     { responseType: "blob" },
   );
-  
+
   return response;
 }
 
 export async function enrolUser(courseId, upi, role) {
-  const response = await api.post(
-    `/courses/${courseId}/enroluser`, {
-    upi: upi, role: role
+  const response = await api.post(`/courses/${courseId}/enroluser`, {
+    upi,
+    role,
   });
 
   return response.data;
 }
 
-export async function deleteEnrolment(course_id, upi, role) {
-  const response = await api.delete(
-    `/courses/${course_id}/delete-enrolment`, {
-      data: { upi, role}
+export async function deleteEnrolment(courseId, upi, role) {
+  const response = await api.delete(`/courses/${courseId}/delete-enrolment`, {
+    data: { upi, role },
   });
 
   return response.data;

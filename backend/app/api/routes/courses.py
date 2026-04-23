@@ -97,7 +97,7 @@ def enrol_user(
 
     db.commit()
 
-    return {"message": f"Enrolled successfully."}
+    return {"message": "Enrolled successfully."}
 
 
 # Import students via CSV
@@ -530,6 +530,9 @@ def delete_enrolment(
 
     if not target_enrolment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User enrolment not found")
+    
+    if target_enrolment.user_id == current_user.id:
+      raise HTTPException(409, detail="Cannot remove your own enrolment.")
 
     try:
         db.delete(target_enrolment)
