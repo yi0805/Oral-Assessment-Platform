@@ -23,7 +23,6 @@ export default function StudentManagement() {
   const [upiD, setUpiD] = useState("");
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
 
   const { importStudents, isPending: isImporting } = useImportStudents();
   const { exportResults, isPending: isExporting } = useExportResults();
@@ -65,27 +64,21 @@ export default function StudentManagement() {
     exportResults({ courseId, assessmentConfigId: selectedAssessment });
   }
 
-  function emptyError(upi) {
-    return upi.trim() === "" ? "Required to be filled." : "";
-  } 
-
   function handleAdd() {
-    if (!courseId) return;
+    if (!courseId || !upi.trim()) return;
     try {
       setLoading(true);
-      // setStatusMessage("Enroling instructor to course...");
-      enrolUser( {courseId, upi: upi});
+      enrolUser( {courseId, upi: upi, role: role});
     }finally {
       setLoading(false);
     }
   }
 
   function handleDelete() {
-    if (!courseId) return;
+    if (!courseId || !upiD.trim()) return;
     try {
       setLoading(true);
-      // setStatusMessage("Deleting user enrolment in...")
-      deleteEnrolment({course_id: courseId, upi: upiD});
+      deleteEnrolment({course_id: courseId, upi: upiD, role: ""});
     } finally {
       setLoading(false);
     }
@@ -306,15 +299,16 @@ export default function StudentManagement() {
 
               <button 
                 onClick={handleAdd}
+                disabled={!upi || !courseId}
                 className={`rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
-                  upi && courseId && emptyError(upi)
+                  upi && courseId
                     ? "bg-primary text-on-primary hover:bg-primary-dim"
                     : "cursor-not-allowed bg-surface-container text-outline"
                 }`}
               >
                 Connect User!
               </button>
-              </div>
+            </div>
             <div className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
               <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
                 <span
@@ -326,7 +320,7 @@ export default function StudentManagement() {
                 </span>
                 Delete Enrolment 
               </h2>
-              <div className="space-y-2">
+              <div className="space-y-2 mb-2">
                 <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                   Email (before @)
                 </label>
@@ -341,8 +335,9 @@ export default function StudentManagement() {
               </div>
               <button 
                 onClick={handleDelete}
-                className={`mt-2 rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
-                  upiD && courseId && emptyError(upiD)
+                disabled={!upiD || !courseId}
+                className={`rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
+                  upiD.trim() && courseId
                     ? "bg-primary text-on-primary hover:bg-primary-dim"
                     : "cursor-not-allowed bg-surface-container text-outline"
                 }`}

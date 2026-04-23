@@ -66,13 +66,23 @@ def enrol_user(
     if new_user:
         existing = db.query(CourseEnrollment).filter(
             CourseEnrollment.course_id == course_id,
-            CourseEnrollment.user_id == new_user.upi
+            CourseEnrollment.user_id == new_user.id
         ).first()
         if existing:
-            raise HTTPException(400, "User already enrolled")
-    elif new_user:
-        new_user.role = UserRole.instructor
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User already enrolled")
+        if payload.role == UserRole.instructor:
+            new_user.role = UserRole.instructor
+        else:
+            new_user.role = UserRole.student
+
+        db.add(CourseEnrollment(course_id=course_id, user_id=new_user.id))
     else:
+        existing = db.query(CourseEnrollment).filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.upi == payload.upi
+        ).first()
+        if existing:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User already enrolled")
         db.add(CourseEnrollment(course_id=course_id, upi=payload.upi))
         
     db.commit()
@@ -510,7 +520,7 @@ def delete_enrolment(
         )   
     
     if not enrolment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrolment not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User enrolment not found")
     
     try: 
         db.delete(enrolment)

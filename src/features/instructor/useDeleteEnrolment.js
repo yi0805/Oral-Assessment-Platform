@@ -7,7 +7,7 @@ export function useDeleteEnrolment() {
   const queryClient = useQueryClient();
 
   const { mutate: deleteEnrolment, isPending } = useMutation({
-    mutationFn: ({ course_id, upi }) => deleteEnrolmentApi(course_id, upi),
+    mutationFn: ({ course_id, upi, role }) => deleteEnrolmentApi(course_id, upi, role),
     onSuccess: (data) => {
       toast.success(data.message || "Enrolment delete successful");
 

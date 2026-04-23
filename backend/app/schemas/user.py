@@ -19,7 +19,7 @@ class UserResponse(BaseModel):
 
 class Userupi(BaseModel):
     upi: str
-    # role: str | None
+    role: str | None
 
 # Auth
 
