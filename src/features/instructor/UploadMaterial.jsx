@@ -280,8 +280,8 @@ function UpdateMaterial() {
 
   return (
     <div className="min-h-screen">
-      <main className="ml-64 min-h-screen pt-16">
-        <div className="mx-auto max-w-6xl px-8 py-12">
+      <main className="ml-64 px-10 pb-12 pt-24">
+        {/* <div className="mx-auto max-w-6xl px-8 py-12"> */}
           <div className="mb-10">
             <NavLink
               className="group mb-4 inline-flex items-center gap-2 text-xs font-bold 
@@ -1091,7 +1091,7 @@ function UpdateMaterial() {
               )}
             </div>
           )}
-        </div>
+        {/* </div> */}
       </main>
     </div>
   );
