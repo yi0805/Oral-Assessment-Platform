@@ -20,3 +20,11 @@ export async function getCurrentUser() {
 
   return response.data;
 }
+
+export async function updateUserName(newUsername) {
+  const response = await api.put(
+    `/users/updateUsername?new_username=${newUsername}`
+  );
+
+  return response.data;
+}

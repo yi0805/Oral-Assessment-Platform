@@ -140,7 +140,7 @@ function Sidebar() {
           >
             settings
           </span>
-          <span>Setting</span>
+          <span>Settings</span>
         </NavLink>
         
       </nav>

@@ -36,13 +36,7 @@ def _fetch_google_userinfo(token: str) -> dict:
 def _upsert_user(db: Session, email: str, full_name: str, upi: str, image: str | None) -> User:
     user: User | None = db.query(User).filter(User.email == email).first()
 
-    if user:
-        user.full_name = full_name
-        user.image = image
-
-        db.commit()
-        db.refresh(user)
-        
+    if user:       
         return user
 
     role = resolve_role_for_new_user(email)
