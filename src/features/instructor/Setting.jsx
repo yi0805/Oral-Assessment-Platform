@@ -1,9 +1,11 @@
-import { useEffect, useState, useQueryClient } from "react";
+import { useEffect, useState, useRef } from "react";
 import Spinner from "../../ui/Spinner";
 import { NavLink } from "react-router";
 
 import { useUser } from "../authentication/useUser";
 import { useUpdateName } from "./useUpdateName";
+import { useUpdatePicture } from "./useUpdatePicture";
+
 
 export default function Setting(){
   const [upi, setUPI] = useState("");
@@ -11,8 +13,10 @@ export default function Setting(){
 
   const { user, isLoading } = useUser();
   const { updateName, isPending } = useUpdateName();
+  const { uploadFile, isUpdatingPic } = useUpdatePicture();
   
   const userUPI = user?.upi || user?.email?.split('@')[0] || "N/A";
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (user?.full_name) setDisplayName(user.full_name);
@@ -25,12 +29,24 @@ export default function Setting(){
       updateName(displayName);
     };
 
+  const handleImageClick = () => {
+      fileInputRef.current.click();
+    };  
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0]; 
+    if (file) {
+      uploadFile(file);
+    }
+  };
+
   return (
     <div className="min-h-screen">
       <main className="ml-64 px-10 pb-12 pt-24">
         <div className="mb-10">
           <NavLink
-            className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
+            className="group mb-4 inline-flex items-center gap-2 text-xs font-bold 
+            text-outline-variant transition-colors hover:text-primary"
             to="/home"
           >
             <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
@@ -65,17 +81,43 @@ export default function Setting(){
 
           <div className="space-y-6">
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-2">
-                <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                  Profile Picture
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="ml-1 mb-2 block text-sm font-semibold text-on-surface-variant">
+                  Edit Your Profile Picture
                 </label>
-                <img
-                  alt="User profile avatar"
-                  className="h-30 w-30 rounded-full object-cover"
-                  referrerPolicy="no-referrer"
-                  src={user?.image || "/WhereRU.png"}
-                />
+                <div className="relative h-24 w-24 cursor-pointer" onClick={handleImageClick}>
+                  <div className={`h-24 w-24 rounded-full overflow-hidden
+                    border-2 border-surface-container ${isUpdatingPic ? 'opacity-50' : ''}`}>
+                    <img 
+                      src={user?.image || "/default-avatar.png"} 
+                      className="h-full w-full object-cover"
+                      alt="Profile" 
+                    />
+                  </div>
+                  <button 
+                    className="absolute -bottom-1 -right-1 h-8 w-8 rounded-full bg-white p-1 
+                    text-black shadow-[0_2px_8px_rgba(0,0,0,0.15)] flex items-center justify-center 
+                    border border-gray-100 hover:bg-gray-100 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-xl">
+                      photo_camera
+                    </span>
+                  </button>
+                  {isUpdatingPic && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    </div>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    className="hidden" 
+                    accept="image/*"
+                  />
+                </div>
+
               </div>
             </div>
 
@@ -89,7 +131,7 @@ export default function Setting(){
                     className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
                     type="text"
                     onChange={(e) => setDisplayName(e.target.value)}
-                    defaultValue={user?.full_name || ""}
+                    value={displayName}
                   />                  
                   <button
                     onClick={handleUpdateName}

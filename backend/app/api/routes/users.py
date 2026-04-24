@@ -38,7 +38,8 @@ def update_user_name(new_username: str,
     return {"message": "User updated successfully"}
 
 
-@router.put("/updatePicture", summary="Change the current users profile picture")
+@router.put("/updatePicture", 
+            summary="Change the current users profile picture")
 async def update_picture(
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
@@ -50,6 +51,7 @@ async def update_picture(
     
     filename = file.filename or "unknown"
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    S3_BASE_URL = "https://team8-project20-materials.s3.ap-southeast-2.amazonaws.com/"
 
     file_bytes = await file.read()
 
@@ -63,7 +65,7 @@ async def update_picture(
 
     safe_filename = Path(filename).name
     storage_key = f"users/{user.id}/images/{image_id}/{safe_filename}"
-    
+    public_url = f"{S3_BASE_URL}{storage_key}"
     content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
 
     try:
@@ -85,7 +87,7 @@ async def update_picture(
         ) from e
 
     try:
-        user.image = storage_key
+        user.image = public_url
         db.commit()
         db.refresh(user)
 
