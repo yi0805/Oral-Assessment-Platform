@@ -274,12 +274,30 @@ function UpdateMaterial() {
 
   return (
     <div className="min-h-screen">
-      <main className="ml-64 min-h-screen pt-16">
-        <div className="mx-auto max-w-6xl px-8 py-12">
+      <main className="ml-64 px-10 pb-12 pt-24">
+        {/* <div className="mx-auto max-w-6xl px-8 py-12"> */}
           <div className="mb-10">
-            <h1 className="text-4xl font-extrabold tracking-tight text-on-background">
+            <NavLink
+              className="group mb-4 inline-flex items-center gap-2 text-xs font-bold 
+              text-outline-variant transition-colors hover:text-primary"
+              to="/home"
+            >
+              <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
+                arrow_back
+              </span>
+
+              <span className="font-body uppercase tracking-widest">
+                Back to Courses
+              </span>
+            </NavLink>
+
+            <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
               New Assessment Setup
             </h1>
+
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Configure the assessment and generate questions.
+            </p>
           </div>
 
           {statusMessage && (
@@ -1086,7 +1104,7 @@ function UpdateMaterial() {
               )}
             </div>
           )}
-        </div>
+        {/* </div> */}
       </main>
     </div>
   );

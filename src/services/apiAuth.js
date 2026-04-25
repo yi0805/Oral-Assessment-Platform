@@ -28,3 +28,17 @@ export async function updateUserName(newUsername) {
 
   return response.data;
 }
+
+export async function updateUserPicture(uploadFile) {
+  const formData = new FormData();
+  formData.append("file", uploadFile);
+
+  const response = await api.put(
+    "/users/updatePicture", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      }
+    });
+
+  return response.data;
+}
