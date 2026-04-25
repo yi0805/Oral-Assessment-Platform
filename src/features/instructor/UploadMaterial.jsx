@@ -32,11 +32,9 @@ function UpdateMaterial() {
   const [numQuestions, setNumQuestions] = useState("");
   const [assessmentTime, setAssessmentTime] = useState("");
 
-  const [show, setShow] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
-  
+
   const [touched, setTouched] = useState({
     assessmentName: false,
     numQuestions: false,
@@ -88,9 +86,9 @@ function UpdateMaterial() {
   if (isLoading) return <Spinner />;
 
   const num = Number(numQuestions);
-  const max_q = 50
+  const max_q = 50;
   const time = Number(assessmentTime);
-  const max_time = 120
+  const max_time = 120;
 
   const assessmentNameError =
     assessmentName.trim() === "" ? "Assessment name is required." : "";
@@ -101,7 +99,7 @@ function UpdateMaterial() {
       : !Number.isInteger(num)
         ? "Must be a whole number."
         : num < 1 || num > max_q
-          ? "Must be between 1 and " + str(max_q) + "."
+          ? `Must be between 1 and ${max_q}.`
           : "";
 
   const assessmentTimeError =
@@ -110,7 +108,7 @@ function UpdateMaterial() {
       : !Number.isFinite(time)
         ? "Must be a number."
         : time < 1 || time > max_time
-          ? "Must be between 1 and " + str(max_time) + "."
+          ? `Must be between 1 and ${max_time}.`
           : "";
 
   const rubricRowErrors = rubricRows.map((row) => ({
@@ -177,17 +175,17 @@ function UpdateMaterial() {
 
       const release = releaseTime?.toISOString();
       const due = dueTime?.toISOString();
-      
+
       setStatusMessage("Generating questions with AI...");
       const updateResponse = await questionGenerate({
         courseId,
         materialId: MaterialId,
         rubricId: RubricId,
         assessmentName,
-        numQuestions,
+        numQuestions: num,
         totalTime: time,
         releaseTime: release,
-        dueTime: due, 
+        dueTime: due,
       });
 
       setQuestions(updateResponse.questions);
@@ -239,10 +237,6 @@ function UpdateMaterial() {
       setStatusMessage("");
       setLoading(false);
     }
-  }
-
-  function handleSave() {
-    
   }
 
   function handleAddRow() {
@@ -344,8 +338,8 @@ function UpdateMaterial() {
 
           {phase === "setup" && (
             <div className="grid grid-cols-12 items-start gap-6">
-              <div className="col-span-12 space-y-6 lg:col-span-5">
-                <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+              <div className="col-span-12 space-y-6 lg:col-span-6">
+                <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
                   <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
                     <span
                       className="material-symbols-outlined text-primary"
@@ -411,7 +405,7 @@ function UpdateMaterial() {
                         </p>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                           No. of Questions
@@ -466,26 +460,31 @@ function UpdateMaterial() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 ">
-                      <DateTimePicker
-                        label="Release Date"
-                        value={releaseTime}
-                        onChange={setReleaseTime}
-                      />
+                    <div className="space-y-1.5">
+                      <div className="grid grid-cols-2 gap-4">
+                        <DateTimePicker
+                          label="Release Date"
+                          value={releaseTime}
+                          onChange={setReleaseTime}
+                        />
 
-                      <DateTimePicker
-                        label="Due date"
-                        value={dueTime}
-                        onChange={setDueTime}
-                        minDate={releaseTime}
-                      />
+                        <DateTimePicker
+                          label="Due date"
+                          value={dueTime}
+                          onChange={setDueTime}
+                          minDate={releaseTime}
+                        />
+                      </div>
+
+                      <p className="ml-1 text-[11px] text-outline">
+                        Leave blank to default to now → 30 days from now.
+                      </p>
                     </div>
-                    
                   </form>
                 </section>
               </div>
 
-              <div className="col-span-12 flex h-full flex-col gap-2 lg:col-span-7">
+              <div className="col-span-12 flex flex-col gap-4 lg:col-span-6">
                 <div
                   className="flex rounded-xl bg-surface-container-low p-1"
                   role="tablist"
@@ -527,29 +526,64 @@ function UpdateMaterial() {
                 </div>
 
                 {source === "pdf" ? (
-                  <section className="flex flex-1 flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low p-10 text-center transition-colors hover:border-primary/40">
-                    <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-container-lowest shadow-sm">
-                      <span
-                        className="material-symbols-outlined text-3xl text-primary"
-                        data-icon="upload_file"
-                        style={{ verticalAlign: "middle" }}
-                      >
-                        upload_file
-                      </span>
+                  <section className="flex flex-1 flex-col rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+                    <div className="mb-6 flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          data-icon="upload_file"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          upload_file
+                        </span>
+                      </div>
+
+                      <div>
+                        <h3 className="text-xl font-bold text-on-surface">
+                          Assessment Material
+                        </h3>
+
+                        <p className="mt-1 max-w-md text-xs text-on-surface-variant">
+                          Upload a PDF of the source material — we&apos;ll use
+                          it to generate every question.
+                        </p>
+                      </div>
                     </div>
 
-                    <h3 className="mb-2 text-xl font-bold text-on-surface">
-                      Assessment Material
-                    </h3>
+                    <div className="space-y-4">
+                      <label className="block cursor-pointer">
+                        <input
+                          className="hidden"
+                          type="file"
+                          accept=".pdf"
+                          onChange={(e) =>
+                            setMaterialFile(e.target.files[0] || null)
+                          }
+                        />
 
-                    <p className="mb-8 max-w-sm text-sm text-on-surface-variant">
-                      Upload a PDF of the source material — we&apos;ll use it
-                      to generate every question.
-                    </p>
+                        <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low px-6 py-10 text-center transition-colors hover:border-primary/40 hover:bg-primary/5">
+                          <span
+                            className="material-symbols-outlined mb-2 text-3xl text-primary"
+                            data-icon="cloud_upload"
+                            style={{ verticalAlign: "middle" }}
+                          >
+                            cloud_upload
+                          </span>
 
-                    <div className="w-full max-w-md space-y-4">
+                          <p className="text-sm font-bold text-primary">
+                            {materialFile
+                              ? "Replace File"
+                              : "Click to browse PDF"}
+                          </p>
+
+                          <p className="mt-1 text-[11px] text-outline">
+                            PDF only · Max 50 MB
+                          </p>
+                        </div>
+                      </label>
+
                       {materialFile && (
-                        <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-4 text-left shadow-sm">
+                        <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-low p-4 text-left">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
                             <span
                               className="material-symbols-outlined text-2xl"
@@ -584,25 +618,6 @@ function UpdateMaterial() {
                           </button>
                         </div>
                       )}
-
-                      <label className="block cursor-pointer">
-                        <input
-                          className="hidden"
-                          type="file"
-                          accept=".pdf"
-                          onChange={(e) =>
-                            setMaterialFile(e.target.files[0] || null)
-                          }
-                        />
-
-                        <div className="w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-3.5 text-center text-sm font-bold text-primary shadow-sm transition-all hover:border-primary/40 hover:bg-primary/5">
-                          {materialFile ? "Replace File" : "Browse PDF"}
-                        </div>
-                      </label>
-
-                      <p className="text-[11px] text-outline">
-                        PDF only · Max 50 MB
-                      </p>
                     </div>
                   </section>
                 ) : (
@@ -624,8 +639,8 @@ function UpdateMaterial() {
                         </h3>
 
                         <p className="mt-1 max-w-md text-xs text-on-surface-variant">
-                          Paste a public GitHub repo URL — we&apos;ll import
-                          its markdown, docs, and source files to generate
+                          Paste a public GitHub repo URL — we&apos;ll import its
+                          markdown, docs, and source files to generate
                           questions.
                         </p>
                       </div>
@@ -681,8 +696,8 @@ function UpdateMaterial() {
                       </div>
 
                       <p className="text-[11px] text-outline">
-                        Public repos only · Up to 2 MB of text (markdown,
-                        docs, source)
+                        Public repos only · Up to 2 MB of text (markdown, docs,
+                        source)
                       </p>
                     </div>
                   </section>
@@ -973,10 +988,8 @@ function UpdateMaterial() {
                       toast.success("Assessment saved successfully.");
                     }}
                   >
-                    <span>
-                      Save 
-                    </span>
-                  </NavLink>                  
+                    <span>Save Assessment</span>
+                  </NavLink>
                   <button
                     className="ml-3 rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
                     onClick={handlePublish}

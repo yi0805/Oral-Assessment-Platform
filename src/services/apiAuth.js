@@ -23,7 +23,7 @@ export async function getCurrentUser() {
 
 export async function updateUserName(newUsername) {
   const response = await api.put(
-    `/users/updateUsername?new_username=${newUsername}`
+    `/users/updateUsername?new_username=${encodeURIComponent(newUsername)}`
   );
 
   return response.data;

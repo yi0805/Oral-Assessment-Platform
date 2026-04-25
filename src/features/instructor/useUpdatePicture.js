@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
 import { updateUserPicture } from "../../services/apiAuth";
@@ -17,7 +17,7 @@ export function useUpdatePicture() {
       const message =
         error?.response?.data?.detail ||
         error.message ||
-        "Failed to update user full name.";
+        "Failed to update profile picture.";
 
       toast.error(message);
     },

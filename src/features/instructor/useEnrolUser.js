@@ -7,7 +7,7 @@ export function useEnrolUser() {
   const queryClient = useQueryClient();
 
   const { mutate: enrolUser, isPending } = useMutation({
-    mutationFn: ({ courseId, upi }) => enrolUserApi(courseId, upi),
+    mutationFn: ({ courseId, upi, role }) => enrolUserApi(courseId, upi, role),
     onSuccess: (data) => {
       toast.success(data.message || "User enrolment successful");
 

@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -88,6 +89,10 @@ async def generate_question(
         )
 
     # Create assessment config and question pool
+    now = datetime.now(timezone.utc)
+    release_time = payload.release_time or now
+    due_time = payload.due_time or (release_time + timedelta(days=30))
+
     config = AssessmentConfig(
         course_id=course_id,
         title=payload.assessment_title,
@@ -96,8 +101,8 @@ async def generate_question(
         main_question_num=payload.num_main_questions,
         follow_up_num=payload.max_followups_per_main,
         status="draft",
-        release_time=payload.release_time | None,
-        due_time=payload.due_time | None,
+        release_time=release_time,
+        due_time=due_time,
     )
 
     db.add(config)

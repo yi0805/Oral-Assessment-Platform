@@ -3,21 +3,19 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
-from app.models.assessment import AssessmentConfig, AssessmentSession
-from app.models.feedback import AISummary
-from app.models.material import Material, MaterialChunk
-from app.models.session_runtime import TranscriptMessage
-from app.models.rubric import Rubric
 from app.services._prompt_safety import (
     extract_json_object,
     sanitize_untrusted,
     truncate_for_prompt,
 )
 from app.services.ai_gateway import smart_chat_complete
+
+from app.models import AssessmentConfig, AssessmentSession, AISummary, TranscriptMessage, Rubric
 from app.schemas import _SummaryLLMOutput
+
 
 logger = logging.getLogger(__name__)
 

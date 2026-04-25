@@ -13,9 +13,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 
 from app.models import Course, CourseEnrollment, AISummary, SessionFeedback, User, AssessmentConfig, AssessmentSession
-from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, Userupi
-
-from app.schemas.enums import UserRole
+from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, Userupi, UserRole
 
 router = APIRouter()
 
@@ -51,33 +49,55 @@ def enrol_user(
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-    
-    enrolment = db.query(CourseEnrollment).filter(
+
+    caller_enrolment = db.query(CourseEnrollment).filter(
         CourseEnrollment.course_id == course_id,
         CourseEnrollment.user_id == current_user.id
     ).first()
-    if not enrolment:
+
+    if not caller_enrolment:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not an instructor of this course.",
-    )
-   
+        )
+
+    role = (payload.role or UserRole.student.value).strip().lower()
+
+    if role not in {UserRole.student.value, UserRole.instructor.value}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Role must be 'student' or 'instructor'.",
+        )
+
     new_user = db.query(User).filter(User.upi == payload.upi).first()
     if new_user:
         existing = db.query(CourseEnrollment).filter(
             CourseEnrollment.course_id == course_id,
-            CourseEnrollment.user_id == new_user.upi
+            CourseEnrollment.user_id == new_user.id
         ).first()
+
         if existing:
-            raise HTTPException(400, "User already enrolled")
-    elif new_user:
-        new_user.role = UserRole.instructor
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already enrolled")
+
+        if role == UserRole.instructor.value and new_user.role != UserRole.instructor.value:
+            new_user.role = UserRole.instructor.value
+
+        db.add(CourseEnrollment(course_id=course_id, user_id=new_user.id, upi=payload.upi))
+
     else:
-        db.add(CourseEnrollment(course_id=course_id, upi=payload.upi))
+        existing = db.query(CourseEnrollment).filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.upi == payload.upi
+        ).first()
+
+        if existing:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already enrolled")
         
+        db.add(CourseEnrollment(course_id=course_id, upi=payload.upi))
+
     db.commit()
 
-    return {"message": f"Instructor '{payload.upi}' connected successfully '{course.course_code}'."}
+    return {"message": "Enrolled successfully."}
 
 
 # Import students via CSV
@@ -492,29 +512,32 @@ def delete_enrolment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor)
 ):
-    enrolment = db.query(CourseEnrollment).filter(
+    caller_enrolment = db.query(CourseEnrollment).filter(
         CourseEnrollment.course_id == course_id,
         CourseEnrollment.user_id == current_user.id
     ).first()
-    if not enrolment:
+
+    if not caller_enrolment:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not an instructor of this course.",
-    )
+        )
 
-    enrolment = (
-        db.query(CourseEnrollment).filter(
-            CourseEnrollment.course_id == course_id,
-            CourseEnrollment.upi == payload.upi
-            ).first()
-        )   
+    target_enrolment = db.query(CourseEnrollment).filter(
+        CourseEnrollment.course_id == course_id,
+        CourseEnrollment.upi == payload.upi,
+    ).first()
+
+    if not target_enrolment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User enrolment not found")
     
-    if not enrolment:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enrolment not found")
-    
-    try: 
-        db.delete(enrolment)
+    if target_enrolment.user_id == current_user.id:
+      raise HTTPException(409, detail="Cannot remove your own enrolment.")
+
+    try:
+        db.delete(target_enrolment)
         db.commit()
+
     except Exception:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database deletion failed")

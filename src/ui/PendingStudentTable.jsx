@@ -8,7 +8,7 @@ function PendingStudentTable({
   filteredReviews = [],
   grades,
   onGradeChange,
-  isValidGrade,  
+  isValidGrade,
 }) {
   const navigate = useNavigate();
 
@@ -23,8 +23,6 @@ function PendingStudentTable({
   const startIndex = (currentPage - 1) * rowsPerPage;
   const endIndex = startIndex + rowsPerPage;
   const currentRows = filteredReviews.slice(startIndex, endIndex);
-
-  console.log(filteredReviews);
 
   function goToPage(page) {
     setCurrentPage(page);
@@ -60,8 +58,6 @@ function PendingStudentTable({
 
     updateGrade({ sessionId, grade: Number(grade) });
   }
-
-
 
   return (
     <>
@@ -156,7 +152,7 @@ function PendingStudentTable({
                         </div>
                       </div>
                     </td>
-                    
+
                     {/* Course */}
                     <td className="px-6 py-5">
                       <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
@@ -220,7 +216,6 @@ function PendingStudentTable({
                     </td>
                   </tr>
                 );
-                
               })
             )}
           </tbody>
