@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -16,26 +16,32 @@ from app.models import User
 
 logger = logging.getLogger(__name__)
 
-MIME_MAP = {
-    "pdf": "application/pdf",
-    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "txt": "text/plain",
-}
+S3_BASE_URL = "https://team8-project20-materials.s3.ap-southeast-2.amazonaws.com/"
+MAX_PICTURE_BYTES = 5 * 1024 * 1024
 
 router = APIRouter()
 
 @router.put("/updateUsername",
             summary = "Change the current users full name.")
-def update_user_name(new_username: str,
-                    user: User = Depends(get_current_user),
-                    db: Session = Depends(get_db)):
-    user.full_name = new_username
+def update_user_name(
+    new_username: str = Query(..., min_length=1, max_length=100),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    cleaned = new_username.strip()
+
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Display name cannot be empty.",
+        )
+
+    user.full_name = cleaned
 
     db.commit()
     db.refresh(user)
 
-    return {"message": "User updated successfully"}
+    return {"message": "Name updated successfully"}
 
 
 @router.put("/updatePicture", 
@@ -48,10 +54,8 @@ async def update_picture(
 
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="File must be an image")
-    
+
     filename = file.filename or "unknown"
-    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    S3_BASE_URL = "https://team8-project20-materials.s3.ap-southeast-2.amazonaws.com/"
 
     file_bytes = await file.read()
 
@@ -60,13 +64,20 @@ async def update_picture(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The uploaded file is empty.",
         )
-    
+
+    if len(file_bytes) > MAX_PICTURE_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Profile picture must be 5 MB or smaller.",
+        )
+
     image_id = uuid4()
 
     safe_filename = Path(filename).name
     storage_key = f"users/{user.id}/images/{image_id}/{safe_filename}"
     public_url = f"{S3_BASE_URL}{storage_key}"
-    content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
+    content_type = file.content_type
+    previous_image_url = user.image
 
     try:
         s3_client.upload_file(
@@ -106,6 +117,18 @@ async def update_picture(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Profile picture could not be saved.",
         ) from e
+
+    if previous_image_url and previous_image_url.startswith(S3_BASE_URL):
+        previous_key = previous_image_url[len(S3_BASE_URL):]
+
+        if previous_key and previous_key != storage_key:
+            try:
+                s3_client.delete_file(previous_key)
+                
+            except RuntimeError:
+                logger.exception(
+                    "Failed to delete previous profile picture %s", previous_key
+                )
 
     return {
         "message": "Profile picture updated successfully",

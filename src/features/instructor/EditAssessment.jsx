@@ -1,16 +1,12 @@
-import { useEffect, useState, useRef } from "react";
-import Spinner from "../../ui/Spinner";
 import { NavLink } from "react-router";
 
-export default function EditAssessment(){
-
+export default function EditAssessment() {
   return (
     <div className="min-h-screen">
       <main className="ml-64 px-10 pb-12 pt-24">
         <div className="mb-10">
           <NavLink
-            className="group mb-4 inline-flex items-center gap-2 text-xs font-bold 
-            text-outline-variant transition-colors hover:text-primary"
+            className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
             to="/home"
           >
             <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
