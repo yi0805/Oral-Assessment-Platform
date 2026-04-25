@@ -135,7 +135,7 @@ export default function Setting(){
                   />                  
                   <button
                     onClick={handleUpdateName}
-                    disabled={isPending || displayName === user?.full_name}
+                    disabled={isPending || displayName === user?.full_name || !displayName.trim()}
                     className="rounded-xl bg-primary px-6 py-2 font-bold text-white transition-opacity disabled:opacity-50"
                   >
                     {isPending ? "Saving..." : "Save"}
