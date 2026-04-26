@@ -124,7 +124,20 @@ def get_assessment(
     course_id: UUID,
     assessment_config_id: UUID,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
 ):
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
     config = (
         db.query(AssessmentConfig)
         .filter(
