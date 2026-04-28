@@ -23,6 +23,7 @@ export default function StudentAssessment() {
 
   const [expiresAt, setExpiresAt] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
+
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [typedAnswer, setTypedAnswer] = useState("");
 
@@ -30,6 +31,7 @@ export default function StudentAssessment() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [error, setError] = useState(null);
+  const [audioError, setAudioError] = useState(null);
 
   const [canComplete, setCanComplete] = useState(false);
 
@@ -57,6 +59,7 @@ export default function StudentAssessment() {
   const { logout } = useLogout();
 
   const isRecording = recordingStatus === "recording";
+  const audioBusy = isRecording || isTranscribing;
 
   useEffect(() => {
     let cancelled = false;
@@ -186,12 +189,14 @@ export default function StudentAssessment() {
     if (!currentQuestion) return;
     if (isSubmitting || isTranscribing) return;
 
+    setAudioError(null);
+
     if (isRecording) {
       try {
         const blob = await stopRecording();
 
         if (!blob || blob.size === 0) {
-          setError("No audio was captured. Please try again.");
+          setAudioError("No audio was captured. Please try again.");
           return;
         }
 
@@ -207,13 +212,15 @@ export default function StudentAssessment() {
           setCanComplete(true);
         }
       } catch (err) {
-        setError(getErrorMessage(err, "Failed to submit your audio answer."));
+        setAudioError(
+          getErrorMessage(err, "Failed to submit your audio answer."),
+        );
       }
       return;
     }
 
     if (!isAudioSupported) {
-      setError(
+      setAudioError(
         "Audio recording isn't supported in this browser. Please type your answer instead.",
       );
       return;
@@ -225,15 +232,15 @@ export default function StudentAssessment() {
       const name = err && err.name;
 
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        setError(
+        setAudioError(
           "Microphone access was blocked. Please allow microphone access in your browser and try again.",
         );
       } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-        setError(
+        setAudioError(
           "No microphone was detected. Please connect one and try again.",
         );
       } else {
-        setError(getErrorMessage(err, "Failed to start recording."));
+        setAudioError(getErrorMessage(err, "Failed to start recording."));
       }
 
       resetRecorder();
@@ -449,6 +456,12 @@ export default function StudentAssessment() {
                       }`}
                     ></div>
                   </div>
+
+                  {audioError && (
+                    <p className="mt-6 max-w-md text-center text-sm text-error">
+                      {audioError}
+                    </p>
+                  )}
                 </div>
 
                 <div className="relative">
@@ -459,11 +472,12 @@ export default function StudentAssessment() {
                   </div>
 
                   <textarea
-                    className="block w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-4 pl-12 pr-4 font-body text-sm placeholder:text-outline-variant focus:border-primary focus:ring-primary"
+                    className="block w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-4 pl-12 pr-4 font-body text-sm placeholder:text-outline-variant focus:border-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
                     placeholder="Type your response here if you prefer not to use voice..."
                     rows="4"
                     value={typedAnswer}
                     onChange={(e) => setTypedAnswer(e.target.value)}
+                    disabled={audioBusy}
                     onCopy={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
@@ -587,7 +601,7 @@ export default function StudentAssessment() {
                 <button
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-sm transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
                   onClick={handleSubmitAnswer}
-                  disabled={isSubmitting || !typedAnswer.trim()}
+                  disabled={isSubmitting || audioBusy || !typedAnswer.trim()}
                 >
                   {isSubmitting ? "Submitting..." : "Submit Answer"}
 
@@ -601,7 +615,7 @@ export default function StudentAssessment() {
                 <button
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-secondary py-4 font-bold text-on-secondary shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                   onClick={handleCompleteSession}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || audioBusy}
                 >
                   {isSubmitting ? "Submitting..." : "Submit Assessment"}
                   <span className="material-symbols-outlined text-sm">
