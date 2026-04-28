@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useStartSession } from "./useStartSession";
 import { useCourses } from "../../hooks/useCourses";
 import { useSubmitAnswer } from "./useSubmitAnswer";
+import { useSubmitAudioAnswer } from "./useSubmitAudioAnswer";
+import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 
@@ -42,9 +44,20 @@ export default function StudentAssessment() {
 
   const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
+  const { submitAudioAnswer, isPending: isTranscribing } =
+    useSubmitAudioAnswer();
+  const {
+    status: recordingStatus,
+    isSupported: isAudioSupported,
+    start: startRecording,
+    stop: stopRecording,
+    reset: resetRecorder,
+  } = useAudioRecorder();
   const { completeAssessment } = useCompleteAssessment();
 
   const { logout } = useLogout();
+
+  const isRecording = recordingStatus === "recording";
 
   useEffect(() => {
     let cancelled = false;
@@ -167,6 +180,64 @@ export default function StudentAssessment() {
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
+    }
+  }
+
+  async function handleMicClick() {
+    if (!currentQuestion) return;
+    if (isSubmitting || isTranscribing) return;
+
+    if (isRecording) {
+      try {
+        const blob = await stopRecording();
+
+        if (!blob || blob.size === 0) {
+          setError("No audio was captured. Please try again.");
+          return;
+        }
+
+        const response = await submitAudioAnswer({
+          sessionId,
+          audioBlob: blob,
+        });
+
+        if (response.next_question) {
+          setCurrentQuestion(response.next_question);
+        } else {
+          setCurrentQuestion(null);
+          setCanComplete(true);
+        }
+      } catch (err) {
+        setError(getErrorMessage(err, "Failed to submit your audio answer."));
+      }
+      return;
+    }
+
+    if (!isAudioSupported) {
+      setError(
+        "Audio recording isn't supported in this browser. Please type your answer instead.",
+      );
+      return;
+    }
+
+    try {
+      await startRecording();
+    } catch (err) {
+      const name = err && err.name;
+
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setError(
+          "Microphone access was blocked. Please allow microphone access in your browser and try again.",
+        );
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setError(
+          "No microphone was detected. Please connect one and try again.",
+        );
+      } else {
+        setError(getErrorMessage(err, "Failed to start recording."));
+      }
+
+      resetRecorder();
     }
   }
 
@@ -313,7 +384,11 @@ export default function StudentAssessment() {
 
                   <div className="relative">
                     <div className="absolute -inset-4 rounded-full bg-primary/5 blur-xl"></div>
-                    <button className="relative flex h-24 w-24 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-all hover:bg-primary-dim active:scale-95">
+                    <button
+                      type="button"
+                      onClick={handleMicClick}
+                      className="relative flex h-24 w-24 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-all hover:bg-primary-dim active:scale-95"
+                    >
                       <span
                         className="material-symbols-outlined text-4xl"
                         data-weight="fill"
@@ -498,7 +573,7 @@ export default function StudentAssessment() {
                 <span className="material-symbols-outlined text-sm">info</span>
 
                 <span className="text-xs font-bold uppercase tracking-wider">
-                  Curator's Tip
+                  Instructor's Tip
                 </span>
               </div>
 
