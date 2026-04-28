@@ -23,7 +23,6 @@ export default function StudentAssessment() {
 
   const [expiresAt, setExpiresAt] = useState(null);
   const [timeLeft, setTimeLeft] = useState(null);
-
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [typedAnswer, setTypedAnswer] = useState("");
 
@@ -379,7 +378,11 @@ export default function StudentAssessment() {
               <div className="space-y-6">
                 <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low p-10">
                   <p className="mb-8 font-medium text-on-surface-variant">
-                    Tap the microphone to speak your answer
+                    {isTranscribing
+                      ? "Transcribing your answer…"
+                      : isRecording
+                        ? "Recording… tap the button again to stop and submit"
+                        : "Tap the microphone to speak your answer"}
                   </p>
 
                   <div className="relative">
@@ -420,11 +423,31 @@ export default function StudentAssessment() {
                   </div>
 
                   <div className="mt-8 flex gap-2">
-                    <div className="h-4 w-1 rounded-full bg-primary/20"></div>
-                    <div className="h-8 w-1 rounded-full bg-primary/40"></div>
-                    <div className="h-12 w-1 rounded-full bg-primary"></div>
-                    <div className="h-6 w-1 rounded-full bg-primary/60"></div>
-                    <div className="h-10 w-1 rounded-full bg-primary/80"></div>
+                    <div
+                      className={`h-4 w-1 rounded-full ${
+                        isRecording ? "bg-error/40" : "bg-primary/20"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-8 w-1 rounded-full ${
+                        isRecording ? "bg-error/60" : "bg-primary/40"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-12 w-1 rounded-full ${
+                        isRecording ? "bg-error" : "bg-primary"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-6 w-1 rounded-full ${
+                        isRecording ? "bg-error/70" : "bg-primary/60"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-10 w-1 rounded-full ${
+                        isRecording ? "bg-error/80" : "bg-primary/80"
+                      }`}
+                    ></div>
                   </div>
                 </div>
 
