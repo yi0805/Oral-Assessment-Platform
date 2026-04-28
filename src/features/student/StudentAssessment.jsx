@@ -383,18 +383,38 @@ export default function StudentAssessment() {
                   </p>
 
                   <div className="relative">
-                    <div className="absolute -inset-4 rounded-full bg-primary/5 blur-xl"></div>
+                    <div
+                      className={`absolute -inset-4 rounded-full blur-xl ${
+                        isRecording ? "bg-error/30" : "bg-primary/5"
+                      }`}
+                    ></div>
                     <button
                       type="button"
                       onClick={handleMicClick}
-                      className="relative flex h-24 w-24 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-all hover:bg-primary-dim active:scale-95"
+                      disabled={isSubmitting || isTranscribing}
+                      aria-label={
+                        isTranscribing
+                          ? "Transcribing"
+                          : isRecording
+                            ? "Stop recording"
+                            : "Start recording"
+                      }
+                      className={`relative flex h-24 w-24 items-center justify-center rounded-full text-on-primary shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isRecording
+                          ? "animate-pulse bg-error hover:bg-error/90"
+                          : "bg-primary hover:bg-primary-dim"
+                      }`}
                     >
                       <span
                         className="material-symbols-outlined text-4xl"
                         data-weight="fill"
                         style={{ fontVariationSettings: '"FILL" 1' }}
                       >
-                        mic
+                        {isTranscribing
+                          ? "hourglass_top"
+                          : isRecording
+                            ? "stop"
+                            : "mic"}
                       </span>
                     </button>
                   </div>
