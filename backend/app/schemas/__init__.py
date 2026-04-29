@@ -13,7 +13,8 @@ from app.schemas.feedback import (
 )
 
 from app.schemas.assessment import (
-    ReleaseResponse, AssessmentConfigInfoOut, AssessmentHistoryItemOut, AssessmentHistoryOut, AssessmentTitleOut,
+    ReleaseResponse, AssessmentConfigInfoOut, AssessmentConfigDetailOut, AssessmentConfigUpdate,
+    AssessmentConfigSummary, AssessmentHistoryItemOut, AssessmentHistoryOut, AssessmentTitleOut,
     SessionFeedbackOut, SessionInfoOut, PendingReviewOut, StudentInfoOut,
     TranscriptMessageOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse

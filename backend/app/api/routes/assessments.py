@@ -8,7 +8,12 @@ from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
 from app.models import AssessmentConfig, AssessmentSession, CourseEnrollment, User, QuestionPool
-from app.schemas import ReleaseResponse, AssessmentConfigInfoOut
+from app.schemas import (
+    ReleaseResponse,
+    AssessmentConfigDetailOut,
+    AssessmentConfigUpdate,
+    AssessmentConfigSummary,
+)
 
 router = APIRouter()
 
@@ -113,11 +118,45 @@ def release_assessment(
     return ReleaseResponse(sessions_created=sessions_created)
 
 
+# List assessment configs for a course
+
+@router.get(
+    "/courses/{course_id}/assessments",
+    response_model=list[AssessmentConfigSummary],
+    summary="List all assessment configs for a course (instructor view)",
+)
+def list_course_assessments(
+    course_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
+    configs = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.course_id == course_id)
+        .order_by(AssessmentConfig.title.asc())
+        .all()
+    )
+
+    return configs
+
+
 # Get assessment config
 
 @router.get(
     "/courses/{course_id}/assessments/{assessment_config_id}",
-    response_model=AssessmentConfigInfoOut,
+    response_model=AssessmentConfigDetailOut,
     summary="Get assessment config details",
 )
 def get_assessment(
@@ -157,16 +196,28 @@ def get_assessment(
 
 @router.put(
     "/courses/{course_id}/assessments/{assessment_config_id}",
-    response_model=AssessmentConfigInfoOut,
+    response_model=AssessmentConfigDetailOut,
     summary="Update an assessment config",
 )
 def update_assessment(
     course_id: UUID,
     assessment_config_id: UUID,
-    payload: AssessmentConfigInfoOut,
+    payload: AssessmentConfigUpdate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
     config = (
         db.query(AssessmentConfig)
         .filter(
@@ -208,6 +259,18 @@ def delete_assessment(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
     config = (
         db.query(AssessmentConfig)
         .filter(
