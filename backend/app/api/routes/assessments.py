@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
-from app.models import AssessmentConfig, AssessmentSession, CourseEnrollment, User, QuestionPool
+from app.models import AssessmentConfig, AssessmentSession, CourseEnrollment, User, Question, QuestionPool
 from app.schemas import (
     ReleaseResponse,
     AssessmentConfigDetailOut,
@@ -239,6 +239,26 @@ def update_assessment(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Only the due date can be updated for a published assessment.",
             )
+
+    if "main_question_num" in update_data and update_data["main_question_num"] is not None:
+        pool_size = 0
+        if config.question_pool:
+            pool_size = (
+                db.query(Question)
+                .filter(Question.question_pool_id == config.question_pool.id)
+                .count()
+            )
+
+        if update_data["main_question_num"] > pool_size:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"main_question_num ({update_data['main_question_num']}) "
+                    f"cannot exceed the question pool size ({pool_size}). "
+                    f"Add more questions first."
+                ),
+            )
+
     for field, value in update_data.items():
         setattr(config, field, value)
 
