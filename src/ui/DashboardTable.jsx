@@ -149,6 +149,7 @@ function DashboardTable({
                           alt="Student Avatar"
                           className="h-10 w-10 rounded-full object-cover"
                           src={student.student_image || "/WhereRU.png"}
+                          referrerPolicy="no-referrer"
                         />
 
                         <div>
