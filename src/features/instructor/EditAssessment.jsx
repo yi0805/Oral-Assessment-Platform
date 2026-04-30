@@ -32,6 +32,7 @@ function StatusBadge({ status }) {
 export default function EditAssessment() {
   const [courseId, setCourseId] = useState("");
   const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [assessmentName, setAssessmentName] = useState("");
   const [numQuestions, setNumQuestions] = useState("");
@@ -61,6 +62,7 @@ export default function EditAssessment() {
     setAssessmentTime("");
     setReleaseTime(null);
     setDueTime(null);
+    setSearchQuery("");
   }, [courseId]);
 
   useEffect(() => {
@@ -77,6 +79,9 @@ export default function EditAssessment() {
   if (isCoursesLoading) return <Spinner />;
 
   const hasCourses = courses.length > 0;
+  const filteredAssessments = assessments.filter((a) =>
+    a.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
   const isPublished = assessment?.status === "published";
   const formEnabled =
     !!selectedAssessmentId && !isDetailLoading && !isSaving;
@@ -204,27 +209,51 @@ export default function EditAssessment() {
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {assessments.map((a) => {
-                      const isSelected = a.id === selectedAssessmentId;
-                      return (
-                        <button
-                          key={a.id}
-                          type="button"
-                          onClick={() => setSelectedAssessmentId(a.id)}
-                          className={`flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all ${
-                            isSelected
-                              ? "border-primary/30 bg-primary/5 ring-2 ring-primary/20"
-                              : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/40"
-                          }`}
-                        >
-                          <span className="text-sm font-semibold text-on-surface">
-                            {a.title}
-                          </span>
-                          <StatusBadge status={a.status} />
-                        </button>
-                      );
-                    })}
+                  <div className="space-y-3">
+                    <div className="group relative">
+                      <span
+                        className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-outline"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        search
+                      </span>
+                      <input
+                        className="w-full rounded-xl border-none bg-surface-container-low py-2.5 pl-9 pr-4 text-sm text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                        placeholder="Search assessments…"
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+
+                    {filteredAssessments.length === 0 ? (
+                      <p className="px-1 py-3 text-center text-xs text-outline">
+                        No assessments match &ldquo;{searchQuery}&rdquo;
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {filteredAssessments.map((a) => {
+                          const isSelected = a.id === selectedAssessmentId;
+                          return (
+                            <button
+                              key={a.id}
+                              type="button"
+                              onClick={() => setSelectedAssessmentId(a.id)}
+                              className={`flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all ${
+                                isSelected
+                                  ? "border-primary/30 bg-primary/5 ring-2 ring-primary/20"
+                                  : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/40"
+                              }`}
+                            >
+                              <span className="text-sm font-semibold text-on-surface">
+                                {a.title}
+                              </span>
+                              <StatusBadge status={a.status} />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
 
