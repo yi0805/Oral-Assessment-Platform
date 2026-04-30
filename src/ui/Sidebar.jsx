@@ -103,7 +103,7 @@ function Sidebar() {
               className="material-symbols-outlined text-[20px]"
               data-icon="add"
             >
-              add
+              assignment_add
             </span>
             <span>Generate Assessment</span>
           </NavLink>

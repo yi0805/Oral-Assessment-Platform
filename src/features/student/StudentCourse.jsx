@@ -6,6 +6,7 @@ import { useCourses } from "../../hooks/useCourses";
 
 import { formatDeadline } from "../../utils/formatDeadline";
 import Spinner from "../../ui/Spinner";
+// import { nowInTimeZone } from "react-datepicker/dist/dist/date_utils.js";
 
 export default function StudentCourse() {
   const navigate = useNavigate();
@@ -26,14 +27,14 @@ export default function StudentCourse() {
   const course = courses.find(
     (course) => String(course.id) === String(courseId),
   );
-
-  const sortedAssessments = [...assessments].sort(
-    (a, b) => new Date(a.due_time || 0) - new Date(b.due_time || 0),
-  );
+  
+  const upcomingAssessments = assessments
+    .filter(a => new Date(a.due_time) > Date.now())
+    .sort((a, b) => new Date(a.due_time) - new Date(b.due_time));
 
   const earliestDeadline =
-    sortedAssessments.length > 0
-      ? formatDeadline(sortedAssessments[0].due_time)
+    upcomingAssessments.length > 0
+      ? formatDeadline(upcomingAssessments[0].due_time)
       : null;
 
   return (
@@ -83,7 +84,7 @@ export default function StudentCourse() {
             </div>
 
             <div className="grid grid-cols-12 gap-6">
-              {sortedAssessments.map((assessment, index) => {
+              {upcomingAssessments.map((assessment, index) => {
                 if (index === 0) {
                   return (
                     <div
@@ -103,10 +104,10 @@ export default function StudentCourse() {
 
                         <div>
                           <span
-                            className="material-symbols-outlined mb-4 text-4xl text-primary"
+                            className="material-symbols-outlined mb-2 text-4xl text-red-600"
                             style={{ fontVariationSettings: '"FILL" 1' }}
                           >
-                            analytics
+                            breaking_news
                           </span>
 
                           <h2 className="mb-2 text-2xl font-bold text-on-surface">
@@ -182,9 +183,9 @@ export default function StudentCourse() {
                         setAssessmentConfigId(assessment.assessment_config_id);
                       }}
                     >
-                      <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
+                      <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest py-8 px-6 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
                         <div>
-                          <div className="mb-6 flex items-start justify-between">
+                          <div className="mb-5 flex items-start justify-between">
                             <span className="material-symbols-outlined text-2xl text-secondary">
                               database
                             </span>
@@ -204,12 +205,18 @@ export default function StudentCourse() {
                           </p>
                         </div>
 
-                        <div className="mt-8">
-                          <div className="mb-4 h-1.5 w-full rounded-full bg-surface-container">
-                            <div className="h-1.5 w-0 rounded-full bg-primary transition-all duration-1000"></div>
-                          </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
+                          <span className="material-symbols-outlined text-[15px]">
+                            schedule
+                          </span>
+                          {assessment.total_time_minute} mins
 
-                          <div className="flex items-center justify-between text-[10px] font-bold text-outline"></div>
+                          <span className="ml-4 material-symbols-outlined text-[13px]">
+                            question_mark
+                          </span>
+
+                          {assessment.main_question_num} main •{" "}
+                          {assessment.follow_up_num} each
                         </div>
                       </div>
                     </div>
@@ -226,9 +233,15 @@ export default function StudentCourse() {
                     }}
                   >
                     <div className="rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-lg">
-                      <span className="material-symbols-outlined mb-4 text-primary">
-                        menu_book
-                      </span>
+                      <div className="mb-2 flex items-start justify-between">
+                        <span className="material-symbols-outlined mb-4 text-primary">
+                          assignment
+                        </span>
+
+                        <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
+                          {formatDeadline(assessment.due_time)}
+                        </span>
+                      </div>
 
                       <h3 className="mb-1 font-bold text-on-surface">
                         {assessment.title || "Title Not Available."}
@@ -239,10 +252,16 @@ export default function StudentCourse() {
                       </p>
 
                       <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
-                        <span className="material-symbols-outlined text-sm">
+                        <span className="material-symbols-outlined text-[15px]">
                           schedule
                         </span>
                         {assessment.total_time_minute} mins
+
+                        <span className="ml-3 material-symbols-outlined text-[13px]">
+                          question_mark
+                        </span>
+
+                        {assessment.main_question_num} main
                       </div>
                     </div>
                   </div>
