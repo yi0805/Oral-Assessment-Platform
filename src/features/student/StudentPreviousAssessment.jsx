@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { NavLink } from "react-router";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useAssessmentHistory } from "./useAssessmentHistory";
@@ -75,14 +76,27 @@ function StudentPreviousAssessment() {
       <main className="px-8 pb-12 pt-24 md:ml-64">
         <div className="mx-auto max-w-6xl">
           <div className="mb-10">
-            <span className="text-xs font-medium uppercase tracking-widest text-outline">
-              Performance History
-            </span>
+            <NavLink
+              className="group mb-4 inline-flex items-center gap-2 text-xs font-bold 
+              text-outline-variant transition-colors hover:text-primary"
+              to="/home"
+            >
+              <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
+                arrow_back
+              </span>
 
-            <h1 className="mt-1 text-4xl font-extrabold tracking-tight text-on-surface">
+              <span className="font-body uppercase tracking-widest">
+                Back to Courses
+              </span>
+            </NavLink>
+
+            <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
               Previous Assessments
             </h1>
 
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Performance History
+            </p>
             <div className="mt-4 flex items-center gap-3">
               <span className="text-sm font-semibold text-on-surface-variant">
                 Course:
