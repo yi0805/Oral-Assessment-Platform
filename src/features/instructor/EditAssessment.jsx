@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink } from "react-router";
+import toast from "react-hot-toast";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useCourseAssessments } from "./useCourseAssessments";
@@ -7,29 +8,38 @@ import { useAssessmentDetail } from "./useAssessmentDetail";
 import { useUpdateAssessment } from "./useUpdateAssessment";
 import { usePublishAssessment } from "./usePublishAssessment";
 import { useDeleteAssessment } from "./useDeleteAssessment";
+import { useRubric } from "./useRubric";
+import { useUpdateRubric } from "./useUpdateRubric";
 
 import Spinner from "../../ui/Spinner";
 import ConfirmModal from "../../ui/ConfirmModal";
 import AssessmentConfigForm from "./AssessmentConfigForm";
-import { isAssessmentConfigValid } from "./assessmentFormUtils";
+import RubricEditor from "./RubricEditor";
+import QuestionEditor from "./QuestionEditor";
+import {
+  MAX_QUESTIONS,
+  isAssessmentConfigValid,
+  isRubricValid,
+  rubricTotal,
+} from "./assessmentFormUtils";
 
-const STATUS_STYLES = {
-  published:
-    "bg-primary/10 text-primary",
-  draft:
-    "bg-surface-container text-on-surface-variant",
-};
+function rubricToRows(rubric) {
+  return (rubric?.criteria_data ?? []).map((item) => ({
+    title: item.title ?? "",
+    description: item.description ?? "",
+    max_points: Number(item.max_points) || 0,
+  }));
+}
 
-function StatusBadge({ status }) {
-  const label = status === "published" ? "Published" : "Draft";
-  const className = STATUS_STYLES[status] ?? STATUS_STYLES.draft;
-  return (
-    <span
-      className={`ml-2 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${className}`}
-    >
-      {label}
-    </span>
-  );
+function snapshotKey({ form, rubricRows }) {
+  return JSON.stringify({
+    form: {
+      ...form,
+      releaseTime: form.releaseTime ? form.releaseTime.toISOString() : null,
+      dueTime: form.dueTime ? form.dueTime.toISOString() : null,
+    },
+    rubricRows,
+  });
 }
 
 export default function EditAssessment() {
@@ -43,6 +53,9 @@ export default function EditAssessment() {
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [rubricRows, setRubricRows] = useState([]);
+  const [initialSnapshot, setInitialSnapshot] = useState(null);
+  const [initializedFor, setInitializedFor] = useState(null);
 
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const { assessments, isLoading: isAssessmentsLoading } =
@@ -54,6 +67,9 @@ export default function EditAssessment() {
   const { updateAssessment, isPending: isSaving } = useUpdateAssessment();
   const { publishAssessment, isPending: isPublishing } = usePublishAssessment();
   const { deleteAssessment, isDeleting } = useDeleteAssessment();
+  const { rubric, isLoading: isRubricLoading } =
+    useRubric(selectedAssessmentId);
+  const { updateRubric, isPending: isSavingRubric } = useUpdateRubric();
 
   useEffect(() => {
     if (courses.length > 0 && !courseId) {
@@ -69,6 +85,9 @@ export default function EditAssessment() {
     setReleaseTime(null);
     setDueTime(null);
     setSearchQuery("");
+    setRubricRows([]);
+    setInitialSnapshot(null);
+    setInitializedFor(null);
   }, [courseId]);
 
   useEffect(() => {
@@ -76,15 +95,35 @@ export default function EditAssessment() {
   }, [selectedAssessmentId]);
 
   useEffect(() => {
-    if (!assessment) return;
-    setAssessmentName(assessment.title);
-    setNumQuestions(String(assessment.main_question_num));
-    setAssessmentTime(String(assessment.total_time_minute));
-    setReleaseTime(
-      assessment.release_time ? new Date(assessment.release_time) : null,
-    );
-    setDueTime(assessment.due_time ? new Date(assessment.due_time) : null);
-  }, [assessment]);
+    if (!assessment || !rubric) return;
+    if (initializedFor === selectedAssessmentId) return;
+
+    const form = {
+      assessmentName: assessment.title ?? "",
+      numQuestions:
+        assessment.main_question_num != null
+          ? String(assessment.main_question_num)
+          : "",
+      assessmentTime:
+        assessment.total_time_minute != null
+          ? String(assessment.total_time_minute)
+          : "",
+      releaseTime: assessment.release_time
+        ? new Date(assessment.release_time)
+        : null,
+      dueTime: assessment.due_time ? new Date(assessment.due_time) : null,
+    };
+    const rows = rubricToRows(rubric);
+
+    setAssessmentName(form.assessmentName);
+    setNumQuestions(form.numQuestions);
+    setAssessmentTime(form.assessmentTime);
+    setReleaseTime(form.releaseTime);
+    setDueTime(form.dueTime);
+    setRubricRows(rows);
+    setInitialSnapshot(snapshotKey({ form, rubricRows: rows }));
+    setInitializedFor(selectedAssessmentId);
+  }, [assessment, rubric, selectedAssessmentId, initializedFor]);
 
   if (isCoursesLoading) return <Spinner />;
 
@@ -94,41 +133,96 @@ export default function EditAssessment() {
   );
   const isPublished = assessment?.status === "published";
   const formEnabled =
-    !!selectedAssessmentId && !isDetailLoading && !isSaving && !isPublishing && !isDeleting;
+    !!selectedAssessmentId &&
+    !isDetailLoading &&
+    !isSaving &&
+    !isPublishing &&
+    !isDeleting;
+
+  const currentSnapshot = snapshotKey({
+    form: {
+      assessmentName,
+      numQuestions,
+      assessmentTime,
+      releaseTime,
+      dueTime,
+    },
+    rubricRows,
+  });
+
+  const isDirty =
+    initialSnapshot != null && currentSnapshot !== initialSnapshot;
+  const rubricValid = rubricRows.length > 0 && isRubricValid(rubricRows);
+
   const canSave =
     formEnabled &&
-    isAssessmentConfigValid({ assessmentName, numQuestions, assessmentTime });
+    isAssessmentConfigValid({ assessmentName, numQuestions, assessmentTime }) &&
+    isDirty &&
+    rubricValid &&
+    !isSavingRubric;
   const canRepublish = formEnabled;
 
-  function handleSave() {
+  async function handleSave() {
     if (!canSave) return;
-    updateAssessment({
-      courseId,
-      assessmentConfigId: selectedAssessmentId,
-      payload: {
-        title: assessmentName,
-        total_time_minute: Math.round(Number(assessmentTime)),
-        main_question_num: Number(numQuestions),
-        release_time: releaseTime?.toISOString() ?? null,
-        due_time: dueTime?.toISOString() ?? null,
-      },
-    });
+    const snapshotAtSubmit = currentSnapshot;
+    try {
+      await updateAssessment({
+        courseId,
+        assessmentConfigId: selectedAssessmentId,
+        payload: {
+          title: assessmentName,
+          total_time_minute: Math.round(Number(assessmentTime)),
+          main_question_num: Number(numQuestions),
+          release_time: releaseTime?.toISOString() ?? null,
+          due_time: dueTime?.toISOString() ?? null,
+        },
+      });
+      await updateRubric({
+        assessmentConfigId: selectedAssessmentId,
+        rubricPayload: {
+          total_points: rubricTotal(rubricRows),
+          criteria_data: rubricRows.map((row) => ({
+            title: row.title,
+            description: row.description,
+            max_points: Number(row.max_points),
+          })),
+        },
+      });
+      setInitialSnapshot(snapshotAtSubmit);
+    } catch {
+      //
+    }
   }
 
   async function handlePublish() {
     if (!selectedAssessmentId || isPublishing) return;
-    await updateAssessment({
-      courseId,
-      assessmentConfigId: selectedAssessmentId,
-      payload: {
-        title: assessmentName,
-        total_time_minute: Math.round(Number(assessmentTime)),
-        main_question_num: Number(numQuestions),
-        release_time: releaseTime?.toISOString() ?? null,
-        due_time: dueTime?.toISOString() ?? null,
-      },
-    });
-    publishAssessment({ courseId, assessmentConfigId: selectedAssessmentId });
+    try {
+      await updateAssessment({
+        courseId,
+        assessmentConfigId: selectedAssessmentId,
+        payload: {
+          title: assessmentName,
+          total_time_minute: Math.round(Number(assessmentTime)),
+          main_question_num: Number(numQuestions),
+          release_time: releaseTime?.toISOString() ?? null,
+          due_time: dueTime?.toISOString() ?? null,
+        },
+      });
+      await updateRubric({
+        assessmentConfigId: selectedAssessmentId,
+        rubricPayload: {
+          total_points: rubricTotal(rubricRows),
+          criteria_data: rubricRows.map((row) => ({
+            title: row.title,
+            description: row.description,
+            max_points: Number(row.max_points),
+          })),
+        },
+      });
+      publishAssessment({ courseId, assessmentConfigId: selectedAssessmentId });
+    } catch {
+      //
+    }
   }
 
   function handleRepublish() {
@@ -141,7 +235,10 @@ export default function EditAssessment() {
   }
 
   async function handleDelete() {
-    await deleteAssessment({ courseId, assessmentConfigId: selectedAssessmentId });
+    await deleteAssessment({
+      courseId,
+      assessmentConfigId: selectedAssessmentId,
+    });
     setSelectedAssessmentId("");
     setConfirmingDelete(false);
   }
@@ -197,7 +294,7 @@ export default function EditAssessment() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-12 items-start gap-6">
+          <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 space-y-6 lg:col-span-6">
               <AssessmentConfigForm
                 courses={courses}
@@ -220,7 +317,7 @@ export default function EditAssessment() {
             </div>
 
             <div className="col-span-12 lg:col-span-6">
-              <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+              <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
                 <div className="mb-6 flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                     <span
@@ -292,7 +389,17 @@ export default function EditAssessment() {
                               <span className="text-sm font-semibold text-on-surface">
                                 {a.title}
                               </span>
-                              <StatusBadge status={a.status} />
+                              <span
+                                className={`ml-2 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                  a.status === "published"
+                                    ? "bg-primary/10 text-primary"
+                                    : "bg-surface-container text-on-surface-variant"
+                                }`}
+                              >
+                                {a.status === "published"
+                                  ? "Published"
+                                  : "Draft"}
+                              </span>
                             </button>
                           );
                         })}
@@ -309,12 +416,49 @@ export default function EditAssessment() {
               </section>
             </div>
 
+            {selectedAssessmentId && !isDetailLoading && !isRubricLoading && (
+              <div className="col-span-12">
+                <RubricEditor
+                  rows={rubricRows}
+                  onRowsChange={setRubricRows}
+                  disabled={!formEnabled || isPublished}
+                />
+              </div>
+            )}
+
+            {selectedAssessmentId && !isDetailLoading && !isPublished && (
+              <div className="col-span-12">
+                <QuestionEditor
+                  assessmentConfigId={selectedAssessmentId}
+                  mainQuestionNum={Number(numQuestions) || 0}
+                  disabled={!formEnabled}
+                  onQuestionAdded={(newPoolSize) => {
+                    const current = Number(numQuestions);
+                    if (
+                      current === newPoolSize - 1 &&
+                      newPoolSize <= MAX_QUESTIONS
+                    ) {
+                      setNumQuestions(String(newPoolSize));
+                      toast.success(
+                        `Question count updated to ${newPoolSize}.`,
+                      );
+                    }
+                  }}
+                />
+              </div>
+            )}
+
             <div className="col-span-12">
               <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="text-sm font-bold text-primary">
                       {isPublished ? "Republish Assessment" : "Save Changes"}
+                      {isDirty && !isPublished && (
+                        <span className="ml-2 text-xs font-medium text-on-surface-variant">
+                          • Unsaved changes
+                        </span>
+                      )}
                     </p>
                     <p className="text-[11px] text-on-surface-variant">
                       {!selectedAssessmentId
@@ -338,16 +482,28 @@ export default function EditAssessment() {
                   ) : (
                     <>
                       {selectedAssessmentId && (
+                        <>
                           <button
-                            className="flex items-center gap-1.5 rounded-xl border border-error/40 bg-transparent px-4 py-2.5 text-sm font-bold text-error transition-all hover:bg-error/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                            type="button"
+                            aria-label="Delete assessment"
+                            title="Delete assessment"
+                            className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
                             disabled={isSaving || isPublishing}
                             onClick={() => setConfirmingDelete(true)}
                           >
-                            <span className="material-symbols-outlined text-base" style={{ verticalAlign: "middle" }}>
+                            <span
+                              className="material-symbols-outlined text-xl"
+                              style={{ verticalAlign: "middle" }}
+                            >
                               delete
                             </span>
-                            Delete
                           </button>
+
+                          <div
+                            aria-hidden="true"
+                            className="mx-1 h-8 w-px bg-outline-variant/30"
+                          />
+                        </>
                       )}
 
                       <button
