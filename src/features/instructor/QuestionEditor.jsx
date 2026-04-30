@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import Spinner from "../../ui/Spinner";
 import ConfirmModal from "../../ui/ConfirmModal";
-import { useQuestions } from "./useQuestions";
+import { useQuestions } from "./useQuestion";
 import { useAddQuestion } from "./useAddQuestion";
 import { useUpdateQuestion } from "./useUpdateQuestion";
 import { useDeleteQuestion } from "./useDeleteQuestion";
@@ -196,7 +196,7 @@ export default function QuestionEditor({
                     </p>
                   )}
                 </div>
-                  
+
                 {!disabled && editingId !== question.id && (
                   <div className="flex shrink-0 gap-2">
                     <button
