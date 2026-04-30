@@ -6,7 +6,6 @@ import { useCourses } from "../../hooks/useCourses";
 
 import { formatDeadline } from "../../utils/formatDeadline";
 import Spinner from "../../ui/Spinner";
-// import { nowInTimeZone } from "react-datepicker/dist/dist/date_utils.js";
 
 export default function StudentCourse() {
   const navigate = useNavigate();
