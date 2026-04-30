@@ -286,7 +286,7 @@ export default function EditAssessment() {
                         ? "Select an assessment above to begin editing."
                         : isPublished
                           ? "Update the due date and republish to students."
-                          : "Update the assessment configuration."}
+                          : "Save your changes after changing the assesment parameters then publish it to make it visible to students."}
                     </p>
                   </div>
                 </div>
@@ -298,7 +298,7 @@ export default function EditAssessment() {
                       disabled={!canRepublish || isSaving}
                       onClick={handleRepublish}
                     >
-                      {isSaving ? "Saving…" : "Republish"}
+                      {isSaving ? "Saving…" : "Republish Assessment"}
                     </button>
                   ) : (
                     <>
@@ -308,7 +308,7 @@ export default function EditAssessment() {
                           disabled={isPublishing || isSaving}
                           onClick={handlePublish}
                         >
-                          {isPublishing ? "Publishing…" : "Publish"}
+                          {isPublishing ? "Publishing…" : "Publish Assessment"}
                         </button>
                       )}
 
