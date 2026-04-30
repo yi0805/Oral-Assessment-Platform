@@ -230,10 +230,15 @@ def update_assessment(
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
 
-    if config.status != "draft":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot update a published assessment.")
-
     update_data = payload.model_dump(exclude_unset=True)
+
+    if config.status != "draft":
+        disallowed = set(update_data.keys()) - {"due_time"}
+        if disallowed:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only the due date can be updated for a published assessment.",
+            )
     for field, value in update_data.items():
         setattr(config, field, value)
 

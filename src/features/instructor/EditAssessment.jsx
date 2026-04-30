@@ -5,6 +5,7 @@ import { useCourses } from "../../hooks/useCourses";
 import { useCourseAssessments } from "./useCourseAssessments";
 import { useAssessmentDetail } from "./useAssessmentDetail";
 import { useUpdateAssessment } from "./useUpdateAssessment";
+import { usePublishAssessment } from "./usePublishAssessment";
 
 import Spinner from "../../ui/Spinner";
 import AssessmentConfigForm from "./AssessmentConfigForm";
@@ -48,6 +49,7 @@ export default function EditAssessment() {
     selectedAssessmentId,
   );
   const { updateAssessment, isPending: isSaving } = useUpdateAssessment();
+  const { publishAssessment, isPending: isPublishing } = usePublishAssessment();
 
   useEffect(() => {
     if (courses.length > 0 && !courseId) {
@@ -84,10 +86,11 @@ export default function EditAssessment() {
   );
   const isPublished = assessment?.status === "published";
   const formEnabled =
-    !!selectedAssessmentId && !isDetailLoading && !isSaving;
+    !!selectedAssessmentId && !isDetailLoading && !isSaving && !isPublishing;
   const canSave =
     formEnabled &&
-    (isPublished || isAssessmentConfigValid({ assessmentName, numQuestions, assessmentTime }));
+    isAssessmentConfigValid({ assessmentName, numQuestions, assessmentTime });
+  const canRepublish = formEnabled;
 
   function handleSave() {
     if (!canSave) return;
@@ -101,6 +104,20 @@ export default function EditAssessment() {
         release_time: releaseTime?.toISOString() ?? null,
         due_time: dueTime?.toISOString() ?? null,
       },
+    });
+  }
+
+  function handlePublish() {
+    if (!selectedAssessmentId || isPublishing) return;
+    publishAssessment({ courseId, assessmentConfigId: selectedAssessmentId });
+  }
+
+  function handleRepublish() {
+    if (!canRepublish) return;
+    updateAssessment({
+      courseId,
+      assessmentConfigId: selectedAssessmentId,
+      payload: { due_time: dueTime?.toISOString() ?? null },
     });
   }
 
@@ -262,25 +279,49 @@ export default function EditAssessment() {
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="text-sm font-bold text-primary">
-                      Save Changes
+                      {isPublished ? "Republish Assessment" : "Save Changes"}
                     </p>
                     <p className="text-[11px] text-on-surface-variant">
                       {!selectedAssessmentId
                         ? "Select an assessment above to begin editing."
                         : isPublished
-                          ? "Published — only the due date can be changed."
+                          ? "Update the due date and republish to students."
                           : "Update the assessment configuration."}
                     </p>
                   </div>
                 </div>
 
-                <button
-                  className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!canSave || isSaving}
-                  onClick={handleSave}
-                >
-                  {isSaving ? "Saving…" : "Save Assessment"}
-                </button>
+                <div className="flex items-center gap-3">
+                  {isPublished ? (
+                    <button
+                      className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!canRepublish || isSaving}
+                      onClick={handleRepublish}
+                    >
+                      {isSaving ? "Saving…" : "Republish"}
+                    </button>
+                  ) : (
+                    <>
+                      {selectedAssessmentId && (
+                        <button
+                          className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={isPublishing || isSaving}
+                          onClick={handlePublish}
+                        >
+                          {isPublishing ? "Publishing…" : "Publish"}
+                        </button>
+                      )}
+
+                      <button
+                        className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!canSave || isSaving || isPublishing}
+                        onClick={handleSave}
+                      >
+                        {isSaving ? "Saving…" : "Save Assessment"}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
