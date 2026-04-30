@@ -10,7 +10,13 @@ from app.core.dependencies import require_instructor
 from app.services.question_generator import generate_pool
 
 from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material, Rubric
-from app.schemas import QuestionGenerationRequest, QuestionUpdate, QuestionOut, QuestionGenerationResponse
+from app.schemas import (
+    QuestionGenerationRequest,
+    QuestionCreate,
+    QuestionUpdate,
+    QuestionOut,
+    QuestionGenerationResponse,
+)
 
 router = APIRouter()
 
@@ -155,13 +161,13 @@ async def generate_question(
     )
 
 
-def _get_question_or_403(
+def _get_question_with_config_or_403(
     db: Session,
     question_id: UUID,
     current_user: User,
-) -> Question:
+) -> tuple[Question, AssessmentConfig]:
     row = (
-        db.query(Question, AssessmentConfig.course_id)
+        db.query(Question, AssessmentConfig)
         .join(QuestionPool, QuestionPool.id == Question.question_pool_id)
         .join(AssessmentConfig, AssessmentConfig.id == QuestionPool.assessment_config_id)
         .filter(Question.id == question_id)
@@ -171,12 +177,12 @@ def _get_question_or_403(
     if not row:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
 
-    question, course_id = row
+    question, config = row
 
     enrollment = (
         db.query(CourseEnrollment)
         .filter(
-            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.course_id == config.course_id,
             CourseEnrollment.user_id == current_user.id,
         )
         .first()
@@ -184,6 +190,125 @@ def _get_question_or_403(
 
     if not enrollment:
         raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
+    return question, config
+
+
+def _require_draft_assessment(config: AssessmentConfig) -> None:
+    if config.status != "draft":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"This assessment is {config.status} — questions cannot be modified.",
+        )
+
+
+def _get_assessment_for_instructor(
+    db: Session,
+    assessment_config_id: UUID,
+    current_user: User,
+) -> AssessmentConfig:
+    config = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.id == assessment_config_id)
+        .first()
+    )
+
+    if not config:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == config.course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
+    return config
+
+
+# List questions
+
+@router.get(
+    "/assessments/{assessment_config_id}/questions",
+    response_model=list[QuestionOut],
+    summary="List all questions in an assessment's pool",
+)
+def list_questions(
+    assessment_config_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    config = _get_assessment_for_instructor(db, assessment_config_id, current_user)
+
+    if not config.question_pool:
+        return []
+
+    questions = (
+        db.query(Question)
+        .filter(Question.question_pool_id == config.question_pool.id)
+        .order_by(Question.question_index.asc())
+        .all()
+    )
+
+    return questions
+
+
+# Add question
+
+@router.post(
+    "/assessments/{assessment_config_id}/questions",
+    response_model=QuestionOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a single question to a draft assessment's pool",
+)
+def add_question(
+    assessment_config_id: UUID,
+    payload: QuestionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    config = _get_assessment_for_instructor(db, assessment_config_id, current_user)
+
+    _require_draft_assessment(config)
+
+    if not config.question_pool:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No question pool found for this assessment.",
+        )
+
+    pool_id = config.question_pool.id
+
+    max_index = (
+        db.query(Question.question_index)
+        .filter(Question.question_pool_id == pool_id)
+        .order_by(Question.question_index.desc())
+        .first()
+    )
+
+    next_index = (max_index[0] + 1) if max_index else 1
+
+    question = Question(
+        question_pool_id=pool_id,
+        question_text=payload.question_text,
+        question_index=next_index,
+    )
+
+    db.add(question)
+
+    try:
+        db.commit()
+        db.refresh(question)
+
+    except SQLAlchemyError as exc:
+        db.rollback()
+        
+        raise HTTPException(status_code=500, detail="Could not save question.") from exc
 
     return question
 
@@ -200,7 +325,29 @@ def delete_question(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    question = _get_question_or_403(db, question_id, current_user)
+    question, config = _get_question_with_config_or_403(db, question_id, current_user)
+    _require_draft_assessment(config)
+
+    pool_count = (
+        db.query(Question)
+        .filter(Question.question_pool_id == question.question_pool_id)
+        .count()
+    )
+
+    if pool_count <= 1:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An assessment must have at least one question.",
+        )
+
+    if pool_count - 1 < config.main_question_num:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Lower the assessment's question count first "
+                f"(currently requires {config.main_question_num})."
+            ),
+        )
 
     db.delete(question)
     db.commit()
@@ -220,7 +367,8 @@ def update_question(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    question = _get_question_or_403(db, question_id, current_user)
+    question, config = _get_question_with_config_or_403(db, question_id, current_user)
+    _require_draft_assessment(config)
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(question, field, value)
