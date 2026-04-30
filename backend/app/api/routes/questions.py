@@ -155,6 +155,39 @@ async def generate_question(
     )
 
 
+def _get_question_or_403(
+    db: Session,
+    question_id: UUID,
+    current_user: User,
+) -> Question:
+    row = (
+        db.query(Question, AssessmentConfig.course_id)
+        .join(QuestionPool, QuestionPool.id == Question.question_pool_id)
+        .join(AssessmentConfig, AssessmentConfig.id == QuestionPool.assessment_config_id)
+        .filter(Question.id == question_id)
+        .first()
+    )
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    question, course_id = row
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
+    return question
+
+
 # Delete question
 
 @router.delete(
@@ -167,10 +200,7 @@ def delete_question(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    question = db.query(Question).filter(Question.id == question_id).first()
-
-    if not question:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    question = _get_question_or_403(db, question_id, current_user)
 
     db.delete(question)
     db.commit()
@@ -190,10 +220,7 @@ def update_question(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    question = db.query(Question).filter(Question.id == question_id).first()
-
-    if not question:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    question = _get_question_or_403(db, question_id, current_user)
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(question, field, value)

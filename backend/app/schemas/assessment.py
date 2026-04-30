@@ -34,6 +34,37 @@ class AssessmentConfigInfoOut(BaseModel):
 
     title: str
 
+
+class AssessmentConfigDetailOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    total_time_minute: int
+    main_question_num: int
+    release_time: datetime | None = None
+    due_time: datetime | None = None
+    status: str
+
+
+class AssessmentConfigUpdate(BaseModel):
+    title: str | None = None
+    total_time_minute: int | None = None
+    main_question_num: int | None = None
+    release_time: datetime | None = None
+    due_time: datetime | None = None
+
+
+class AssessmentConfigSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    status: str
+    release_time: datetime | None = None
+    due_time: datetime | None = None
+
+
 class ReleaseResponse(BaseModel):
     sessions_created: int
 

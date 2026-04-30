@@ -12,7 +12,14 @@ import { useUpdateQuestion } from "./useUpdateQuestion";
 import { usePublishAssessment } from "./usePublishAssessment";
 
 import Spinner from "../../ui/Spinner";
-import DateTimePicker from "../../ui/DateTimePicker";
+import AssessmentConfigForm from "./AssessmentConfigForm";
+import RubricEditor from "./RubricEditor";
+import {
+  isAssessmentConfigValid,
+  isRubricValid,
+  makeBlankRubricRow,
+  rubricTotal,
+} from "./assessmentFormUtils";
 
 const GITHUB_URL_RE = /^https?:\/\/github\.com\/[^/\s]+\/[^/\s#?]+/i;
 const isValidGithubUrl = (u) => GITHUB_URL_RE.test((u || "").trim());
@@ -35,13 +42,7 @@ function UpdateMaterial() {
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
 
-  const [touched, setTouched] = useState({
-    assessmentName: false,
-    numQuestions: false,
-    assessmentTime: false,
-    rubric: false,
-    githubUrl: false,
-  });
+  const [githubUrlTouched, setGithubUrlTouched] = useState(false);
 
   const [phase, setPhase] = useState("setup");
   const [statusMessage, setStatusMessage] = useState("");
@@ -54,16 +55,7 @@ function UpdateMaterial() {
 
   const [sessionsCreated, setSessionsCreated] = useState(0);
 
-  const RUBRIC_TOTAL_POINTS = 100;
-
-  const [rubricRows, setRubricRows] = useState([
-    { title: "", description: "", max_points: 0 },
-  ]);
-  const totalPoints = rubricRows.reduce(
-    (sum, row) => sum + (Number(row.max_points) || 0),
-    0,
-  );
-  const totalPointsValid = totalPoints === RUBRIC_TOTAL_POINTS;
+  const [rubricRows, setRubricRows] = useState([makeBlankRubricRow()]);
 
   const { courses, isLoading } = useCourses();
 
@@ -85,42 +77,6 @@ function UpdateMaterial() {
 
   if (isLoading) return <Spinner />;
 
-  const num = Number(numQuestions);
-  const max_q = 50;
-  const time = Number(assessmentTime);
-  const max_time = 120;
-
-  const assessmentNameError =
-    assessmentName.trim() === "" ? "Assessment name is required." : "";
-
-  const numQuestionsError =
-    numQuestions === ""
-      ? "Number of questions is required."
-      : !Number.isInteger(num)
-        ? "Must be a whole number."
-        : num < 1 || num > max_q
-          ? `Must be between 1 and ${max_q}.`
-          : "";
-
-  const assessmentTimeError =
-    assessmentTime === ""
-      ? "Assessment time is required."
-      : !Number.isFinite(time)
-        ? "Must be a number."
-        : time < 1 || time > max_time
-          ? `Must be between 1 and ${max_time}.`
-          : "";
-
-  const rubricRowErrors = rubricRows.map((row) => ({
-    title: row.title.trim() === "" ? "Required." : "",
-    description: row.description.trim() === "" ? "Required." : "",
-    max_points: !(Number(row.max_points) > 0) ? "Must be greater than 0." : "",
-  }));
-
-  const isRubricValid =
-    totalPointsValid &&
-    rubricRowErrors.every((e) => !e.title && !e.description && !e.max_points);
-
   const githubUrlError =
     source === "github" && githubUrl && !isValidGithubUrl(githubUrl)
       ? "Must be a github.com HTTPS URL."
@@ -130,12 +86,13 @@ function UpdateMaterial() {
     (source === "pdf" && !!materialFile) ||
     (source === "github" && isValidGithubUrl(githubUrl));
 
-  const isValid =
-    !numQuestionsError &&
-    !assessmentTimeError &&
-    !assessmentNameError &&
-    materialReady &&
-    isRubricValid;
+  const configValid = isAssessmentConfigValid({
+    assessmentName,
+    numQuestions,
+    assessmentTime,
+  });
+
+  const isValid = configValid && materialReady && isRubricValid(rubricRows);
 
   async function handleSubmit() {
     try {
@@ -160,7 +117,7 @@ function UpdateMaterial() {
 
       setStatusMessage("Creating rubric...");
       const rubricPayload = {
-        total_points: totalPoints,
+        total_points: rubricTotal(rubricRows),
         criteria_data: rubricRows.map((row) => ({
           title: row.title,
           description: row.description,
@@ -182,8 +139,8 @@ function UpdateMaterial() {
         materialId: MaterialId,
         rubricId: RubricId,
         assessmentName,
-        numQuestions: num,
-        totalTime: time,
+        numQuestions: Number(numQuestions),
+        totalTime: Number(assessmentTime),
         releaseTime: release,
         dueTime: due,
       });
@@ -237,39 +194,6 @@ function UpdateMaterial() {
       setStatusMessage("");
       setLoading(false);
     }
-  }
-
-  function handleAddRow() {
-    setRubricRows([
-      ...rubricRows,
-      { title: "", description: "", max_points: 0 },
-    ]);
-  }
-
-  function handleRemoveRow(index) {
-    if (rubricRows.length > 1) {
-      setRubricRows(rubricRows.filter((_, i) => i !== index));
-    }
-  }
-
-  function handleRowChange(index, field, value) {
-    const updatedRows = rubricRows.map((row, i) => {
-      if (i === index) {
-        if (field === "max_points") {
-          if (value === "") return { ...row, [field]: 0 };
-
-          const numericValue = parseInt(value, 10);
-          if (!Number.isFinite(numericValue)) return row;
-
-          return { ...row, [field]: Math.max(0, numericValue) };
-        }
-
-        return { ...row, [field]: value };
-      }
-      return row;
-    });
-
-    setRubricRows(updatedRows);
   }
 
   return (
@@ -339,149 +263,21 @@ function UpdateMaterial() {
           {phase === "setup" && (
             <div className="grid grid-cols-12 items-start gap-6">
               <div className="col-span-12 space-y-6 lg:col-span-6">
-                <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-                  <h2 className="mb-6 flex items-center gap-2 text-xl font-bold">
-                    <span
-                      className="material-symbols-outlined text-primary"
-                      data-icon="description"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      description
-                    </span>
-                    Assessment Parameters
-                  </h2>
-
-                  <form className="space-y-6">
-                    <div className="space-y-2">
-                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                        Select Course
-                      </label>
-
-                      <div className="group relative">
-                        <select
-                          className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20"
-                          value={courseId}
-                          onChange={(e) => setCourseId(e.target.value)}
-                        >
-                          {courses.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.course_code || "Unknown Course"}
-                            </option>
-                          ))}
-                        </select>
-
-                        <span
-                          className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
-                          data-icon="expand_more"
-                          style={{ verticalAlign: "middle" }}
-                        >
-                          expand_more
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                        Assessment Name
-                      </label>
-
-                      <input
-                        className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                        placeholder="e.g. A1 Intro to Python"
-                        type="text"
-                        value={assessmentName}
-                        onChange={(e) => setAssessmentName(e.target.value)}
-                        onBlur={() =>
-                          setTouched((current) => ({
-                            ...current,
-                            assessmentName: true,
-                          }))
-                        }
-                      />
-
-                      {touched.assessmentName && assessmentNameError && (
-                        <p className="ml-1 text-xs font-medium text-error">
-                          {assessmentNameError}
-                        </p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                          No. of Questions
-                        </label>
-                        <input
-                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                          min={1}
-                          max={max_q}
-                          step={1}
-                          placeholder="e.g. 15"
-                          type="number"
-                          value={numQuestions}
-                          onChange={(e) => setNumQuestions(e.target.value)}
-                          onBlur={() =>
-                            setTouched((current) => ({
-                              ...current,
-                              numQuestions: true,
-                            }))
-                          }
-                        />
-                        {touched.numQuestions && numQuestionsError && (
-                          <p className="ml-1 text-xs font-medium text-error">
-                            {numQuestionsError}
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                          Total Timer (mins)
-                        </label>
-                        <input
-                          className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                          min={1}
-                          max={max_time}
-                          step={0.5}
-                          placeholder="e.g. 30"
-                          type="number"
-                          value={assessmentTime}
-                          onChange={(e) => setAssessmentTime(e.target.value)}
-                          onBlur={() =>
-                            setTouched((current) => ({
-                              ...current,
-                              assessmentTime: true,
-                            }))
-                          }
-                        />
-                        {touched.assessmentTime && assessmentTimeError && (
-                          <p className="ml-1 text-xs font-medium text-error">
-                            {assessmentTimeError}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <div className="grid grid-cols-2 gap-4">
-                        <DateTimePicker
-                          label="Release Date"
-                          value={releaseTime}
-                          onChange={setReleaseTime}
-                        />
-
-                        <DateTimePicker
-                          label="Due date"
-                          value={dueTime}
-                          onChange={setDueTime}
-                          minDate={releaseTime}
-                        />
-                      </div>
-
-                      <p className="ml-1 text-[11px] text-outline">
-                        Leave blank to default to now → 30 days from now.
-                      </p>
-                    </div>
-                  </form>
-                </section>
+                <AssessmentConfigForm
+                  courses={courses}
+                  courseId={courseId}
+                  onCourseIdChange={setCourseId}
+                  assessmentName={assessmentName}
+                  onAssessmentNameChange={setAssessmentName}
+                  numQuestions={numQuestions}
+                  onNumQuestionsChange={setNumQuestions}
+                  assessmentTime={assessmentTime}
+                  onAssessmentTimeChange={setAssessmentTime}
+                  releaseTime={releaseTime}
+                  onReleaseTimeChange={setReleaseTime}
+                  dueTime={dueTime}
+                  onDueTimeChange={setDueTime}
+                />
               </div>
 
               <div className="col-span-12 flex flex-col gap-4 lg:col-span-6">
@@ -661,15 +457,10 @@ function UpdateMaterial() {
                           placeholder="https://github.com/owner/repo"
                           value={githubUrl}
                           onChange={(e) => setGithubUrl(e.target.value)}
-                          onBlur={() =>
-                            setTouched((current) => ({
-                              ...current,
-                              githubUrl: true,
-                            }))
-                          }
+                          onBlur={() => setGithubUrlTouched(true)}
                         />
 
-                        {touched.githubUrl && githubUrlError && (
+                        {githubUrlTouched && githubUrlError && (
                           <p className="ml-1 text-xs font-medium text-error">
                             {githubUrlError}
                           </p>
@@ -705,237 +496,7 @@ function UpdateMaterial() {
               </div>
 
               <div className="col-span-12">
-                <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-                  <div className="mb-8 flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        <span
-                          className="material-symbols-outlined text-xl"
-                          data-icon="assignment"
-                          style={{ verticalAlign: "middle" }}
-                        >
-                          assignment
-                        </span>
-                      </div>
-
-                      <div>
-                        <h2 className="text-xl font-bold text-on-surface">
-                          Grading Rubric
-                        </h2>
-
-                        <p className="mt-1 max-w-md text-xs text-on-surface-variant">
-                          Define how the AI evaluates responses. Each
-                          criterion&apos;s points act as its percentage weight —
-                          must total {RUBRIC_TOTAL_POINTS}.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-5 rounded-xl border border-outline-variant/10 bg-surface-container-low px-5 py-3">
-                      <div className="flex items-baseline gap-1">
-                        <span
-                          className={`font-headline text-3xl font-extrabold leading-none tracking-tight ${
-                            totalPointsValid
-                              ? "text-primary"
-                              : totalPoints > RUBRIC_TOTAL_POINTS
-                                ? "text-error"
-                                : "text-on-surface"
-                          }`}
-                        >
-                          {totalPoints}
-                        </span>
-
-                        <span className="text-sm font-bold text-outline">
-                          / {RUBRIC_TOTAL_POINTS}
-                        </span>
-                      </div>
-
-                      <div className="h-9 w-px bg-outline-variant/30" />
-
-                      <div className="min-w-[132px]">
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-container-high">
-                          <div
-                            className={`h-full rounded-full transition-all duration-300 ${
-                              totalPointsValid
-                                ? "bg-primary"
-                                : totalPoints > RUBRIC_TOTAL_POINTS
-                                  ? "bg-error"
-                                  : "bg-primary/50"
-                            }`}
-                            style={{
-                              width: `${Math.min(
-                                100,
-                                (totalPoints / RUBRIC_TOTAL_POINTS) * 100,
-                              )}%`,
-                            }}
-                          />
-                        </div>
-
-                        <p
-                          className={`mt-1.5 text-[10px] font-bold uppercase tracking-widest ${
-                            totalPointsValid
-                              ? "text-primary"
-                              : totalPoints > RUBRIC_TOTAL_POINTS
-                                ? "text-error"
-                                : "text-on-surface-variant"
-                          }`}
-                        >
-                          {totalPointsValid
-                            ? "Ready"
-                            : totalPoints > RUBRIC_TOTAL_POINTS
-                              ? `${totalPoints - RUBRIC_TOTAL_POINTS} over`
-                              : `${RUBRIC_TOTAL_POINTS - totalPoints} remaining`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    {rubricRows.map((row, index) => {
-                      const rowErrors = rubricRowErrors[index];
-                      const showErrors = touched.rubric;
-                      const hasAnyError =
-                        showErrors &&
-                        (rowErrors.title ||
-                          rowErrors.description ||
-                          rowErrors.max_points);
-
-                      return (
-                        <div
-                          key={index}
-                          className={`group relative rounded-xl border p-5 transition-all ${
-                            hasAnyError
-                              ? "border-error/30 bg-error/[0.02]"
-                              : "border-outline-variant/15 hover:border-outline-variant/40"
-                          }`}
-                        >
-                          <div className="flex items-start gap-4">
-                            <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
-                              {String(index + 1).padStart(2, "0")}
-                            </span>
-
-                            <div className="min-w-0 flex-1 space-y-3">
-                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                                <div className="min-w-0 flex-1">
-                                  <input
-                                    className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm font-semibold text-on-surface transition-all placeholder:font-normal placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                                    placeholder="Criterion title (e.g. Accuracy)"
-                                    value={row.title}
-                                    onChange={(e) =>
-                                      handleRowChange(
-                                        index,
-                                        "title",
-                                        e.target.value,
-                                      )
-                                    }
-                                    onBlur={() =>
-                                      setTouched((current) => ({
-                                        ...current,
-                                        rubric: true,
-                                      }))
-                                    }
-                                  />
-
-                                  {showErrors && rowErrors.title && (
-                                    <p className="ml-1 mt-1 text-xs font-medium text-error">
-                                      {rowErrors.title}
-                                    </p>
-                                  )}
-                                </div>
-
-                                <div className="sm:w-36">
-                                  <div className="flex items-center gap-0 rounded-xl bg-surface-container-low pr-3 transition-all focus-within:ring-2 focus-within:ring-primary/20">
-                                    <input
-                                      className="w-full min-w-0 rounded-xl border-none bg-transparent px-4 py-3 text-right text-sm font-bold text-on-surface focus:outline-none"
-                                      type="number"
-                                      min="0"
-                                      step="1"
-                                      value={row.max_points}
-                                      onChange={(e) =>
-                                        handleRowChange(
-                                          index,
-                                          "max_points",
-                                          e.target.value,
-                                        )
-                                      }
-                                      onBlur={() =>
-                                        setTouched((current) => ({
-                                          ...current,
-                                          rubric: true,
-                                        }))
-                                      }
-                                    />
-
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                                      pts
-                                    </span>
-                                  </div>
-
-                                  {showErrors && rowErrors.max_points && (
-                                    <p className="ml-1 mt-1 text-xs font-medium text-error">
-                                      {rowErrors.max_points}
-                                    </p>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div>
-                                <textarea
-                                  className="min-h-[72px] w-full resize-y rounded-xl border-none bg-surface-container-low px-4 py-3 text-sm leading-relaxed text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                                  placeholder="Describe what a perfect answer looks like. What should the student demonstrate?"
-                                  rows={2}
-                                  value={row.description}
-                                  onChange={(e) =>
-                                    handleRowChange(
-                                      index,
-                                      "description",
-                                      e.target.value,
-                                    )
-                                  }
-                                  onBlur={() =>
-                                    setTouched((current) => ({
-                                      ...current,
-                                      rubric: true,
-                                    }))
-                                  }
-                                />
-
-                                {showErrors && rowErrors.description && (
-                                  <p className="ml-1 mt-1 text-xs font-medium text-error">
-                                    {rowErrors.description}
-                                  </p>
-                                )}
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveRow(index)}
-                              disabled={rubricRows.length === 1}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-outline transition-all hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-20 md:opacity-0 md:group-hover:opacity-100"
-                              aria-label="Remove criterion"
-                            >
-                              <span className="material-symbols-outlined text-lg">
-                                delete
-                              </span>
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddRow}
-                    className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-outline-variant/30 bg-transparent py-3.5 text-sm font-bold text-on-surface-variant transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
-                  >
-                    <span className="material-symbols-outlined text-base">
-                      add
-                    </span>
-                    Add criterion
-                  </button>
-                </section>
+                <RubricEditor rows={rubricRows} onRowsChange={setRubricRows} />
               </div>
 
               <div className="col-span-12">

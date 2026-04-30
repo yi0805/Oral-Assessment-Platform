@@ -253,6 +253,18 @@ def get_transcript_detail(
 
     session_obj, user_obj, assessment_obj, ai_obj, feedback_obj = general_info
 
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == assessment_obj.course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
     transcripts = (
         db.query(TranscriptMessage)
         .filter(TranscriptMessage.session_id == session_id)

@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
@@ -11,6 +13,7 @@ from app.models import User, CourseEnrollment
 from app.schemas import GoogleLoginResponse, UserResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
@@ -25,9 +28,15 @@ def _fetch_google_userinfo(token: str) -> dict:
     )
 
     if resp.status_code != 200:
+        logger.warning(
+            "Google userinfo fetch failed: status=%s body=%s",
+            resp.status_code,
+            resp.text,
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Google userinfo fetch failed: {resp.text}",
+            detail="Google userinfo fetch failed.",
         )
 
     return resp.json()
