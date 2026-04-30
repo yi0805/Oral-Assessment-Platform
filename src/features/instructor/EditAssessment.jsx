@@ -210,21 +210,13 @@ export default function EditAssessment() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    <div className="group relative">
-                      <span
-                        className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-base text-outline"
-                        style={{ verticalAlign: "middle" }}
-                      >
-                        search
-                      </span>
-                      <input
-                        className="w-full rounded-xl border-none bg-surface-container-low py-2.5 pl-9 pr-4 text-sm text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                        placeholder="Search assessments…"
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                    </div>
+                    <input
+                      className="w-full rounded-xl border-none bg-surface-container-low px-4 py-2.5 text-sm text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                      placeholder="Search assessments…"
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
 
                     {filteredAssessments.length === 0 ? (
                       <p className="px-1 py-3 text-center text-xs text-outline">
@@ -268,14 +260,6 @@ export default function EditAssessment() {
             <div className="col-span-12">
               <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
                 <div className="flex items-center gap-4">
-                  <div className="rounded-lg bg-primary/10 p-3 text-primary">
-                    <span
-                      className="material-symbols-outlined"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      save
-                    </span>
-                  </div>
                   <div>
                     <p className="text-sm font-bold text-primary">
                       Save Changes
