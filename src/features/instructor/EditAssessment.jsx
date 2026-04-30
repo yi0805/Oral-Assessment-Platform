@@ -115,8 +115,19 @@ export default function EditAssessment() {
     });
   }
 
-  function handlePublish() {
+  async function handlePublish() {
     if (!selectedAssessmentId || isPublishing) return;
+    await updateAssessment({
+      courseId,
+      assessmentConfigId: selectedAssessmentId,
+      payload: {
+        title: assessmentName,
+        total_time_minute: Math.round(Number(assessmentTime)),
+        main_question_num: Number(numQuestions),
+        release_time: releaseTime?.toISOString() ?? null,
+        due_time: dueTime?.toISOString() ?? null,
+      },
+    });
     publishAssessment({ courseId, assessmentConfigId: selectedAssessmentId });
   }
 

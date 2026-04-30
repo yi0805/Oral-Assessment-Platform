@@ -5,7 +5,7 @@ import { updateAssessmentConfig } from "../../services/apiCourse";
 export function useUpdateAssessment() {
   const queryClient = useQueryClient();
 
-  const { mutate: updateAssessment, isPending } = useMutation({
+  const { mutateAsync: updateAssessment, isPending } = useMutation({
     mutationFn: ({ courseId, assessmentConfigId, payload }) =>
       updateAssessmentConfig(courseId, assessmentConfigId, payload),
     onSuccess: (_, { courseId, assessmentConfigId }) => {
