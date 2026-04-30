@@ -41,3 +41,20 @@ export async function exportResultsCSV(courseId, assessmentConfigId) {
 
   return response;
 }
+
+export async function enrolUser(courseId, upi, role) {
+  const response = await api.post(`/courses/${courseId}/enroluser`, {
+    upi,
+    role,
+  });
+
+  return response.data;
+}
+
+export async function deleteEnrolment(courseId, upi, role) {
+  const response = await api.delete(`/courses/${courseId}/delete-enrolment`, {
+    data: { upi, role },
+  });
+
+  return response.data;
+}

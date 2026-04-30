@@ -16,14 +16,8 @@ class Rubric(Base):
     course_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
     )
-    assessment_config_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("assessment_configs.id", ondelete="CASCADE"), nullable=False
-    )
     total_points: Mapped[int] = mapped_column(Integer, default=100)
-    # [{"title": "Part 1", "description": "...", "ratings": 20}, ...]
     criteria_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
 
-    assessment_config = relationship("AssessmentConfig", back_populates="rubric", passive_deletes=True)
-
     def __repr__(self) -> str:
-        return f"<Rubric {self.id} [{self.assessment_config_id}]>"
+        return f"<Rubric {self.id} [{self.course_id}]>"

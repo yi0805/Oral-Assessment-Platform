@@ -10,7 +10,7 @@ from app.core.dependencies import require_instructor
 
 from app.services import s3_client, material_pipeline
 from app.models import Course, CourseEnrollment, Material, User, Rubric, AssessmentConfig
-from app.schemas import RubricCriteriaIteam, RubricCreate, RubricOut
+from app.schemas import RubricCreate, RubricOut
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -21,6 +21,38 @@ MIME_MAP = {
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "txt": "text/plain",
 }
+
+# helper function
+def _load_rubric_for_config(
+    db: Session, assessment_config_id: UUID, current_user: User
+) -> Rubric:
+    rubric = (
+        db.query(Rubric)
+        .join(AssessmentConfig, AssessmentConfig.rubric_id == Rubric.id)
+        .filter(AssessmentConfig.id == assessment_config_id)
+        .first()
+    )
+
+    if not rubric:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == rubric.course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an instructor in this course.",
+        )
+
+    return rubric
+
+
 
 
 # Upload rubric
@@ -145,13 +177,12 @@ async def upload_rubric(
 # Create rubric via form (criteria, rating, points)
 
 @router.post(
-    "/courses/{course_id}/assessments/{assessment_config_id}/rubric",
+    "/courses/{course_id}/rubrics",
     response_model=RubricOut,
     status_code=status.HTTP_201_CREATED,
     summary="Create a grading rubric for an assessment",
 )
 def create_rubric(
-    assessment_config_id: UUID,
     course_id: UUID,
     payload: RubricCreate,
     db: Session = Depends(get_db),
@@ -175,23 +206,8 @@ def create_rubric(
             detail="You are not an instructor in this course.",
         )
     
-    assessment_config = db.query(AssessmentConfig).filter(
-        AssessmentConfig.id == assessment_config_id,
-        AssessmentConfig.course_id == course_id
-    ).first()
-    if not assessment_config:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
-    
-    # Check total points
-    submitted_total = sum(item.max_points for item in payload.criteria_data)
-    if submitted_total != payload.total_points:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Total points mismatch. Expected {payload.total_points}, got {submitted_total}"
-        )
-
     rubric = Rubric(
-        assessment_config_id=assessment_config_id,
+        course_id=course_id,
         total_points=payload.total_points,
         criteria_data=[item.model_dump() for item in payload.criteria_data]
     )
@@ -210,62 +226,34 @@ def create_rubric(
 
 # Retrieve rubric
 @router.get(
-    "/courses/{course_id}/assessments/{assessment_config_id}/rubric",
+    "/assessments/{assessment_config_id}/rubric",
     response_model=RubricOut,
     summary="Get rubric details",
 )
 def get_rubric(
-    course_id: UUID,
     assessment_config_id: UUID,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    return _load_rubric_for_config(db, assessment_config_id, current_user)
 
-    rubric = (
-            db.query(Rubric)
-            .join(AssessmentConfig)
-            .filter(
-                Rubric.assessment_config_id == assessment_config_id,
-                AssessmentConfig.course_id == course_id
-            )
-            .first()
-        )
-
-    if not rubric:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
-
-    return rubric
 
 # Update rubric
 @router.put(
-    "/courses/{course_id}/assessments/{assessment_config_id}/rubric",
+    "/assessments/{assessment_config_id}/rubric",
     response_model=RubricOut,
     summary="Update a rubric",
 )
 def update_rubric(
-    course_id: UUID,
     assessment_config_id: UUID,
     payload: RubricCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-   
-    rubric = (
-            db.query(Rubric)
-            .join(AssessmentConfig)
-            .filter(
-                Rubric.assessment_config_id == assessment_config_id,
-                AssessmentConfig.course_id == course_id
-            )
-            .first()
-        )
-   
-    if not rubric:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rubric not found")
+    rubric = _load_rubric_for_config(db, assessment_config_id, current_user)
 
-    update_rubric = payload.model_dump(exclude_unset=True)
-    for field, value in update_rubric.items():
-        setattr(rubric, field, value)
+    rubric.total_points = payload.total_points
+    rubric.criteria_data = [item.model_dump() for item in payload.criteria_data]
 
     try:
         db.commit()

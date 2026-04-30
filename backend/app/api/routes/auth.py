@@ -1,3 +1,5 @@
+import logging
+
 import httpx
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
@@ -11,6 +13,7 @@ from app.models import User, CourseEnrollment
 from app.schemas import GoogleLoginResponse, UserResponse
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 _GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
@@ -25,9 +28,15 @@ def _fetch_google_userinfo(token: str) -> dict:
     )
 
     if resp.status_code != 200:
+        logger.warning(
+            "Google userinfo fetch failed: status=%s body=%s",
+            resp.status_code,
+            resp.text,
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Google userinfo fetch failed: {resp.text}",
+            detail="Google userinfo fetch failed.",
         )
 
     return resp.json()
@@ -36,11 +45,7 @@ def _fetch_google_userinfo(token: str) -> dict:
 def _upsert_user(db: Session, email: str, full_name: str, upi: str, image: str | None) -> User:
     user: User | None = db.query(User).filter(User.email == email).first()
 
-    if user:
-        user.full_name = full_name
-        user.image = image
-        db.commit()
-        db.refresh(user)
+    if user:       
         return user
 
     role = resolve_role_for_new_user(email)

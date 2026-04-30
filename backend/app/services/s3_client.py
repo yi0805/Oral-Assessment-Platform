@@ -5,36 +5,18 @@ from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
-import boto3
-from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError, ProfileNotFound
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 
 from app.core.config import settings
+from app.services.aws_clients import get_s3_client
 
 logger = logging.getLogger(__name__)
 
-def _get_session() -> boto3.session.Session:
-
-    logger.info("[S3] Using AWS profile '%s'", settings.aws_profile_name)
-
-    return boto3.Session(
-        profile_name=settings.aws_profile_name,
-        region_name=settings.aws_region,
-    )
-
 
 def _get_s3_client():
-
     if not settings.s3_bucket_name:
         raise RuntimeError("S3_BUCKET_NAME is required when STORAGE_BACKEND=s3")
-
-    try:
-        session = _get_session()
-        return session.client("s3")
-    
-    except ProfileNotFound as exc:
-        raise RuntimeError(
-            f"AWS profile '{settings.aws_profile_name}' was not found. Run aws configure sso or set AWS_PROFILE_NAME in .env correctly."
-        ) from exc
+    return get_s3_client()
 
 
 def upload_file(

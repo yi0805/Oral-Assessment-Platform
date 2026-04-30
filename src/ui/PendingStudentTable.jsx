@@ -24,8 +24,6 @@ function PendingStudentTable({
   const endIndex = startIndex + rowsPerPage;
   const currentRows = filteredReviews.slice(startIndex, endIndex);
 
-  console.log(filteredReviews);
-
   function goToPage(page) {
     setCurrentPage(page);
   }
@@ -121,6 +119,7 @@ function PendingStudentTable({
                     className="group transition-colors hover:bg-surface-container-low/30"
                     key={review.sessionId}
                   >
+                    {/* Publish */}
                     <td className="px-6 py-5">
                       <label className="relative inline-flex cursor-pointer items-center">
                         <input
@@ -135,6 +134,7 @@ function PendingStudentTable({
                       </label>
                     </td>
 
+                    {/* Student */}
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
                         <img
@@ -153,15 +153,18 @@ function PendingStudentTable({
                       </div>
                     </td>
 
+                    {/* Course */}
                     <td className="px-6 py-5">
                       <span className="rounded-md bg-secondary-container px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-on-secondary-container">
                         {review.courseCode || "Unknown Course"}
                       </span>
                     </td>
 
+                    {/* Assignment Name */}
                     <td className="px-6 py-5 text-sm font-medium text-on-surface-variant">
                       {review.title || "Unknown Assessment"}
                     </td>
+                    {/* AI Score */}
                     <td className="px-6 py-5 text-center text-sm font-semibold text-on-surface">
                       {review.suggestedGrade != null
                         ? review.suggestedGrade
@@ -169,6 +172,7 @@ function PendingStudentTable({
                       /100
                     </td>
 
+                    {/* Final Score */}
                     <td className="px-6 py-5 text-center">
                       <input
                         className="h-9 w-12 rounded-lg border border-outline-variant/30 bg-white text-center text-sm font-semibold outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/20"
@@ -201,7 +205,7 @@ function PendingStudentTable({
                         }}
                       />
                     </td>
-
+                    {/* Action */}
                     <td className="px-6 py-5 text-right">
                       <button
                         className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"

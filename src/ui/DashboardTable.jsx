@@ -77,9 +77,6 @@ function DashboardTable({
                 AI Score
               </th>
               <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
-                AI Summary
-              </th>
-              <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
                 Final Score
               </th>
               <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
@@ -105,6 +102,7 @@ function DashboardTable({
                     className="group transition-colors hover:bg-surface-container-high/30"
                     key={student.session_id}
                   >
+                    {/* Publish */}
                     <td className="px-8 py-5">
                       {isPublished && (
                         <label className="relative inline-flex cursor-pointer items-center">
@@ -144,6 +142,7 @@ function DashboardTable({
                       )}
                     </td>
 
+                      {/* Student */}
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-3">
                         <img
@@ -164,6 +163,7 @@ function DashboardTable({
                       </div>
                     </td>
 
+                      {/* AI Score */}
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-2">
                         <span className="font-headline text-sm font-bold text-tertiary">
@@ -176,12 +176,7 @@ function DashboardTable({
                       </div>
                     </td>
 
-                    <td className="max-w-xs px-8 py-5">
-                      <p className="line-clamp-2 text-xs italic text-on-surface-variant">
-                        {student.ai_summary || "No summary available."}
-                      </p>
-                    </td>
-
+                      {/* Final Score */}
                     <td className="px-8 py-5">
                       {isPublished && (
                         <span className="inline-flex min-w-[3rem] items-center justify-center rounded-lg bg-surface-container px-3 py-1.5 text-sm font-bold text-on-surface shadow-sm">
@@ -231,6 +226,7 @@ function DashboardTable({
                       )}
                     </td>
 
+                      {/* Status */}
                     <td className="px-8 py-5">
                       {isPublished && (
                         <span className="rounded-full bg-primary-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-primary-container">
@@ -251,8 +247,9 @@ function DashboardTable({
                       )}
                     </td>
 
+                      {/* Action */}
                     <td className="px-8 py-5 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
+                      <div className="flex items-center justify-end gap-2">
                         {isReview && (
                           <button
                             className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-tertiary/30 bg-tertiary-container/40 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"

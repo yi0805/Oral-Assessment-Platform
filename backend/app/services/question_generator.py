@@ -11,10 +11,10 @@ from app.services._prompt_safety import (
     sanitize_untrusted,
     truncate_for_prompt,
 )
-from app.services.ai_gateway import chat_complete
+from app.services.ai_gateway import smart_chat_complete
 
 
-from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk
+from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk, Rubric
 
 logger = logging.getLogger(__name__)
 
@@ -73,20 +73,13 @@ async def generate_pool(
     rubric_text = ""
 
     if rubric_id:
-        rubric_material = db.query(Material).filter(
-            Material.id == rubric_id,
-            Material.material_category == "rubric",
+        rubric = db.query(Rubric).filter(
+            Rubric.id == rubric_id,
         ).first()
 
-        if rubric_material:
-            rubric_chunks = (
-                db.query(MaterialChunk)
-                .filter(MaterialChunk.material_id == rubric_id)
-                .order_by(MaterialChunk.chunk_index)
-                .all()
-            )
-
-            rubric_text = "\n\n".join(c.chunk_text for c in rubric_chunks)
+        if rubric:
+            for item in rubric.criteria_data:
+                rubric_text += f"- {item['title']}: {item['description']} ({item['max_points']} points)\n"
 
 
     _COVERAGE_QUERIES = [
@@ -199,7 +192,7 @@ async def generate_pool(
     )
 
     try:
-        raw_response = await chat_complete(
+        raw_response = await smart_chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
             system_prompt=_SYSTEM_PROMPT,
             temperature=0.7,
@@ -262,7 +255,7 @@ async def _generate_description(
     )
 
     try:
-        return await chat_complete(
+        return await smart_chat_complete(
             messages=[{"role": "user", "content": prompt}],
             system_prompt=(
                 "You are a university educator. Write a brief, clear assessment "

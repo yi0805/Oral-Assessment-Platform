@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -8,7 +9,7 @@ from app.core.database import get_db
 from app.core.dependencies import require_instructor
 from app.services.question_generator import generate_pool
 
-from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material
+from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material, Rubric
 from app.schemas import QuestionGenerationRequest, QuestionUpdate, QuestionOut, QuestionGenerationResponse
 
 router = APIRouter()
@@ -20,7 +21,7 @@ router = APIRouter()
     "/courses/{course_id}/generate-question",
     response_model=QuestionGenerationResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Generate question pool from materials",
+    summary="Generate question pool from material and rubric",
 )
 async def generate_question(
     course_id: UUID,
@@ -48,10 +49,9 @@ async def generate_question(
 
     # Validate rubric and material 
     rubric = (
-        db.query(Material)
+        db.query(Rubric)
         .filter(
-            Material.id == payload.material_r_id,
-            Material.material_category == "rubric",
+            Rubric.id == payload.rubric_id,
         )
         .first()
     )
@@ -89,14 +89,20 @@ async def generate_question(
         )
 
     # Create assessment config and question pool
+    now = datetime.now(timezone.utc)
+    release_time = payload.release_time or now
+    due_time = payload.due_time or (release_time + timedelta(days=30))
+
     config = AssessmentConfig(
         course_id=course_id,
         title=payload.assessment_title,
-        material_r_id=payload.material_r_id,
+        rubric_id=payload.rubric_id,
         total_time_minute=payload.total_time_minutes,
         main_question_num=payload.num_main_questions,
         follow_up_num=payload.max_followups_per_main,
         status="draft",
+        release_time=release_time,
+        due_time=due_time,
     )
 
     db.add(config)
@@ -117,7 +123,7 @@ async def generate_question(
             db=db,
             pool_id=pool.id,
             material_id=payload.material_id,
-            rubric_id=payload.material_r_id,
+            rubric_id=payload.rubric_id,
             num_main_questions=payload.num_main_questions,
             config_id=config.id,
         )
@@ -149,6 +155,39 @@ async def generate_question(
     )
 
 
+def _get_question_or_403(
+    db: Session,
+    question_id: UUID,
+    current_user: User,
+) -> Question:
+    row = (
+        db.query(Question, AssessmentConfig.course_id)
+        .join(QuestionPool, QuestionPool.id == Question.question_pool_id)
+        .join(AssessmentConfig, AssessmentConfig.id == QuestionPool.assessment_config_id)
+        .filter(Question.id == question_id)
+        .first()
+    )
+
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    question, course_id = row
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
+
+    return question
+
+
 # Delete question
 
 @router.delete(
@@ -161,10 +200,7 @@ def delete_question(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    question = db.query(Question).filter(Question.id == question_id).first()
-
-    if not question:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    question = _get_question_or_403(db, question_id, current_user)
 
     db.delete(question)
     db.commit()
@@ -184,10 +220,7 @@ def update_question(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    question = db.query(Question).filter(Question.id == question_id).first()
-
-    if not question:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+    question = _get_question_or_403(db, question_id, current_user)
 
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(question, field, value)

@@ -85,7 +85,7 @@ function Transcript() {
 
     updateReview({
       sessionId,
-      finalGrade: Number(finalGrade),
+      finalGrade: parseInt(finalGrade, 10),
       comments: comments,
     });
   }
@@ -326,9 +326,9 @@ function Transcript() {
                           type="number"
                           min="0"
                           max="100"
-                          step="0.5"
+                          step="1"
                           value={finalGrade}
-                          onChange={(e) => setFinalGrade(e.target.value)}
+                          onChange={(e) => setFinalGrade(e.target.value.replace(/\D/g, ""))}
                         />
 
                         <span className="text-lg font-bold text-outline">

@@ -19,7 +19,7 @@ function Sidebar() {
           {user.role === "instructor" ? (
             <div>
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
-                Curator Portal
+                Instructor Portal
               </h2>
               <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                 Academic Management
@@ -28,7 +28,7 @@ function Sidebar() {
           ) : (
             <div>
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
-                Portal
+                Student Portal
               </h2>
               <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Academic Engagement
@@ -40,7 +40,9 @@ function Sidebar() {
       <nav className="flex flex-col gap-y-1">
         <NavLink
           className={({ isActive }) =>
-            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" : "text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
+              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
           }
           to="/home"
         >
@@ -55,8 +57,10 @@ function Sidebar() {
         {user.role === "student" && (
           <NavLink
             className={({ isActive }) =>
-              `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" : "text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
-            }
+            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
+              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+          }
             to="/student/previousAssessments"
           >
             <span
@@ -70,16 +74,36 @@ function Sidebar() {
         )}
         {user.role === "instructor" && (
           <NavLink
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" : "text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
+              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
             }
+            to="/instructor/studentManagement"
+            >
+            <span
+              className="material-symbols-outlined text-[20px]"
+              data-icon="people"
+              >
+              people
+            </span>
+            <span>Users & Records</span>
+          </NavLink>
+        )}
+        {user.role === "instructor" && (
+          <NavLink
+            className={({ isActive }) =>
+            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
+              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+          }
             to="/instructor/updateMaterial"
           >
             <span
               className="material-symbols-outlined text-[20px]"
-              data-icon="edit_note"
+              data-icon="add"
             >
-              edit_note
+              add
             </span>
             <span>Generate Assessment</span>
           </NavLink>
@@ -87,19 +111,38 @@ function Sidebar() {
         {user.role === "instructor" && (
           <NavLink
             className={({ isActive }) =>
-              `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" : "text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
-            }
-            to="/instructor/settings"
+            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
+              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+          }
+            to="/instructor/editAssessment"
           >
             <span
               className="material-symbols-outlined text-[20px]"
-              data-icon="settings"
+              data-icon="edit_note"
             >
-              settings
+              edit_note
             </span>
-            <span>Settings</span>
+            <span>Edit Assessment</span>
           </NavLink>
         )}
+        <NavLink
+          className={({ isActive }) =>
+          `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+            isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
+            : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+          }
+          to="/instructor/setting"
+        >
+          <span
+            className="material-symbols-outlined text-[20px]"
+            data-icon="settings"
+          >
+            settings
+          </span>
+          <span>Settings</span>
+        </NavLink>
+        
       </nav>
     </aside>
   );

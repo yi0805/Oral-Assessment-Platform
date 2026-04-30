@@ -1,4 +1,5 @@
 from uuid import UUID
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -21,12 +22,15 @@ class QuestionUpdate(BaseModel):
 
 class QuestionGenerationRequest(BaseModel):
     material_id: UUID
-    material_r_id: UUID
+    rubric_id: UUID
     assessment_title: str
     total_time_minutes: int
     num_main_questions: int
     max_followups_per_main: int = 1
+    release_time: datetime | None = None
+    due_time: datetime | None = None
 
 class QuestionGenerationResponse(BaseModel):
     assessment_config: UUID
     questions: list[QuestionOut]
+

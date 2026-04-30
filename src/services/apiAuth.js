@@ -20,3 +20,25 @@ export async function getCurrentUser() {
 
   return response.data;
 }
+
+export async function updateUserName(newUsername) {
+  const response = await api.put(
+    `/users/updateUsername?new_username=${encodeURIComponent(newUsername)}`
+  );
+
+  return response.data;
+}
+
+export async function updateUserPicture(uploadFile) {
+  const formData = new FormData();
+  formData.append("file", uploadFile);
+
+  const response = await api.put(
+    "/users/updatePicture", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      }
+    });
+
+  return response.data;
+}

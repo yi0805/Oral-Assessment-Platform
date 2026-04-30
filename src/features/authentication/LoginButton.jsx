@@ -26,11 +26,11 @@ function LoginButton({ role, login }) {
           Login as Student
         </h2>
         <p className="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
-          Access your assigned oral exams, review your session history, and view
-          personalized feedback.
+          Exams, Results, Feedback. 
+          All in one place.
         </p>
         <div className="flex items-center justify-center gap-2 font-semibold text-primary transition-all duration-300 group-hover:gap-4">
-          <span>Continue to Portal</span>
+          <span>Enter Student Portal</span>
           <span className="material-symbols-outlined text-lg">
             arrow_forward
           </span>
@@ -62,11 +62,11 @@ function LoginButton({ role, login }) {
           Login as Instructor
         </h2>
         <p className="mx-auto mb-8 max-w-xs font-body text-sm leading-relaxed text-on-surface-variant">
-          Manage course curriculums, design assessment rubrics, and grade
-          student oral performances.
+          Empowering educators to design assessments and grade 
+          oral performances with ease.
         </p>
         <div className="flex items-center justify-center gap-2 font-semibold text-secondary transition-all duration-300 group-hover:gap-4">
-          <span>Curator Portal</span>
+          <span>Enter Instructor Portal</span>
           <span className="material-symbols-outlined text-lg">
             arrow_forward
           </span>

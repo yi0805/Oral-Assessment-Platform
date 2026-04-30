@@ -35,6 +35,8 @@ export default function StudentAssessment() {
 
   const [canComplete, setCanComplete] = useState(false);
 
+  const [blurCount, setBlurCount] = useState(0);
+
   const [maxMainQuestions, setMaxMainQuestions] = useState(0);
   const [maxFollowupsPerMain, setMaxFollowupsPerMain] = useState(0);
 
@@ -105,6 +107,20 @@ export default function StudentAssessment() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [expiresAt]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        setBlurCount((count) => count + 1);
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   useEffect(() => {
     if (timeLeft == null) return;
@@ -314,6 +330,14 @@ export default function StudentAssessment() {
 
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
           <div className="space-y-8 md:col-span-8">
+            {blurCount > 0 && (
+              <div className="rounded-xl border border-error/15 bg-error-container/40 p-4 text-sm text-on-background">
+                You have left this tab {blurCount} time
+                {blurCount === 1 ? "" : "s"} during the assessment. Repeated tab
+                switching may be reported to your instructor.
+              </div>
+            )}
+
             {error && (
               <div className="relative overflow-hidden rounded-xl border border-error/15 bg-error-container/40 p-8 shadow-sm">
                 <div className="absolute left-0 top-0 h-full w-2 bg-error"></div>
@@ -375,7 +399,7 @@ export default function StudentAssessment() {
                   </span>
                 </div>
 
-                <h2 className="mb-4 font-headline text-2xl font-semibold leading-snug text-on-background">
+                <h2 className="mb-4 select-none font-headline text-2xl font-semibold leading-snug text-on-background">
                   {currentQuestion?.question_text}
                 </h2>
               </div>
@@ -476,16 +500,29 @@ export default function StudentAssessment() {
                     placeholder="Type your response here if you prefer not to use voice..."
                     rows="4"
                     value={typedAnswer}
-                    onChange={(e) => setTypedAnswer(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      if (next.length - typedAnswer.length > 5) return;
+                      setTypedAnswer(next);
+                    }}
                     disabled={audioBusy}
                     onCopy={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                     onKeyDown={(e) => {
+                      const key = e.key?.toLowerCase();
                       if (
                         (e.ctrlKey || e.metaKey) &&
-                        ["c", "v", "x"].includes(e.key.toLowerCase())
+                        ["c", "v", "x"].includes(key)
                       ) {
+                        e.preventDefault();
+                        return;
+                      }
+                      if (e.key === "Insert" && (e.shiftKey || e.ctrlKey)) {
+                        e.preventDefault();
+                        return;
+                      }
+                      if (e.key === "Delete" && e.shiftKey) {
                         e.preventDefault();
                       }
                     }}

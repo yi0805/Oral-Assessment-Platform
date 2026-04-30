@@ -28,6 +28,7 @@ from app.schemas import (
     StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
 )
+from app.services.ai_gateway import smart_chat_complete
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -77,7 +78,6 @@ async def _generate_ai_followup(
     current_main: int,
     current_followup: int,
 ) -> str:
-    from app.services.ai_gateway import chat_complete
 
     rows = (
         db.query(TranscriptMessage, SessionQuestionItem)
@@ -148,7 +148,7 @@ async def _generate_ai_followup(
     )
 
     try:
-        result = await chat_complete(
+        result = await smart_chat_complete(
             messages=[{"role": "user", "content": user_prompt}],
             system_prompt=FOLLOWUP_SYSTEM_PROMPT,
             temperature=0.2,
@@ -255,6 +255,18 @@ def get_transcript_detail(
         raise HTTPException(status_code=404, detail="Transcript not found")
 
     session_obj, user_obj, assessment_obj, ai_obj, feedback_obj = general_info
+
+    enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == assessment_obj.course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for this course.")
 
     transcripts = (
         db.query(TranscriptMessage)
