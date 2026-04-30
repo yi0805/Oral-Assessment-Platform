@@ -25,6 +25,7 @@ export default function AssessmentConfigForm({
   onDueTimeChange,
   disabled = false,
   disableCourseSelect = false,
+  onlyDueDate = false,
   releaseHelperText = "Leave blank to default to now → 30 days from now.",
 }) {
   const [touched, setTouched] = useState({
@@ -64,7 +65,7 @@ export default function AssessmentConfigForm({
             <select
               className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
               value={courseId}
-              disabled={disabled || disableCourseSelect}
+              disabled={disabled || disableCourseSelect || onlyDueDate}
               onChange={(e) => onCourseIdChange(e.target.value)}
             >
               {courses.map((c) => (
@@ -94,7 +95,7 @@ export default function AssessmentConfigForm({
             placeholder="e.g. A1 Intro to Python"
             type="text"
             value={assessmentName}
-            disabled={disabled}
+            disabled={disabled || onlyDueDate}
             onChange={(e) => onAssessmentNameChange(e.target.value)}
             onBlur={() => markTouched("assessmentName")}
           />
@@ -120,7 +121,7 @@ export default function AssessmentConfigForm({
               placeholder="e.g. 15"
               type="number"
               value={numQuestions}
-              disabled={disabled}
+              disabled={disabled || onlyDueDate}
               onChange={(e) => onNumQuestionsChange(e.target.value)}
               onBlur={() => markTouched("numQuestions")}
             />
@@ -145,7 +146,7 @@ export default function AssessmentConfigForm({
               placeholder="e.g. 30"
               type="number"
               value={assessmentTime}
-              disabled={disabled}
+              disabled={disabled || onlyDueDate}
               onChange={(e) => onAssessmentTimeChange(e.target.value)}
               onBlur={() => markTouched("assessmentTime")}
             />
@@ -164,7 +165,7 @@ export default function AssessmentConfigForm({
               label="Release Date"
               value={releaseTime}
               onChange={onReleaseTimeChange}
-              disabled={disabled}
+              disabled={disabled || onlyDueDate}
             />
 
             <DateTimePicker
