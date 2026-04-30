@@ -110,7 +110,7 @@ export default function AssessmentConfigForm({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-              No. of Questions
+              Number of Questions
             </label>
 
             <input
