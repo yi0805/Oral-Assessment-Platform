@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import { useDashboard } from "./useDashboard";
 import { useReleaseAllResults } from "./useReleaseAllResults";
 
+import { useCourses } from "../../hooks/useCourses";
+
 import Spinner from "../../ui/Spinner";
 import DashboardTable from "../../ui/DashboardTable";
 
 export default function InstructorDashboard() {
   const { courseId } = useParams();
   const { dashboard = [], isLoading } = useDashboard(courseId);
+  const { courses } = useCourses();
 
   const [searchValue, setSearchValue] = useState("");
   const [selectedAssessment, setSelectedAssessment] = useState("");
@@ -42,6 +45,10 @@ export default function InstructorDashboard() {
   }, [dashboard]);
 
   if (isLoading) return <Spinner />;
+
+  const course = courses.find(
+    (course) => String(course.id) === String(courseId),
+  );
 
   const assessment = dashboard.find(
     (item) => item.assessment_config_id === selectedAssessment,
@@ -118,7 +125,7 @@ export default function InstructorDashboard() {
             </NavLink>
 
             <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
-              {assessment?.course_code} • {assessment?.course_name}
+              {course?.course_code} • {course?.course_name}
             </span>
 
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
