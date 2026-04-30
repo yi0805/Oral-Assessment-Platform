@@ -6,8 +6,10 @@ import { useCourseAssessments } from "./useCourseAssessments";
 import { useAssessmentDetail } from "./useAssessmentDetail";
 import { useUpdateAssessment } from "./useUpdateAssessment";
 import { usePublishAssessment } from "./usePublishAssessment";
+import { useDeleteAssessment } from "./useDeleteAssessment";
 
 import Spinner from "../../ui/Spinner";
+import ConfirmModal from "../../ui/ConfirmModal";
 import AssessmentConfigForm from "./AssessmentConfigForm";
 import { isAssessmentConfigValid } from "./assessmentFormUtils";
 
@@ -40,6 +42,7 @@ export default function EditAssessment() {
   const [assessmentTime, setAssessmentTime] = useState("");
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const { assessments, isLoading: isAssessmentsLoading } =
@@ -50,6 +53,7 @@ export default function EditAssessment() {
   );
   const { updateAssessment, isPending: isSaving } = useUpdateAssessment();
   const { publishAssessment, isPending: isPublishing } = usePublishAssessment();
+  const { deleteAssessment, isDeleting } = useDeleteAssessment();
 
   useEffect(() => {
     if (courses.length > 0 && !courseId) {
@@ -66,6 +70,10 @@ export default function EditAssessment() {
     setDueTime(null);
     setSearchQuery("");
   }, [courseId]);
+
+  useEffect(() => {
+    setConfirmingDelete(false);
+  }, [selectedAssessmentId]);
 
   useEffect(() => {
     if (!assessment) return;
@@ -86,7 +94,7 @@ export default function EditAssessment() {
   );
   const isPublished = assessment?.status === "published";
   const formEnabled =
-    !!selectedAssessmentId && !isDetailLoading && !isSaving && !isPublishing;
+    !!selectedAssessmentId && !isDetailLoading && !isSaving && !isPublishing && !isDeleting;
   const canSave =
     formEnabled &&
     isAssessmentConfigValid({ assessmentName, numQuestions, assessmentTime });
@@ -121,8 +129,24 @@ export default function EditAssessment() {
     });
   }
 
+  async function handleDelete() {
+    await deleteAssessment({ courseId, assessmentConfigId: selectedAssessmentId });
+    setSelectedAssessmentId("");
+    setConfirmingDelete(false);
+  }
+
   return (
     <div className="min-h-screen">
+      {confirmingDelete && (
+        <ConfirmModal
+          title="Delete Assessment"
+          message={`Are you sure you want to delete "${assessment?.title}"? This action cannot be undone.`}
+          confirmLabel="Yes, Delete"
+          isLoading={isDeleting}
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
       <main className="ml-64 px-10 pb-12 pt-24">
         <div className="mb-10">
           <NavLink
@@ -303,14 +327,25 @@ export default function EditAssessment() {
                   ) : (
                     <>
                       {selectedAssessmentId && (
-                        <button
-                          className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={isPublishing || isSaving}
-                          onClick={handlePublish}
-                        >
-                          {isPublishing ? "Publishing…" : "Publish Assessment"}
-                        </button>
+                          <button
+                            className="flex items-center gap-1.5 rounded-xl border border-error/40 bg-transparent px-4 py-2.5 text-sm font-bold text-error transition-all hover:bg-error/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                            disabled={isSaving || isPublishing}
+                            onClick={() => setConfirmingDelete(true)}
+                          >
+                            <span className="material-symbols-outlined text-base" style={{ verticalAlign: "middle" }}>
+                              delete
+                            </span>
+                            Delete
+                          </button>
                       )}
+
+                      <button
+                        className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isPublishing || isSaving}
+                        onClick={handlePublish}
+                      >
+                        {isPublishing ? "Publishing…" : "Publish Assessment"}
+                      </button>
 
                       <button
                         className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"

@@ -82,3 +82,10 @@ export async function updateAssessmentConfig(
   );
   return response.data;
 }
+
+export async function deleteAssessmentConfig(courseId, assessmentConfigId) {
+  const response = await api.delete(
+    `/courses/${courseId}/assessments/${assessmentConfigId}`,
+  );
+  return response.data;
+}
