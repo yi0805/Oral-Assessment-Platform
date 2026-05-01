@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router";
 import toast from "react-hot-toast";
 
-import { useCourses } from "../../hooks/useCourses";
 import { useCourseAssessments } from "./useCourseAssessments";
 import { useAssessmentDetail } from "./useAssessmentDetail";
 import { useUpdateAssessment } from "./useUpdateAssessment";
@@ -11,7 +9,6 @@ import { useDeleteAssessment } from "./useDeleteAssessment";
 import { useRubric } from "./useRubric";
 import { useUpdateRubric } from "./useUpdateRubric";
 
-import Spinner from "../../ui/Spinner";
 import ConfirmModal from "../../ui/ConfirmModal";
 import AssessmentConfigForm from "./AssessmentConfigForm";
 import RubricEditor from "./RubricEditor";
@@ -42,8 +39,7 @@ function snapshotKey({ form, rubricRows }) {
   });
 }
 
-export default function EditAssessment() {
-  const [courseId, setCourseId] = useState("");
+export default function EditPanel({ courseId, courses }) {
   const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -57,7 +53,6 @@ export default function EditAssessment() {
   const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [initializedFor, setInitializedFor] = useState(null);
 
-  const { courses, isLoading: isCoursesLoading } = useCourses();
   const { assessments, isLoading: isAssessmentsLoading } =
     useCourseAssessments(courseId);
   const { assessment, isLoading: isDetailLoading } = useAssessmentDetail(
@@ -70,12 +65,6 @@ export default function EditAssessment() {
   const { rubric, isLoading: isRubricLoading } =
     useRubric(selectedAssessmentId);
   const { updateRubric, isPending: isSavingRubric } = useUpdateRubric();
-
-  useEffect(() => {
-    if (courses.length > 0 && !courseId) {
-      setCourseId(courses[0].id);
-    }
-  }, [courses, courseId]);
 
   useEffect(() => {
     setSelectedAssessmentId("");
@@ -124,8 +113,6 @@ export default function EditAssessment() {
     setInitialSnapshot(snapshotKey({ form, rubricRows: rows }));
     setInitializedFor(selectedAssessmentId);
   }, [assessment, rubric, selectedAssessmentId, initializedFor]);
-
-  if (isCoursesLoading) return <Spinner />;
 
   const hasCourses = courses.length > 0;
   const filteredAssessments = assessments.filter((a) =>
@@ -244,7 +231,7 @@ export default function EditAssessment() {
   }
 
   return (
-    <div className="min-h-screen">
+    <>
       {confirmingDelete && (
         <ConfirmModal
           title="Delete Assessment"
@@ -255,30 +242,8 @@ export default function EditAssessment() {
           onCancel={() => setConfirmingDelete(false)}
         />
       )}
-      <main className="ml-64 px-10 pb-12 pt-24">
-        <div className="mb-10">
-          <NavLink
-            className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
-            to="/home"
-          >
-            <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
-              arrow_back
-            </span>
-            <span className="font-body uppercase tracking-widest">
-              Back to Courses
-            </span>
-          </NavLink>
 
-          <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
-            Edit Assessment
-          </h1>
-
-          <p className="mt-2 text-sm text-on-surface-variant">
-            Select an assessment and update its details.
-          </p>
-        </div>
-
-        {!hasCourses ? (
+      {!hasCourses ? (
           <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-12 text-center">
             <span
               className="material-symbols-outlined mb-2 text-3xl text-outline"
@@ -299,7 +264,8 @@ export default function EditAssessment() {
               <AssessmentConfigForm
                 courses={courses}
                 courseId={courseId}
-                onCourseIdChange={setCourseId}
+                onCourseIdChange={() => {}}
+                hideCourseSelect={true}
                 assessmentName={assessmentName}
                 onAssessmentNameChange={setAssessmentName}
                 numQuestions={numQuestions}
@@ -528,7 +494,6 @@ export default function EditAssessment() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+    </>
   );
 }

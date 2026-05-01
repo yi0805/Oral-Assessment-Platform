@@ -25,6 +25,7 @@ export default function AssessmentConfigForm({
   onDueTimeChange,
   disabled = false,
   disableCourseSelect = false,
+  hideCourseSelect = false,
   onlyDueDate = false,
   releaseHelperText = "Leave blank to default to now → 30 days from now.",
 }) {
@@ -56,6 +57,7 @@ export default function AssessmentConfigForm({
       </h2>
 
       <form className="space-y-6">
+        {!hideCourseSelect && (
         <div className="space-y-2">
           <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
             Select Course
@@ -84,6 +86,7 @@ export default function AssessmentConfigForm({
             </span>
           </div>
         </div>
+        )}
 
         <div className="space-y-2">
           <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
