@@ -97,6 +97,7 @@ function DashboardTable({
                 const isPublished = student.status === "published";
                 const isReview = student.status === "review";
                 const isInProgress = student.status === "inprogress";
+                const isOverdue = student.status === "overdue";
                 return (
                   <tr
                     className="group transition-colors hover:bg-surface-container-high/30"
@@ -244,6 +245,11 @@ function DashboardTable({
                       {isInProgress && (
                         <span className="rounded-full border border-outline-variant/40 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                           In Progress
+                        </span>
+                      )}
+                      {isOverdue && (
+                        <span className="rounded-full border border-outline-variant/40 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+                          Overdue
                         </span>
                       )}
                     </td>
