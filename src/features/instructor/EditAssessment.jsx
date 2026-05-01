@@ -453,7 +453,7 @@ export default function EditAssessment() {
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="text-sm font-bold text-primary">
-                      {isPublished ? "Republish Assessment" : "Save Changes"}
+                      {isPublished ? "Extend Deadline" : "Save Changes"}
                       {isDirty && !isPublished && (
                         <span className="ml-2 text-xs font-medium text-on-surface-variant">
                           • Unsaved changes
@@ -464,7 +464,7 @@ export default function EditAssessment() {
                       {!selectedAssessmentId
                         ? "Select an assessment above to begin editing."
                         : isPublished
-                          ? "Update the due date and republish to students."
+                          ? "Extend the deadline of the published assessment."
                           : "Save your changes after changing the assesment parameters then publish it to make it visible to students."}
                     </p>
                   </div>
@@ -477,7 +477,7 @@ export default function EditAssessment() {
                       disabled={!canRepublish || isSaving}
                       onClick={handleRepublish}
                     >
-                      {isSaving ? "Saving…" : "Republish Assessment"}
+                      {isSaving ? "Saving…" : "Extend Deadline"}
                     </button>
                   ) : (
                     <>
