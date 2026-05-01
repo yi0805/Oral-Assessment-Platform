@@ -157,9 +157,22 @@ export default function QuestionEditor({
               className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 transition-all hover:border-outline-variant/40"
             >
               <div className="flex items-start gap-4">
-                <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+                <div className="mt-1 flex shrink-0 flex-col items-center gap-1">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  {!disabled && editingId !== question.id && (
+                    <button
+                      type="button"
+                      className="rounded-lg px-2 py-0.5 text-xs font-bold text-error transition-all hover:bg-error/10 disabled:opacity-50"
+                      onClick={() => handleDelete(question)}
+                      disabled={isDeleting}
+                    >
+                      Delete
+                    </button>
+                  )}
+                </div>
 
                 <div className="min-w-0 flex-1">
                   {editingId === question.id ? (
@@ -205,15 +218,6 @@ export default function QuestionEditor({
                       onClick={() => startEdit(question)}
                     >
                       Edit
-                    </button>
-
-                    <button
-                      type="button"
-                      className="rounded-lg px-3 py-1 text-xs font-bold text-error transition-all hover:bg-error/10 disabled:opacity-50"
-                      onClick={() => handleDelete(question)}
-                      disabled={isDeleting}
-                    >
-                      Delete
                     </button>
                   </div>
                 )}
