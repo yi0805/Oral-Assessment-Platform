@@ -98,7 +98,7 @@ export default function AssessmentConfigForm({
             placeholder="e.g. A1 Intro to Python"
             type="text"
             value={assessmentName}
-            disabled={disabled || onlyDueDate}
+            disabled={disabled}
             onChange={(e) => onAssessmentNameChange(e.target.value)}
             onBlur={() => markTouched("assessmentName")}
           />

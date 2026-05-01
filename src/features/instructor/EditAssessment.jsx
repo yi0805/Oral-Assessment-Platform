@@ -217,7 +217,10 @@ export default function EditPanel({ courseId, courses }) {
     updateAssessment({
       courseId,
       assessmentConfigId: selectedAssessmentId,
-      payload: { due_time: dueTime?.toISOString() ?? null },
+      payload: { 
+        title: assessmentName, 
+        due_time: dueTime?.toISOString() ?? null 
+      },
     });
   }
 
@@ -477,7 +480,7 @@ export default function EditPanel({ courseId, courses }) {
                         disabled={isPublishing || isSaving}
                         onClick={handlePublish}
                       >
-                        {isPublishing ? "Publishing…" : "Publish Assessment"}
+                        {isPublishing ? "Publishing…" : "Publish"}
                       </button>
 
                       <button
@@ -485,7 +488,7 @@ export default function EditPanel({ courseId, courses }) {
                         disabled={!canSave || isSaving || isPublishing}
                         onClick={handleSave}
                       >
-                        {isSaving ? "Saving…" : "Save Assessment"}
+                        {isSaving ? "Saving…" : "Save"}
                       </button>
                     </>
                   )}
