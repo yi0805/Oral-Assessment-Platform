@@ -237,7 +237,7 @@ def update_assessment(
         if disallowed:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Only the due date can be updated for a published assessment.",
+                detail="Only the due date and the title can be updated for a published assessment.",
             )
 
     if "main_question_num" in update_data and update_data["main_question_num"] is not None:
