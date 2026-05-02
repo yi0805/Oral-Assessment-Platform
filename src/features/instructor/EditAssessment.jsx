@@ -147,7 +147,7 @@ export default function EditPanel({ courseId, courses }) {
     isDirty &&
     rubricValid &&
     !isSavingRubric;
-  const canRepublish = formEnabled;
+  const canUpdatePublished = formEnabled;
 
   async function handleSave() {
     if (!canSave) return;
@@ -212,8 +212,8 @@ export default function EditPanel({ courseId, courses }) {
     }
   }
 
-  function handleRepublish() {
-    if (!canRepublish) return;
+  function handleUpdatePublished() {
+    if (!canUpdatePublished) return;
     updateAssessment({
       courseId,
       assessmentConfigId: selectedAssessmentId,
@@ -422,8 +422,12 @@ export default function EditPanel({ courseId, courses }) {
                 <div className="flex items-center gap-4">
                   <div>
                     <p className="text-sm font-bold text-primary">
-                      {isPublished ? "Extend Deadline" : "Save Changes"}
-                      {isDirty && !isPublished && (
+                      {!selectedAssessmentId
+                        ? "Start Editing"
+                        : isPublished
+                          ? "Update Published Assessment"
+                          : "Publish Draft Assessment"}
+                      {isDirty && !isPublished && selectedAssessmentId && (
                         <span className="ml-2 text-xs font-medium text-on-surface-variant">
                           • Unsaved changes
                         </span>
@@ -433,66 +437,64 @@ export default function EditPanel({ courseId, courses }) {
                       {!selectedAssessmentId
                         ? "Select an assessment above to begin editing."
                         : isPublished
-                          ? "Extend the deadline of the published assessment."
-                          : "Save your changes after changing the assesment parameters then publish it to make it visible to students."}
+                          ? "Update name and due date of the published assessment."
+                          : "Change assessment parameters and publish to students."}
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  {isPublished ? (
-                    <button
-                      className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canRepublish || isSaving}
-                      onClick={handleRepublish}
-                    >
-                      {isSaving ? "Saving…" : "Extend Deadline"}
-                    </button>
-                  ) : (
-                    <>
-                      {selectedAssessmentId && (
-                        <>
-                          <button
-                            type="button"
-                            aria-label="Delete assessment"
-                            title="Delete assessment"
-                            className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={isSaving || isPublishing}
-                            onClick={() => setConfirmingDelete(true)}
-                          >
-                            <span
-                              className="material-symbols-outlined text-xl"
-                              style={{ verticalAlign: "middle" }}
-                            >
-                              delete
-                            </span>
-                          </button>
-
-                          <div
-                            aria-hidden="true"
-                            className="mx-1 h-8 w-px bg-outline-variant/30"
-                          />
-                        </>
-                      )}
-
-                      <button
-                        className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={isPublishing || isSaving}
-                        onClick={handlePublish}
-                      >
-                        {isPublishing ? "Publishing…" : "Publish"}
-                      </button>
-
+                {selectedAssessmentId && (
+                  <div className="flex items-center gap-3">
+                    {isPublished ? (
                       <button
                         className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!canSave || isSaving || isPublishing}
-                        onClick={handleSave}
+                        disabled={!canUpdatePublished || isSaving}
+                        onClick={handleUpdatePublished}
                       >
-                        {isSaving ? "Saving…" : "Save"}
+                        {isSaving ? "Saving…" : "Update"}
                       </button>
-                    </>
-                  )}
-                </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Delete assessment"
+                          title="Delete assessment"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={isSaving || isPublishing}
+                          onClick={() => setConfirmingDelete(true)}
+                        >
+                          <span
+                            className="material-symbols-outlined text-xl"
+                            style={{ verticalAlign: "middle" }}
+                          >
+                            delete
+                          </span>
+                        </button>
+
+                        <div
+                          aria-hidden="true"
+                          className="mx-1 h-8 w-px bg-outline-variant/30"
+                        />
+
+                        <button
+                          className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={isPublishing || isSaving}
+                          onClick={handlePublish}
+                        >
+                          {isPublishing ? "Publishing…" : "Publish"}
+                        </button>
+
+                        <button
+                          className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!canSave || isSaving || isPublishing}
+                          onClick={handleSave}
+                        >
+                          {isSaving ? "Saving…" : "Save"}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
