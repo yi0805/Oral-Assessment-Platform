@@ -233,7 +233,7 @@ def update_assessment(
     update_data = payload.model_dump(exclude_unset=True)
 
     if config.status != "draft":
-        disallowed = set(update_data.keys()) - {"due_time"}
+        disallowed = set(update_data.keys()) - {"due_time", "title"}
         if disallowed:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
