@@ -85,7 +85,7 @@ export default function QuestionEditor({
       {pendingDelete && (
         <ConfirmModal
           title="Delete Question"
-          message={`Are you sure you want to delete this question? This cannot be undone.\n\n"${pendingDelete.question_text}"`}
+          message={`Are you sure you want to delete this question?\n\n"${pendingDelete.question_text}"\n\nThis action cannot be undone.`}
           confirmLabel="Yes, Delete"
           isLoading={isDeleting}
           onConfirm={confirmDelete}
