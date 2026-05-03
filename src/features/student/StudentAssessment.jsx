@@ -128,6 +128,7 @@ export default function StudentAssessment() {
     if (!sessionId) return;
     if (hasAutoCompleted.current) return;
     if (isSubmitting) return;
+    if (isTranscribing) return;
 
     hasAutoCompleted.current = true;
     setIsSubmitting(true);
@@ -148,6 +149,7 @@ export default function StudentAssessment() {
     timeLeft,
     sessionId,
     isSubmitting,
+    isTranscribing,
     completeAssessment,
     navigate,
     courseId,
@@ -216,6 +218,8 @@ export default function StudentAssessment() {
           return;
         }
 
+        setIsSubmitting(true);
+
         const response = await submitAudioAnswer({
           sessionId,
           audioBlob: blob,
@@ -227,10 +231,14 @@ export default function StudentAssessment() {
           setCurrentQuestion(null);
           setCanComplete(true);
         }
+
+        setTypedAnswer("");
       } catch (err) {
         setAudioError(
           getErrorMessage(err, "Failed to submit your audio answer."),
         );
+      } finally {
+        setIsSubmitting(false);
       }
       return;
     }

@@ -873,6 +873,39 @@ async def submit_response_audio(
             detail="Session is not in progress.",
         )
 
+    config = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.id == session.assessment_config_id)
+        .first()
+    )
+
+    # Time check
+    if session.started_at and config and config.total_time_minute:
+        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The time limit for this assessment has expired.",
+            )
+
+    # Enforce upload size limit (25 MB)
+    max_audio_bytes = 25 * 1024 * 1024
+    content_length = audio.headers.get("content-length") if audio.headers else None
+
+    if content_length is not None:
+        try:
+            declared_size = int(content_length)
+            
+        except ValueError:
+            declared_size = None
+
+        if declared_size is not None and declared_size > max_audio_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Audio file exceeds the 25 MB upload limit.",
+            )
+
     # Read audio bytes
     audio_bytes = await audio.read()
 
@@ -880,6 +913,12 @@ async def submit_response_audio(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The uploaded audio is empty.",
+        )
+
+    if len(audio_bytes) > max_audio_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Audio file exceeds the 25 MB upload limit.",
         )
 
     # Upload to S3 under an ephemeral key (Transcribe requires an S3 source)

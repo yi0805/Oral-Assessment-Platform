@@ -49,6 +49,8 @@ def fake_session(session_id, student_id):
         id=session_id,
         user_s_id=student_id,
         status="in_progress",
+        started_at=None,
+        assessment_config_id=None,
     )
 
 

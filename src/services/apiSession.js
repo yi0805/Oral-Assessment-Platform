@@ -103,11 +103,6 @@ export async function respondSessionAudio(sessionId, audioBlob) {
   const response = await api.post(
     `/sessions/${sessionId}/respond/audio`,
     formData,
-    {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    },
   );
 
   return response.data;

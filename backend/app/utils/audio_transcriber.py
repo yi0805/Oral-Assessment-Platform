@@ -100,61 +100,64 @@ def transcribe_audio_from_s3(
     deadline = time.monotonic() + _MAX_WAIT_SECONDS
     transcript_uri: str | None = None
 
-    while True:
+    try:
+        while True:
+            try:
+                response = client.get_transcription_job(TranscriptionJobName=job_name)
+
+            except (BotoCoreError, ClientError) as exc:
+                raise RuntimeError(f"Could not poll transcription job: {exc}") from exc
+
+            job = response["TranscriptionJob"]
+            status = job["TranscriptionJobStatus"]
+
+            if status == "COMPLETED":
+                transcript_uri = job["Transcript"]["TranscriptFileUri"]
+                break
+
+            if status == "FAILED":
+                reason = job.get("FailureReason", "unknown")
+                raise RuntimeError(f"Transcription job failed: {reason}")
+
+            if time.monotonic() >= deadline:
+                raise RuntimeError(
+                    f"Transcription job did not complete within {_MAX_WAIT_SECONDS} seconds"
+                )
+
+            time.sleep(_POLL_INTERVAL_SECONDS)
+
+        # Fetch and parse the transcript JSON (AWS-hosted presigned URL)
         try:
-            response = client.get_transcription_job(TranscriptionJobName=job_name)
+            with httpx.Client(timeout=60.0) as http:
+                resp = http.get(transcript_uri)
+                resp.raise_for_status()
+                payload = resp.json()
 
-        except (BotoCoreError, ClientError) as exc:
-            raise RuntimeError(f"Could not poll transcription job: {exc}") from exc
+        except (httpx.HTTPError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Could not fetch transcript JSON: {exc}") from exc
 
-        job = response["TranscriptionJob"]
-        status = job["TranscriptionJobStatus"]
+        try:
+            transcripts = payload["results"]["transcripts"]
+            text = " ".join(t.get("transcript", "") for t in transcripts).strip()
 
-        if status == "COMPLETED":
-            transcript_uri = job["Transcript"]["TranscriptFileUri"]
-            break
+        except (KeyError, TypeError) as exc:
+            raise RuntimeError(f"Unexpected transcript JSON shape: {exc}") from exc
 
-        if status == "FAILED":
-            reason = job.get("FailureReason", "unknown")
-            raise RuntimeError(f"Transcription job failed: {reason}")
+        if not text:
+            raise RuntimeError("Transcription returned empty text")
 
-        if time.monotonic() >= deadline:
-            raise RuntimeError(
-                f"Transcription job did not complete within {_MAX_WAIT_SECONDS} seconds"
-            )
+        logger.info(
+            "[Transcribe] Job %s completed (%d chars, lang=%s)",
+            job_name, len(text), language_code,
+        )
 
-        time.sleep(_POLL_INTERVAL_SECONDS)
+        return TranscribeResult(text=text, job_name=job_name, language_code=language_code)
 
-    # Fetch and parse the transcript JSON (AWS-hosted presigned URL)
-    try:
-        with httpx.Client(timeout=60.0) as http:
-            resp = http.get(transcript_uri)
-            resp.raise_for_status()
-            payload = resp.json()
+    finally:
+        # Always attempt to delete the Transcribe job, including on poll timeout
+        # or polling exception, so jobs never accumulate in the AWS account.
+        try:
+            client.delete_transcription_job(TranscriptionJobName=job_name)
 
-    except (httpx.HTTPError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"Could not fetch transcript JSON: {exc}") from exc
-
-    try:
-        transcripts = payload["results"]["transcripts"]
-        text = " ".join(t.get("transcript", "") for t in transcripts).strip()
-
-    except (KeyError, TypeError) as exc:
-        raise RuntimeError(f"Unexpected transcript JSON shape: {exc}") from exc
-
-    if not text:
-        raise RuntimeError("Transcription returned empty text")
-
-    logger.info(
-        "[Transcribe] Job %s completed (%d chars, lang=%s)",
-        job_name, len(text), language_code,
-    )
-
-    # Best-effort cleanup of the Transcribe job record
-    try:
-        client.delete_transcription_job(TranscriptionJobName=job_name)
-
-    except (BotoCoreError, ClientError):
-        logger.warning("[Transcribe] Could not delete job %s (non-fatal)", job_name)
-
-    return TranscribeResult(text=text, job_name=job_name, language_code=language_code)
+        except (BotoCoreError, ClientError):
+            logger.warning("[Transcribe] Could not delete job %s (non-fatal)", job_name)
