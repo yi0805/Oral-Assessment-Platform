@@ -291,11 +291,11 @@ export default function StudentManagement() {
             </h2>
 
             <div className="mb-6">
-              <p className="mb-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+              <p className="mb-4 text-[13px] font-bold uppercase tracking-wider text-on-surface-variant">
                 Add user
               </p>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
                 <div className="space-y-2 md:col-span-2">
                   <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                     Enrol as
@@ -321,13 +321,13 @@ export default function StudentManagement() {
                   </div>
                 </div>
 
-                <div className="space-y-2 md:col-span-3">
+                <div className="space-y-2 md:col-span-4">
                   <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                     UPI
                   </label>
                   <input
                     className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="e.g. john.doe (from john.doe@gmail.com)"
+                    placeholder="e.g. jcle890 (from jcle890@gmail.com)"
                     type="text"
                     value={upiAdd}
                     onChange={(e) => setUpiAdd(e.target.value)}
@@ -336,9 +336,9 @@ export default function StudentManagement() {
                 </div>
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3">
                 <button
-                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
                     canEnrol
                       ? "bg-primary text-on-primary hover:bg-primary-dim"
                       : "cursor-not-allowed bg-surface-container text-outline"
@@ -361,7 +361,7 @@ export default function StudentManagement() {
             <hr className="my-6 border-outline-variant/30" />
 
             <div>
-              <p className="mb-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
+              <p className="mb-4 text-[13px] font-bold uppercase tracking-wider text-on-surface-variant">
                 Remove user
               </p>
 
@@ -371,7 +371,7 @@ export default function StudentManagement() {
                 </label>
                 <input
                   className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="e.g. john.doe (from john.doe@gmail.com)"
+                  placeholder="e.g. jcle890 (from jcle890@gmail.com)"
                   type="text"
                   value={upiRemove}
                   onChange={(e) => setUpiRemove(e.target.value)}
@@ -379,9 +379,9 @@ export default function StudentManagement() {
                 />
               </div>
 
-              <div className="mt-4">
+              <div className="mt-3">
                 <button
-                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-8 py-3 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2 font-headline text-sm font-bold shadow-sm transition-all duration-200 active:scale-95 ${
                     canDelete
                       ? "bg-error text-on-error hover:bg-error-dim"
                       : "cursor-not-allowed bg-surface-container text-outline"

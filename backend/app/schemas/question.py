@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # Question
@@ -16,6 +16,10 @@ class QuestionOut(BaseModel):
 
 class QuestionUpdate(BaseModel):
     question_text: str | None = None
+
+
+class QuestionCreate(BaseModel):
+    question_text: str = Field(min_length=1)
 
 
 # Question generation

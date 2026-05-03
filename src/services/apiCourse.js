@@ -58,3 +58,34 @@ export async function deleteEnrolment(courseId, upi, role) {
 
   return response.data;
 }
+
+export async function getCourseAssessments(courseId) {
+  const response = await api.get(`/courses/${courseId}/assessments`);
+  return response.data;
+}
+
+export async function getAssessmentDetail(courseId, assessmentConfigId) {
+  const response = await api.get(
+    `/courses/${courseId}/assessments/${assessmentConfigId}`,
+  );
+  return response.data;
+}
+
+export async function updateAssessmentConfig(
+  courseId,
+  assessmentConfigId,
+  payload,
+) {
+  const response = await api.put(
+    `/courses/${courseId}/assessments/${assessmentConfigId}`,
+    payload,
+  );
+  return response.data;
+}
+
+export async function deleteAssessmentConfig(courseId, assessmentConfigId) {
+  const response = await api.delete(
+    `/courses/${courseId}/assessments/${assessmentConfigId}`,
+  );
+  return response.data;
+}

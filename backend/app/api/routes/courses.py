@@ -1,6 +1,6 @@
 from uuid import UUID
 from io import StringIO
-from datetime import datetime
+from datetime import datetime, timezone
 import csv
 from charset_normalizer import from_bytes
 import pandas as pd
@@ -27,11 +27,14 @@ def generate_term() -> str:
     return f"{year_short}{semester}"
 
 
-def dashboard_status(session_status: str) -> str:
+def dashboard_status(session_status: str, due_time: datetime) -> str:
     if session_status == "released":
         return "published"
     if session_status == "under_review":
         return "review"
+    now = datetime.now(timezone.utc)
+    if now > due_time:
+        return "overdue"
     return "inprogress"
 
 # Add student/instructor individually
@@ -382,7 +385,7 @@ def get_instructor_dashboard(
                 else None
             ),
             final_grade=final_grade,
-            status=dashboard_status(session.status),
+            status=dashboard_status(session.status, assessment_config.due_time),
         )
 
         group["students"].append(student_row)

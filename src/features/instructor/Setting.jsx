@@ -161,6 +161,27 @@ export default function Setting() {
             <div className="max-w-xl space-y-6">
               <div className="space-y-2">
                 <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+                  UPI (University ID)
+                </label>
+
+                <div className="relative">
+                  <input
+                    disabled
+                    className="w-full cursor-not-allowed rounded-xl border-none bg-surface-container-low px-4 py-3 pr-11 text-on-surface-variant"
+                    value={user?.upi || ""}
+                  />
+
+                  <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-base text-outline">
+                    lock
+                  </span>
+                </div>
+                <p className="ml-1 text-[11px] text-outline">
+                  Issued by your institution.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
                   Display Name
                 </label>
                 <input
@@ -179,27 +200,6 @@ export default function Setting() {
                     {isPending ? "Saving..." : "Save"}
                   </button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                  UPI (University ID)
-                </label>
-
-                <div className="relative">
-                  <input
-                    disabled
-                    className="w-full cursor-not-allowed rounded-xl border-none bg-surface-container-low px-4 py-3 pr-11 text-on-surface-variant"
-                    value={user?.upi || ""}
-                  />
-
-                  <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-base text-outline">
-                    lock
-                  </span>
-                </div>
-                <p className="ml-1 text-[11px] text-outline">
-                  Issued by your institution.
-                </p>
               </div>
             </div>
           </div>
