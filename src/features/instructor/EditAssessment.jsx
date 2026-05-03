@@ -463,8 +463,8 @@ export default function EditPanel({ courseId, courses }) {
                       {!selectedAssessmentId
                         ? "Select an assessment above to begin editing."
                         : isPublished
-                          ? "Update name and due date of the published assessment."
-                          : "Change assessment parameters and publish to students."}
+                          ? "Copy published assesments and update name and due date of published assessments."
+                          : "Change assessment parameters, copy and delete assessments and publish to students."}
                     </p>
                   </div>
                 </div>
