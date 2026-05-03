@@ -6,10 +6,12 @@ import { useAssessmentDetail } from "./useAssessmentDetail";
 import { useUpdateAssessment } from "./useUpdateAssessment";
 import { usePublishAssessment } from "./usePublishAssessment";
 import { useDeleteAssessment } from "./useDeleteAssessment";
+import { useCopyAssessment } from "./useCopyAssessment";
 import { useRubric } from "./useRubric";
 import { useUpdateRubric } from "./useUpdateRubric";
 
 import ConfirmModal from "../../ui/ConfirmModal";
+import CopyAssessmentModal from "./CopyAssessmentModal";
 import AssessmentConfigForm from "./AssessmentConfigForm";
 import RubricEditor from "./RubricEditor";
 import QuestionEditor from "./QuestionEditor";
@@ -49,6 +51,7 @@ export default function EditPanel({ courseId, courses }) {
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [rubricRows, setRubricRows] = useState([]);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [initializedFor, setInitializedFor] = useState(null);
@@ -62,6 +65,7 @@ export default function EditPanel({ courseId, courses }) {
   const { updateAssessment, isPending: isSaving } = useUpdateAssessment();
   const { publishAssessment, isPending: isPublishing } = usePublishAssessment();
   const { deleteAssessment, isDeleting } = useDeleteAssessment();
+  const { copyAssessment, isCopying } = useCopyAssessment();
   const { rubric, isLoading: isRubricLoading } =
     useRubric(selectedAssessmentId);
   const { updateRubric, isPending: isSavingRubric } = useUpdateRubric();
@@ -81,6 +85,7 @@ export default function EditPanel({ courseId, courses }) {
 
   useEffect(() => {
     setConfirmingDelete(false);
+    setCopyModalOpen(false);
   }, [selectedAssessmentId]);
 
   useEffect(() => {
@@ -224,6 +229,16 @@ export default function EditPanel({ courseId, courses }) {
     });
   }
 
+  async function handleCopy({ targetCourseId, title }) {
+    await copyAssessment({
+      courseId,
+      assessmentConfigId: selectedAssessmentId,
+      targetCourseId,
+      title,
+    });
+    setCopyModalOpen(false);
+  }
+
   async function handleDelete() {
     await deleteAssessment({
       courseId,
@@ -243,6 +258,17 @@ export default function EditPanel({ courseId, courses }) {
           isLoading={isDeleting}
           onConfirm={handleDelete}
           onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+
+      {copyModalOpen && (
+        <CopyAssessmentModal
+          assessment={assessment}
+          courses={courses}
+          currentCourseId={courseId}
+          isCopying={isCopying}
+          onConfirm={handleCopy}
+          onCancel={() => setCopyModalOpen(false)}
         />
       )}
 
@@ -446,13 +472,31 @@ export default function EditPanel({ courseId, courses }) {
                 {selectedAssessmentId && (
                   <div className="flex items-center gap-3">
                     {isPublished ? (
-                      <button
-                        className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!canUpdatePublished || isSaving}
-                        onClick={handleUpdatePublished}
-                      >
-                        {isSaving ? "Saving…" : "Update"}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          aria-label="Copy assessment"
+                          title="Copy assessment"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={isCopying}
+                          onClick={() => setCopyModalOpen(true)}
+                        >
+                          <span
+                            className="material-symbols-outlined text-xl"
+                            style={{ verticalAlign: "middle" }}
+                          >
+                            content_copy
+                          </span>
+                        </button>
+
+                        <button
+                          className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={!canUpdatePublished || isSaving}
+                          onClick={handleUpdatePublished}
+                        >
+                          {isSaving ? "Saving…" : "Update"}
+                        </button>
+                      </>
                     ) : (
                       <>
                         <button
@@ -460,7 +504,7 @@ export default function EditPanel({ courseId, courses }) {
                           aria-label="Delete assessment"
                           title="Delete assessment"
                           className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={isSaving || isPublishing}
+                          disabled={isSaving || isPublishing || isCopying}
                           onClick={() => setConfirmingDelete(true)}
                         >
                           <span
@@ -468,6 +512,22 @@ export default function EditPanel({ courseId, courses }) {
                             style={{ verticalAlign: "middle" }}
                           >
                             delete
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          aria-label="Copy assessment"
+                          title="Copy assessment"
+                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={isSaving || isPublishing || isCopying}
+                          onClick={() => setCopyModalOpen(true)}
+                        >
+                          <span
+                            className="material-symbols-outlined text-xl"
+                            style={{ verticalAlign: "middle" }}
+                          >
+                            content_copy
                           </span>
                         </button>
 

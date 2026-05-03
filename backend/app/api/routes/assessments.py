@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
-from app.models import AssessmentConfig, AssessmentSession, CourseEnrollment, User, Question, QuestionPool
+from app.models import AssessmentConfig, AssessmentSession, CourseEnrollment, User, Question, QuestionPool, Rubric
 from app.schemas import (
     ReleaseResponse,
     AssessmentConfigDetailOut,
     AssessmentConfigUpdate,
     AssessmentConfigSummary,
+    AssessmentCopyRequest,
 )
 
 router = APIRouter()
@@ -319,3 +320,124 @@ def delete_assessment(
         raise HTTPException(status_code=500, detail="Database deletion failed")
 
     return {"message": "Assessment deleted successfully."}
+
+
+# Copy assessment
+
+@router.post(
+    "/courses/{course_id}/assessments/{assessment_config_id}/copy",
+    response_model=AssessmentConfigSummary,
+    summary="Copy an assessment to the same or a different course",
+)
+def copy_assessment(
+    course_id: UUID,
+    assessment_config_id: UUID,
+    payload: AssessmentCopyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    # Verify instructor is enrolled in the source course
+    source_enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not source_enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for the source course.")
+
+    # Verify instructor is enrolled in the target course
+    target_enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == payload.target_course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not target_enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for the target course.")
+
+    # Load source assessment
+    source_config = (
+        db.query(AssessmentConfig)
+        .filter(
+            AssessmentConfig.id == assessment_config_id,
+            AssessmentConfig.course_id == course_id,
+        )
+        .first()
+    )
+    if not source_config:
+        raise HTTPException(status_code=404, detail="Assessment not found.")
+
+    source_rubric = db.query(Rubric).filter(Rubric.id == source_config.rubric_id).first()
+    if not source_rubric:
+        raise HTTPException(status_code=404, detail="Source rubric not found.")
+
+    source_pool = (
+        db.query(QuestionPool)
+        .filter(QuestionPool.assessment_config_id == source_config.id)
+        .first()
+    )
+    if not source_pool:
+        raise HTTPException(status_code=422, detail="Source assessment has no question pool to copy.")
+
+    new_title = payload.title if payload.title else f"Copy of {source_config.title}"
+
+    try:
+        # Copy rubric (independent from original)
+        new_rubric = Rubric(
+            course_id=payload.target_course_id,
+            total_points=source_rubric.total_points,
+            criteria_data=source_rubric.criteria_data,
+        )
+        db.add(new_rubric)
+        db.flush()
+
+        # Copy assessment config (reset status and dates)
+        new_config = AssessmentConfig(
+            course_id=payload.target_course_id,
+            title=new_title,
+            description=source_config.description,
+            rubric_id=new_rubric.id,
+            total_time_minute=source_config.total_time_minute,
+            main_question_num=source_config.main_question_num,
+            follow_up_num=source_config.follow_up_num,
+            release_time=None,
+            due_time=None,
+            status="draft",
+        )
+        db.add(new_config)
+        db.flush()
+
+        # Copy question pool and its questions
+        new_pool = QuestionPool(
+            assessment_config_id=new_config.id,
+            material_id=source_pool.material_id,
+            status="draft",
+        )
+        db.add(new_pool)
+        db.flush()
+
+        source_questions = (
+            db.query(Question)
+            .filter(Question.question_pool_id == source_pool.id)
+            .order_by(Question.question_index)
+            .all()
+        )
+        for q in source_questions:
+            db.add(Question(
+                question_pool_id=new_pool.id,
+                question_text=q.question_text,
+                question_index=q.question_index,
+            ))
+
+        db.commit()
+        db.refresh(new_config)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to copy assessment.")
+
+    return new_config
