@@ -16,6 +16,8 @@ export default function StudentCourse() {
 
   const [assessmentConfigId, setAssessmentConfigId] = useState(null);
 
+  const [now] = useState(() => Date.now());
+
   const { courses, isLoading } = useCourses();
 
   const { assessments, isLoading: isAssessmentsLoading } =
@@ -26,10 +28,12 @@ export default function StudentCourse() {
   const course = courses.find(
     (course) => String(course.id) === String(courseId),
   );
-  
+
   const upcomingAssessments = assessments
-    .filter(a => new Date(a.due_time) > Date.now())
-    .sort((a, b) => new Date(a.due_time) - new Date(b.due_time));
+    .filter((a) => new Date(a.due_time).getTime() > now)
+    .sort(
+      (a, b) => new Date(a.due_time).getTime() - new Date(b.due_time).getTime(),
+    );
 
   const earliestDeadline =
     upcomingAssessments.length > 0
@@ -182,7 +186,7 @@ export default function StudentCourse() {
                         setAssessmentConfigId(assessment.assessment_config_id);
                       }}
                     >
-                      <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest py-8 px-6 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
+                      <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest px-6 py-8 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
                         <div>
                           <div className="mb-5 flex items-start justify-between">
                             <span className="material-symbols-outlined text-2xl text-secondary">
@@ -209,11 +213,7 @@ export default function StudentCourse() {
                             schedule
                           </span>
                           {assessment.total_time_minute} mins
-
-                          <span className="ml-4 material-symbols-outlined text-[13px]">
-                            question_mark
-                          </span>
-
+                          <span className="mx-1"></span>
                           {assessment.main_question_num} main •{" "}
                           {assessment.follow_up_num} each
                         </div>
@@ -255,12 +255,9 @@ export default function StudentCourse() {
                           schedule
                         </span>
                         {assessment.total_time_minute} mins
-
-                        <span className="ml-3 material-symbols-outlined text-[13px]">
-                          question_mark
-                        </span>
-
-                        {assessment.main_question_num} main
+                        <span className="mx-1"></span>
+                        {assessment.main_question_num} main •{" "}
+                        {assessment.follow_up_num} each
                       </div>
                     </div>
                   </div>

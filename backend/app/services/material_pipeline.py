@@ -128,8 +128,8 @@ def _stage_extract(material_id: UUID) -> str | None:
                 material_id, material.storage_key,
             )
             return None
-        
-        except Exception as exc:  
+
+        except Exception as exc:
             logger.error("Material %s: storage download error: %s", material_id, exc)
             return None
 
