@@ -8,9 +8,11 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
 from app.services import material_pipeline, s3_client
+from app.services.github_importer import fetch_repo_as_text
 
 from app.models import Course, CourseEnrollment, Material, User
 from app.schemas import GithubImportBody
+
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -146,85 +148,85 @@ async def upload_material(
 
 # Import GitHub repo as material
 
-# @router.post(
-#     "/courses/{course_id}/materials/github",
-#     status_code=status.HTTP_201_CREATED,
-#     summary="Import GitHub Repo as Material",
-# )
-# async def import_github_repo(
-#     course_id: UUID,
-#     body: GithubImportBody,
-#     background_tasks: BackgroundTasks,
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(require_instructor),
-# ):
-#     _require_course_instructor(db, course_id, current_user)
+@router.post(
+    "/courses/{course_id}/materials/github",
+    status_code=status.HTTP_201_CREATED,
+    summary="Import GitHub Repo as Material",
+)
+async def import_github_repo(
+    course_id: UUID,
+    body: GithubImportBody,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    _require_course_instructor(db, course_id, current_user)
 
-#     text_bytes, filename = function that returns text_bytes and filename
+    text_bytes, filename = await fetch_repo_as_text(body.url, body.ref)
 
-#     existing_material = (
-#         db.query(Material)
-#         .filter(
-#             Material.course_id == course_id,
-#             Material.filename == filename,
-#         )
-#         .first()
-#     )
+    existing_material = (
+        db.query(Material)
+        .filter(
+            Material.course_id == course_id,
+            Material.filename == filename,
+        )
+        .first()
+    )
 
-#     if existing_material:
-#         return existing_material.id
+    if existing_material:
+        return existing_material.id
 
-#     material_id = uuid4()
-#     storage_key = s3_client.generate_key(course_id, material_id, filename)
-#     content_type = "text/plain"
+    material_id = uuid4()
+    storage_key = s3_client.generate_key(course_id, material_id, filename)
+    content_type = "text/plain"
 
-#     try:
-#         s3_client.upload_file(
-#             text_bytes,
-#             storage_key,
-#             content_type=content_type,
-#             metadata={
-#                 "course_id": str(course_id),
-#                 "material_id": str(material_id),
-#                 "title": filename,
-#                 "source": "github",
-#                 "source_url": body.url,
-#             },
-#         )
+    try:
+        s3_client.upload_file(
+            text_bytes,
+            storage_key,
+            content_type=content_type,
+            metadata={
+                "course_id": str(course_id),
+                "material_id": str(material_id),
+                "title": filename,
+                "source": "github",
+                "source_url": body.url,
+            },
+        )
 
-#     except RuntimeError as exc:
-#         raise HTTPException(
-#             status_code=status.HTTP_502_BAD_GATEWAY,
-#             detail=f"Storage upload failed: {exc}",
-#         ) from exc
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Storage upload failed: {exc}",
+        ) from exc
 
-#     material = Material(
-#         id=material_id,
-#         course_id=course_id,
-#         filename=filename,
-#         mime_type=content_type,
-#         storage_key=storage_key,
-#         material_category="course_material",
-#     )
+    material = Material(
+        id=material_id,
+        course_id=course_id,
+        filename=filename,
+        mime_type=content_type,
+        storage_key=storage_key,
+        material_category="course_material",
+    )
 
-#     try:
-#         db.add(material)
-#         db.commit()
-#         db.refresh(material)
+    try:
+        db.add(material)
+        db.commit()
+        db.refresh(material)
 
-#     except SQLAlchemyError as exc:
-#         db.rollback()
-#         try:
-#             s3_client.delete_file(storage_key)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        try:
+            s3_client.delete_file(storage_key)
 
-#         except Exception:
-#             logger.exception("Rollback cleanup failed for storage key=%s", storage_key)
+        except Exception:
+            logger.exception("Rollback cleanup failed for storage key=%s", storage_key)
 
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail="Material metadata could not be saved.",
-#         ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Material metadata could not be saved.",
+        ) from exc
 
-#     background_tasks.add_task(material_pipeline.run_pipeline, material.id)
+    background_tasks.add_task(material_pipeline.run_pipeline, material.id)
 
-#     return material.id
+    return material.id

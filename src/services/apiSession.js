@@ -78,6 +78,36 @@ export async function respondSession(sessionId, answerText) {
   return response.data;
 }
 
+const AUDIO_MIME_TO_EXT = {
+  "audio/webm": "webm",
+  "audio/ogg": "ogg",
+  "audio/mp4": "m4a",
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/flac": "flac",
+};
+
+function inferAudioExtension(blob) {
+  const baseType = (blob?.type || "").split(";")[0].trim().toLowerCase();
+  return AUDIO_MIME_TO_EXT[baseType] || "webm";
+}
+
+export async function respondSessionAudio(sessionId, audioBlob) {
+  const ext = inferAudioExtension(audioBlob);
+
+  const formData = new FormData();
+  formData.append("audio", audioBlob, `answer.${ext}`);
+
+  const response = await api.post(
+    `/sessions/${sessionId}/respond/audio`,
+    formData,
+  );
+
+  return response.data;
+}
+
 export async function completeSession(sessionId) {
   const response = await api.post(`/sessions/${sessionId}/complete`);
   return response.data;

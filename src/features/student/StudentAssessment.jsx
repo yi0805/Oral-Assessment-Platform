@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useStartSession } from "./useStartSession";
 import { useCourses } from "../../hooks/useCourses";
 import { useSubmitAnswer } from "./useSubmitAnswer";
+import { useSubmitAudioAnswer } from "./useSubmitAudioAnswer";
+import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 
@@ -29,6 +31,7 @@ export default function StudentAssessment() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [error, setError] = useState(null);
+  const [audioError, setAudioError] = useState(null);
 
   const [canComplete, setCanComplete] = useState(false);
 
@@ -44,9 +47,21 @@ export default function StudentAssessment() {
 
   const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
+  const { submitAudioAnswer, isPending: isTranscribing } =
+    useSubmitAudioAnswer();
+  const {
+    status: recordingStatus,
+    isSupported: isAudioSupported,
+    start: startRecording,
+    stop: stopRecording,
+    reset: resetRecorder,
+  } = useAudioRecorder();
   const { completeAssessment } = useCompleteAssessment();
 
   const { logout } = useLogout();
+
+  const isRecording = recordingStatus === "recording";
+  const audioBusy = isRecording || isTranscribing;
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +128,7 @@ export default function StudentAssessment() {
     if (!sessionId) return;
     if (hasAutoCompleted.current) return;
     if (isSubmitting) return;
+    if (isTranscribing) return;
 
     hasAutoCompleted.current = true;
     setIsSubmitting(true);
@@ -133,6 +149,7 @@ export default function StudentAssessment() {
     timeLeft,
     sessionId,
     isSubmitting,
+    isTranscribing,
     completeAssessment,
     navigate,
     courseId,
@@ -183,6 +200,74 @@ export default function StudentAssessment() {
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
+    }
+  }
+
+  async function handleMicClick() {
+    if (!currentQuestion) return;
+    if (isSubmitting || isTranscribing) return;
+
+    setAudioError(null);
+
+    if (isRecording) {
+      try {
+        const blob = await stopRecording();
+
+        if (!blob || blob.size === 0) {
+          setAudioError("No audio was captured. Please try again.");
+          return;
+        }
+
+        setIsSubmitting(true);
+
+        const response = await submitAudioAnswer({
+          sessionId,
+          audioBlob: blob,
+        });
+
+        if (response.next_question) {
+          setCurrentQuestion(response.next_question);
+        } else {
+          setCurrentQuestion(null);
+          setCanComplete(true);
+        }
+
+        setTypedAnswer("");
+      } catch (err) {
+        setAudioError(
+          getErrorMessage(err, "Failed to submit your audio answer."),
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (!isAudioSupported) {
+      setAudioError(
+        "Audio recording isn't supported in this browser. Please type your answer instead.",
+      );
+      return;
+    }
+
+    try {
+      await startRecording();
+    } catch (err) {
+      const name = err && err.name;
+
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setAudioError(
+          "Microphone access was blocked. Please allow microphone access in your browser and try again.",
+        );
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setAudioError(
+          "No microphone was detected. Please connect one and try again.",
+        );
+      } else {
+        setAudioError(getErrorMessage(err, "Failed to start recording."));
+      }
+
+      resetRecorder();
     }
   }
 
@@ -332,29 +417,83 @@ export default function StudentAssessment() {
               <div className="space-y-6">
                 <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low p-10">
                   <p className="mb-8 font-medium text-on-surface-variant">
-                    Tap the microphone to speak your answer
+                    {isTranscribing
+                      ? "Transcribing your answer…"
+                      : isRecording
+                        ? "Recording… tap the button again to stop and submit"
+                        : "Tap the microphone to speak your answer"}
                   </p>
 
                   <div className="relative">
-                    <div className="absolute -inset-4 rounded-full bg-primary/5 blur-xl"></div>
-                    <button className="relative flex h-24 w-24 items-center justify-center rounded-full bg-primary text-on-primary shadow-lg transition-all hover:bg-primary-dim active:scale-95">
+                    <div
+                      className={`absolute -inset-4 rounded-full blur-xl ${
+                        isRecording ? "bg-error/30" : "bg-primary/5"
+                      }`}
+                    ></div>
+                    <button
+                      type="button"
+                      onClick={handleMicClick}
+                      disabled={isSubmitting || isTranscribing}
+                      aria-label={
+                        isTranscribing
+                          ? "Transcribing"
+                          : isRecording
+                            ? "Stop recording"
+                            : "Start recording"
+                      }
+                      className={`relative flex h-24 w-24 items-center justify-center rounded-full text-on-primary shadow-lg transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isRecording
+                          ? "animate-pulse bg-error hover:bg-error/90"
+                          : "bg-primary hover:bg-primary-dim"
+                      }`}
+                    >
                       <span
                         className="material-symbols-outlined text-4xl"
                         data-weight="fill"
                         style={{ fontVariationSettings: '"FILL" 1' }}
                       >
-                        mic
+                        {isTranscribing
+                          ? "hourglass_top"
+                          : isRecording
+                            ? "stop"
+                            : "mic"}
                       </span>
                     </button>
                   </div>
 
                   <div className="mt-8 flex gap-2">
-                    <div className="h-4 w-1 rounded-full bg-primary/20"></div>
-                    <div className="h-8 w-1 rounded-full bg-primary/40"></div>
-                    <div className="h-12 w-1 rounded-full bg-primary"></div>
-                    <div className="h-6 w-1 rounded-full bg-primary/60"></div>
-                    <div className="h-10 w-1 rounded-full bg-primary/80"></div>
+                    <div
+                      className={`h-4 w-1 rounded-full ${
+                        isRecording ? "bg-error/40" : "bg-primary/20"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-8 w-1 rounded-full ${
+                        isRecording ? "bg-error/60" : "bg-primary/40"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-12 w-1 rounded-full ${
+                        isRecording ? "bg-error" : "bg-primary"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-6 w-1 rounded-full ${
+                        isRecording ? "bg-error/70" : "bg-primary/60"
+                      }`}
+                    ></div>
+                    <div
+                      className={`h-10 w-1 rounded-full ${
+                        isRecording ? "bg-error/80" : "bg-primary/80"
+                      }`}
+                    ></div>
                   </div>
+
+                  {audioError && (
+                    <p className="mt-6 max-w-md text-center text-sm text-error">
+                      {audioError}
+                    </p>
+                  )}
                 </div>
 
                 <div className="relative">
@@ -365,7 +504,7 @@ export default function StudentAssessment() {
                   </div>
 
                   <textarea
-                    className="block w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-4 pl-12 pr-4 font-body text-sm placeholder:text-outline-variant focus:border-primary focus:ring-primary"
+                    className="block w-full rounded-xl border border-outline-variant/20 bg-surface-container-lowest py-4 pl-12 pr-4 font-body text-sm placeholder:text-outline-variant focus:border-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
                     placeholder="Type your response here if you prefer not to use voice..."
                     rows="4"
                     value={typedAnswer}
@@ -374,6 +513,7 @@ export default function StudentAssessment() {
                       if (next.length - typedAnswer.length > 5) return;
                       setTypedAnswer(next);
                     }}
+                    disabled={audioBusy}
                     onCopy={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
@@ -506,7 +646,7 @@ export default function StudentAssessment() {
                 <button
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-4 font-bold text-on-primary shadow-sm transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
                   onClick={handleSubmitAnswer}
-                  disabled={isSubmitting || !typedAnswer.trim()}
+                  disabled={isSubmitting || audioBusy || !typedAnswer.trim()}
                 >
                   {isSubmitting ? "Submitting..." : "Submit Answer"}
 
@@ -520,7 +660,7 @@ export default function StudentAssessment() {
                 <button
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-secondary py-4 font-bold text-on-secondary shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                   onClick={handleCompleteSession}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || audioBusy}
                 >
                   {isSubmitting ? "Submitting..." : "Submit Assessment"}
                   <span className="material-symbols-outlined text-sm">
