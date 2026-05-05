@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { NavLink, useNavigate } from "react-router";
 
 import { useCourses } from "../../hooks/useCourses";
 import Spinner from "../../ui/Spinner";
@@ -26,6 +26,22 @@ export default function AssessmentManagement() {
   return (
     <div className="min-h-screen">
       <main className="ml-64 px-10 pb-12 pt-24">
+        <div className="mb-4">
+          <NavLink
+            className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant transition-colors hover:text-primary"
+            to="/home"
+          >
+            <span
+              className="material-symbols-outlined text-sm"
+              style={{ verticalAlign: "middle" }}
+              data-icon="arrow_back"
+            >
+              arrow_back
+            </span>
+            BACK TO COURSES
+          </NavLink>
+        </div>
+
         <div className="mb-8">
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
             Assessments

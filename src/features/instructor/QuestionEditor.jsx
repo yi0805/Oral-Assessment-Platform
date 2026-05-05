@@ -154,7 +154,7 @@ export default function QuestionEditor({
           {questions.map((question, index) => (
             <div
               key={question.id}
-              className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 transition-all hover:border-outline-variant/40"
+              className="group rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 transition-all hover:border-outline-variant/40"
             >
               <div className="flex items-start gap-4">
                 <div className="mt-1 flex shrink-0 flex-col items-center gap-1">
@@ -165,11 +165,14 @@ export default function QuestionEditor({
                   {!disabled && editingId !== question.id && (
                     <button
                       type="button"
-                      className="rounded-lg px-2 py-0.5 text-xs font-bold text-error transition-all hover:bg-error/10 disabled:opacity-50"
                       onClick={() => handleDelete(question)}
                       disabled={isDeleting}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-outline transition-all hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-20 md:opacity-0 md:group-hover:opacity-100"
+                      aria-label="Delete question"
                     >
-                      Delete
+                      <span className="material-symbols-outlined text-lg">
+                        delete
+                      </span>
                     </button>
                   )}
                 </div>
