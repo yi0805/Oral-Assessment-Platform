@@ -24,7 +24,6 @@ export default function AssessmentConfigForm({
   dueTime,
   onDueTimeChange,
   disabled = false,
-  disableCourseSelect = false,
   hideCourseSelect = false,
   onlyDueDate = false,
   releaseHelperText = "Leave blank to default to now → 30 days from now.",
@@ -67,7 +66,6 @@ export default function AssessmentConfigForm({
             <select
               className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
               value={courseId}
-              disabled={disableCourseSelect}
               onChange={(e) => onCourseIdChange(e.target.value)}
             >
               {courses.map((c) => (
