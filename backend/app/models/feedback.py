@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, Text, Integer
+from sqlalchemy import ForeignKey, String, Text, Integer, JSON
 from sqlalchemy.dialects.postgresql import  UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,7 +22,7 @@ class AISummary(Base):
         comment="One AI summary per assessment session.",
     )
 
-    summary_text: Mapped[str] = mapped_column(Text, nullable=False)
+    detailed_feedback: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     suggested_grade: Mapped[int] = mapped_column(
         Integer, nullable=False,
         comment="Advisory numeric score suggested by the AI (0-100).",
