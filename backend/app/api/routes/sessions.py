@@ -311,13 +311,13 @@ def list_my_course_assessments(
             detail="You are not enrolled in this course.",
         )
 
-    configs = (
-        db.query(AssessmentConfig)
+    rows = (
+        db.query(AssessmentConfig, AssessmentSession)
         .join(AssessmentSession, AssessmentSession.assessment_config_id == AssessmentConfig.id)
         .filter(
             AssessmentConfig.course_id == course_id,
             AssessmentSession.user_s_id == current_user.id,
-            AssessmentSession.status.in_(["not_started", "in_progress"]),
+            AssessmentSession.status.in_(["not_started", "in_progress", "under_review"]),
         )
         .order_by(AssessmentConfig.release_time.desc())
         .all()
@@ -332,8 +332,10 @@ def list_my_course_assessments(
             main_question_num=config.main_question_num,
             follow_up_num=config.follow_up_num,
             due_time=config.due_time,
+            status=session.status,
+            completed_at=session.completed_at,
         )
-        for config in configs
+        for config, session in rows
     ]
 
     return items

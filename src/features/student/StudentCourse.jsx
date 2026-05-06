@@ -30,15 +30,29 @@ export default function StudentCourse() {
   );
 
   const upcomingAssessments = assessments
-    .filter((a) => new Date(a.due_time).getTime() > now)
+    .filter(
+      (a) =>
+        a.status !== "under_review" && new Date(a.due_time).getTime() > now,
+    )
     .sort(
       (a, b) => new Date(a.due_time).getTime() - new Date(b.due_time).getTime(),
+    );
+
+  const attemptedAssessments = assessments
+    .filter((a) => a.status === "under_review")
+    .sort(
+      (a, b) =>
+        new Date(b.completed_at ?? 0).getTime() -
+        new Date(a.completed_at ?? 0).getTime(),
     );
 
   const earliestDeadline =
     upcomingAssessments.length > 0
       ? formatDeadline(upcomingAssessments[0].due_time)
       : null;
+
+  const hasAnyAssessment =
+    upcomingAssessments.length > 0 || attemptedAssessments.length > 0;
 
   return (
     <>
@@ -66,131 +80,172 @@ export default function StudentCourse() {
           </h1>
         </div>
 
-        {assessments.length > 0 ? (
+        {hasAnyAssessment ? (
           <>
-            <div className="mb-8 flex items-end justify-between">
-              <div className="flex gap-4">
-                <button className="flex items-center gap-2 rounded-full bg-surface-container-highest px-4 py-2 text-xs font-bold text-primary">
-                  UPCOMING
-                </button>
-              </div>
+            {upcomingAssessments.length > 0 && (
+              <>
+                <div className="mb-8 flex items-end justify-between">
+                  <div className="flex gap-4">
+                    <button className="flex items-center gap-2 rounded-full bg-surface-container-highest px-4 py-2 text-xs font-bold text-primary">
+                      UPCOMING
+                    </button>
+                  </div>
 
-              <div className="text-right">
-                <p className="text-sm font-medium text-on-surface-variant">
-                  Next Deadline:
-                  <span className="font-bold text-error">
-                    {" "}
-                    {earliestDeadline}
-                  </span>
-                </p>
-              </div>
-            </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-on-surface-variant">
+                      Next Deadline:
+                      <span className="font-bold text-error">
+                        {" "}
+                        {earliestDeadline}
+                      </span>
+                    </p>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-12 gap-6">
-              {upcomingAssessments.map((assessment, index) => {
-                if (index === 0) {
-                  return (
-                    <div
-                      key={assessment.assessment_config_id}
-                      className="group col-span-12 cursor-pointer lg:col-span-8"
-                      onClick={() => {
-                        setIsOpen(true);
-                        setAssessmentConfigId(assessment.assessment_config_id);
-                      }}
-                    >
-                      <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8 transition-all hover:shadow-2xl hover:shadow-primary/5">
-                        <div className="absolute right-0 top-0 p-8">
-                          <span className="rounded-full bg-error/10 px-3 py-1 text-[10px] font-bold tracking-wider text-error">
-                            DUE SOON
-                          </span>
-                        </div>
-
-                        <div>
-                          <span
-                            className="material-symbols-outlined mb-2 text-4xl text-red-600"
-                            style={{ fontVariationSettings: '"FILL" 1' }}
-                          >
-                            breaking_news
-                          </span>
-
-                          <h2 className="mb-2 text-2xl font-bold text-on-surface">
-                            {assessment.title || "Title Not Available."}
-                          </h2>
-
-                          <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
-                            {assessment.description ||
-                              "Description not available."}
-                          </p>
-                        </div>
-
-                        <div className="mt-12 flex items-center justify-between">
-                          <div className="flex gap-8">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                                Duration
-                              </span>
-
-                              <span className="text-sm font-semibold text-on-surface">
-                                {assessment.total_time_minute} mins
+                <div className="grid grid-cols-12 gap-6">
+                  {upcomingAssessments.map((assessment, index) => {
+                    if (index === 0) {
+                      return (
+                        <div
+                          key={assessment.assessment_config_id}
+                          className="group col-span-12 cursor-pointer lg:col-span-8"
+                          onClick={() => {
+                            setIsOpen(true);
+                            setAssessmentConfigId(
+                              assessment.assessment_config_id,
+                            );
+                          }}
+                        >
+                          <div className="relative flex h-full flex-col justify-between overflow-hidden rounded-xl bg-surface-container-lowest p-8 transition-all hover:shadow-2xl hover:shadow-primary/5">
+                            <div className="absolute right-0 top-0 p-8">
+                              <span className="rounded-full bg-error/10 px-3 py-1 text-[10px] font-bold tracking-wider text-error">
+                                DUE SOON
                               </span>
                             </div>
 
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                                Questions
+                            <div>
+                              <span
+                                className="material-symbols-outlined mb-2 text-4xl text-red-600"
+                                style={{ fontVariationSettings: '"FILL" 1' }}
+                              >
+                                breaking_news
                               </span>
 
-                              <span className="text-sm font-semibold text-on-surface">
-                                {assessment.main_question_num} main •{" "}
-                                {assessment.follow_up_num} each
-                              </span>
+                              <h2 className="mb-2 text-2xl font-bold text-on-surface">
+                                {assessment.title || "Title Not Available."}
+                              </h2>
+
+                              <p className="max-w-md text-sm leading-relaxed text-on-surface-variant">
+                                {assessment.description ||
+                                  "Description not available."}
+                              </p>
                             </div>
 
-                            {/* Not showing weight for now  */}
+                            <div className="mt-12 flex items-center justify-between">
+                              <div className="flex gap-8">
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                                    Duration
+                                  </span>
 
-                            {/* <div className="flex flex-col">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                                Weight
+                                  <span className="text-sm font-semibold text-on-surface">
+                                    {assessment.total_time_minute} mins
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
+                                    Questions
+                                  </span>
+
+                                  <span className="text-sm font-semibold text-on-surface">
+                                    {assessment.main_question_num} main •{" "}
+                                    {assessment.follow_up_num} each
+                                  </span>
+                                </div>
+                              </div>
+
+                              <button className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-xs font-bold text-on-primary transition-transform group-hover:translate-x-1">
+                                START NOW
+                                <span className="material-symbols-outlined text-sm">
+                                  arrow_forward
+                                </span>
+                              </button>
+                            </div>
+
+                            <div className="absolute -bottom-10 -right-10 opacity-5 transition-opacity group-hover:opacity-10">
+                              <span className="material-symbols-outlined text-[200px]">
+                                history_edu
                               </span>
-                              <span className="text-sm font-semibold text-on-surface">
-                                10% Final Grade
-                              </span>
-                            </div> */}
+                            </div>
                           </div>
-
-                          <button className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-xs font-bold text-on-primary transition-transform group-hover:translate-x-1">
-                            START NOW
-                            <span className="material-symbols-outlined text-sm">
-                              arrow_forward
-                            </span>
-                          </button>
                         </div>
+                      );
+                    }
 
-                        <div className="absolute -bottom-10 -right-10 opacity-5 transition-opacity group-hover:opacity-10">
-                          <span className="material-symbols-outlined text-[200px]">
-                            history_edu
-                          </span>
+                    if (index === 1) {
+                      return (
+                        <div
+                          key={assessment.assessment_config_id}
+                          className="group col-span-12 cursor-pointer lg:col-span-4"
+                          onClick={() => {
+                            setIsOpen(true);
+                            setAssessmentConfigId(
+                              assessment.assessment_config_id,
+                            );
+                          }}
+                        >
+                          <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest px-6 py-8 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
+                            <div>
+                              <div className="mb-5 flex items-start justify-between">
+                                <span className="material-symbols-outlined text-2xl text-secondary">
+                                  database
+                                </span>
+
+                                <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
+                                  {formatDeadline(assessment.due_time)}
+                                </span>
+                              </div>
+
+                              <h3 className="mb-2 text-lg font-bold text-on-surface">
+                                {assessment.title || "Title Not Available."}
+                              </h3>
+
+                              <p className="text-xs leading-relaxed text-on-surface-variant">
+                                {assessment.description ||
+                                  "Description not available."}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
+                              <span className="material-symbols-outlined text-[15px]">
+                                schedule
+                              </span>
+                              {assessment.total_time_minute} mins
+                              <span className="mx-1"></span>
+                              {assessment.main_question_num} main •{" "}
+                              {assessment.follow_up_num} each
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  );
-                }
+                      );
+                    }
 
-                if (index === 1) {
-                  return (
-                    <div
-                      key={assessment.assessment_config_id}
-                      className="group col-span-12 cursor-pointer lg:col-span-4"
-                      onClick={() => {
-                        setIsOpen(true);
-                        setAssessmentConfigId(assessment.assessment_config_id);
-                      }}
-                    >
-                      <div className="flex h-full flex-col justify-between rounded-xl border border-transparent bg-surface-container-lowest px-6 py-8 transition-all hover:border-outline-variant/10 hover:shadow-xl hover:shadow-primary/5">
-                        <div>
-                          <div className="mb-5 flex items-start justify-between">
-                            <span className="material-symbols-outlined text-2xl text-secondary">
-                              database
+                    return (
+                      <div
+                        key={assessment.assessment_config_id}
+                        className="group col-span-12 cursor-pointer md:col-span-4 lg:col-span-3"
+                        onClick={() => {
+                          setIsOpen(true);
+                          setAssessmentConfigId(
+                            assessment.assessment_config_id,
+                          );
+                        }}
+                      >
+                        <div className="rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-lg">
+                          <div className="mb-2 flex items-start justify-between">
+                            <span className="material-symbols-outlined mb-4 text-primary">
+                              assignment
                             </span>
 
                             <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
@@ -198,15 +253,81 @@ export default function StudentCourse() {
                             </span>
                           </div>
 
-                          <h3 className="mb-2 text-lg font-bold text-on-surface">
+                          <h3 className="mb-1 font-bold text-on-surface">
                             {assessment.title || "Title Not Available."}
                           </h3>
 
-                          <p className="text-xs leading-relaxed text-on-surface-variant">
+                          <p className="mb-6 text-xs text-on-surface-variant">
                             {assessment.description ||
                               "Description not available."}
                           </p>
+
+                          <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
+                            <span className="material-symbols-outlined text-[15px]">
+                              schedule
+                            </span>
+                            {assessment.total_time_minute} mins
+                            <span className="mx-1"></span>
+                            {assessment.main_question_num} main •{" "}
+                            {assessment.follow_up_num} each
+                          </div>
                         </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+
+            {attemptedAssessments.length > 0 && (
+              <>
+                <div
+                  className={`mb-8 flex items-end justify-between ${
+                    upcomingAssessments.length > 0 ? "mt-16" : ""
+                  }`}
+                >
+                  <div className="flex gap-4">
+                    <button className="flex items-center gap-2 rounded-full bg-surface-container-highest px-4 py-2 text-xs font-bold text-primary">
+                      SUBMITTED
+                    </button>
+                  </div>
+
+                  <NavLink
+                    className="group inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-outline-variant transition-colors hover:text-primary"
+                    to="/student/previousAssessments"
+                  >
+                    View past assessments
+                    <span className="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">
+                      arrow_forward
+                    </span>
+                  </NavLink>
+                </div>
+
+                <div className="grid grid-cols-12 gap-6">
+                  {attemptedAssessments.map((assessment) => (
+                    <div
+                      key={assessment.assessment_config_id}
+                      className="col-span-12 md:col-span-4 lg:col-span-3"
+                    >
+                      <div className="h-full rounded-xl border border-transparent bg-surface-container-lowest p-6 opacity-90">
+                        <div className="mb-2 flex items-start justify-between">
+                          <span className="material-symbols-outlined mb-4 text-on-surface-variant">
+                            hourglass_top
+                          </span>
+
+                          <span className="rounded-full bg-tertiary-container/60 px-3 py-1 text-[10px] font-bold tracking-wider text-on-tertiary-container">
+                            UNDER REVIEW
+                          </span>
+                        </div>
+
+                        <h3 className="mb-1 font-bold text-on-surface">
+                          {assessment.title || "Title Not Available."}
+                        </h3>
+
+                        <p className="mb-6 text-xs text-on-surface-variant">
+                          {assessment.description ||
+                            "Description not available."}
+                        </p>
 
                         <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
                           <span className="material-symbols-outlined text-[15px]">
@@ -219,51 +340,10 @@ export default function StudentCourse() {
                         </div>
                       </div>
                     </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={assessment.assessment_config_id}
-                    className="group col-span-12 cursor-pointer md:col-span-4 lg:col-span-3"
-                    onClick={() => {
-                      setIsOpen(true);
-                      setAssessmentConfigId(assessment.assessment_config_id);
-                    }}
-                  >
-                    <div className="rounded-xl border border-transparent bg-surface-container-lowest p-6 transition-all hover:border-outline-variant/10 hover:shadow-lg">
-                      <div className="mb-2 flex items-start justify-between">
-                        <span className="material-symbols-outlined mb-4 text-primary">
-                          assignment
-                        </span>
-
-                        <span className="rounded bg-primary-container px-2 py-1 text-[10px] font-bold text-on-primary-container">
-                          {formatDeadline(assessment.due_time)}
-                        </span>
-                      </div>
-
-                      <h3 className="mb-1 font-bold text-on-surface">
-                        {assessment.title || "Title Not Available."}
-                      </h3>
-
-                      <p className="mb-6 text-xs text-on-surface-variant">
-                        {assessment.description || "Description not available."}
-                      </p>
-
-                      <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
-                        <span className="material-symbols-outlined text-[15px]">
-                          schedule
-                        </span>
-                        {assessment.total_time_minute} mins
-                        <span className="mx-1"></span>
-                        {assessment.main_question_num} main •{" "}
-                        {assessment.follow_up_num} each
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              </>
+            )}
           </>
         ) : (
           <div className="flex min-h-[420px] items-center justify-center">
