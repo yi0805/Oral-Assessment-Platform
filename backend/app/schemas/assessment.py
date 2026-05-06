@@ -102,6 +102,8 @@ class StudentCourseAssessmentOut(BaseModel):
     main_question_num: int | None = None
     follow_up_num: int | None = None
     due_time: datetime | None = None
+    status: str
+    completed_at: datetime | None = None
 
 class StudentNextQuestionOut(BaseModel):
     question_text: str
