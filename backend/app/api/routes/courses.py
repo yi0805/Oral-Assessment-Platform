@@ -475,9 +475,11 @@ def export_results_csv(
         )
 
     rows = (
-        db.query(User.upi, SessionFeedback.comments, SessionFeedback.final_grade)
+        db.query(User.upi, SessionFeedback.comments, SessionFeedback.final_grade, AISummary.suggested_grade)
+        .select_from(User)
         .join(AssessmentSession, AssessmentSession.user_s_id == User.id)
         .join(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
+        .join(AISummary, AISummary.session_id == AssessmentSession.id)
         .filter(
             AssessmentSession.assessment_config_id == assessment_config_id,
             AssessmentSession.status == "released",
@@ -489,10 +491,10 @@ def export_results_csv(
 
     output = StringIO()
     writer = csv.writer(output)
-    writer.writerow(["UPI", "Comments", "Final_Grade"])
+    writer.writerow(["UPI", "Comments", "Final_Grade", "AI_grade"])
 
-    for upi, comments, final_grade in rows:
-        writer.writerow([upi, comments or "", final_grade])
+    for upi, comments, final_grade, AI_grade in rows:
+        writer.writerow([upi, comments or "", final_grade, AI_grade])
 
     output.seek(0)
 
