@@ -8,7 +8,7 @@ import Spinner from "../../ui/Spinner";
 import InstructorFeedback from "../../ui/InstructorFeedback";
 import CourseSelector from "../../ui/CourseSelector";
 
-function StudentPreviousAssessment() {
+function StudentGradedAssessment() {
   const [selectedCourse, setSelectedCourse] = useState("");
 
   const { courses, isLoading: coursesLoading } = useCourses();
@@ -91,7 +91,7 @@ function StudentPreviousAssessment() {
             </NavLink>
 
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
-              Previous Assessments
+              Graded Assessments
             </h1>
 
             <p className="mt-2 text-sm text-on-surface-variant">
@@ -254,4 +254,4 @@ function StudentPreviousAssessment() {
   );
 }
 
-export default StudentPreviousAssessment;
+export default StudentGradedAssessment;
