@@ -5,7 +5,7 @@ import { Toaster } from "react-hot-toast";
 
 import AppLayout from "./ui/AppLayout";
 import Home from "./pages/Home";
-import StudentPreviousAssessment from "./features/student/StudentPreviousAssessment";
+import StudentGradedAssessment from "./features/student/StudentGradedAssessment";
 import PageNotFound from "./pages/PageNotFound";
 import Login from "./pages/Login";
 import StudentCourse from "./features/student/StudentCourse";
@@ -40,8 +40,8 @@ function App() {
 
               <Route path="student/:courseId" element={<StudentCourse />} />
               <Route
-                path="student/previousAssessments"
-                element={<StudentPreviousAssessment />}
+                path="student/gradedAssessments"
+                element={<StudentGradedAssessment />}
               />
 
               <Route

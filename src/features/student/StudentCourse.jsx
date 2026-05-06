@@ -294,7 +294,7 @@ export default function StudentCourse() {
 
                   <NavLink
                     className="group inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-outline-variant transition-colors hover:text-primary"
-                    to="/student/previousAssessments"
+                    to="/student/gradedAssessments"
                   >
                     View past assessments
                     <span className="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">

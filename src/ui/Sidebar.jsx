@@ -61,7 +61,7 @@ function Sidebar() {
               isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
               : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
           }
-            to="/student/previousAssessments"
+            to="/student/gradedAssessments"
           >
             <span
               className="material-symbols-outlined text-[20px]"
@@ -69,7 +69,7 @@ function Sidebar() {
             >
               history
             </span>
-            <span>Previous Assessments</span>
+            <span>Graded Assessments</span>
           </NavLink>
         )}
         {user.role === "instructor" && (
