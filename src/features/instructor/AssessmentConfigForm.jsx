@@ -24,7 +24,7 @@ export default function AssessmentConfigForm({
   dueTime,
   onDueTimeChange,
   disabled = false,
-  disableCourseSelect = false,
+  hideCourseSelect = false,
   onlyDueDate = false,
   releaseHelperText = "Leave blank to default to now → 30 days from now.",
 }) {
@@ -56,6 +56,7 @@ export default function AssessmentConfigForm({
       </h2>
 
       <form className="space-y-6">
+        {!hideCourseSelect && (
         <div className="space-y-2">
           <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
             Select Course
@@ -65,7 +66,6 @@ export default function AssessmentConfigForm({
             <select
               className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
               value={courseId}
-              disabled={disableCourseSelect}
               onChange={(e) => onCourseIdChange(e.target.value)}
             >
               {courses.map((c) => (
@@ -84,6 +84,7 @@ export default function AssessmentConfigForm({
             </span>
           </div>
         </div>
+        )}
 
         <div className="space-y-2">
           <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
@@ -95,7 +96,7 @@ export default function AssessmentConfigForm({
             placeholder="e.g. A1 Intro to Python"
             type="text"
             value={assessmentName}
-            disabled={disabled || onlyDueDate}
+            disabled={disabled}
             onChange={(e) => onAssessmentNameChange(e.target.value)}
             onBlur={() => markTouched("assessmentName")}
           />

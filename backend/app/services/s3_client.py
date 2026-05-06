@@ -65,6 +65,29 @@ def download_file(storage_key: str) -> bytes:
         raise RuntimeError(f"Could not download file from S3: {exc}") from exc
 
 
+def copy_object(source_key: str, dest_key: str) -> str:
+
+    client = _get_s3_client()
+
+    try:
+        client.copy_object(
+            Bucket=settings.s3_bucket_name,
+            Key=dest_key,
+            CopySource={"Bucket": settings.s3_bucket_name, "Key": source_key},
+        )
+
+    except (NoCredentialsError, BotoCoreError, ClientError) as exc:
+        logger.exception("[S3] Copy failed: %s -> %s", source_key, dest_key)
+        raise RuntimeError(f"Could not copy file in S3: {exc}") from exc
+
+    logger.info(
+        "[S3] Copied s3://%s/%s -> s3://%s/%s",
+        settings.s3_bucket_name, source_key,
+        settings.s3_bucket_name, dest_key,
+    )
+    return dest_key
+
+
 def delete_file(storage_key: str) -> None:
 
     client = _get_s3_client()

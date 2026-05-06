@@ -156,9 +156,25 @@ export default function RubricEditor({ rows, onRowsChange, disabled = false }) {
               }`}
             >
               <div className="flex items-start gap-4">
-                <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+                <div className="mt-1 flex shrink-0 flex-col items-center gap-1">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  {!disabled && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveRow(index)}
+                      disabled={rows.length === 1}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-outline transition-all hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-20 md:opacity-0 md:group-hover:opacity-100"
+                      aria-label="Remove criterion"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        delete
+                      </span>
+                    </button>
+                  )}
+                </div>
 
                 <div className="min-w-0 flex-1 space-y-3">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
@@ -229,20 +245,6 @@ export default function RubricEditor({ rows, onRowsChange, disabled = false }) {
                     )}
                   </div>
                 </div>
-
-                {!disabled && (
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveRow(index)}
-                    disabled={rows.length === 1}
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-outline transition-all hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-20 md:opacity-0 md:group-hover:opacity-100"
-                    aria-label="Remove criterion"
-                  >
-                    <span className="material-symbols-outlined text-lg">
-                      delete
-                    </span>
-                  </button>
-                )}
               </div>
             </div>
           );

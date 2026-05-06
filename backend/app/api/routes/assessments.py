@@ -1,19 +1,28 @@
-from uuid import UUID
+import logging
+from uuid import UUID, uuid4
 from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
+from app.services import s3_client
 
-from app.models import AssessmentConfig, AssessmentSession, CourseEnrollment, User, Question, QuestionPool
+from app.models import (
+    AssessmentConfig, AssessmentSession, CourseEnrollment, User,
+    Question, QuestionPool, Rubric, Material, MaterialChunk,
+)
 from app.schemas import (
     ReleaseResponse,
     AssessmentConfigDetailOut,
     AssessmentConfigUpdate,
     AssessmentConfigSummary,
+    AssessmentCopyRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -233,11 +242,11 @@ def update_assessment(
     update_data = payload.model_dump(exclude_unset=True)
 
     if config.status != "draft":
-        disallowed = set(update_data.keys()) - {"due_time"}
+        disallowed = set(update_data.keys()) - {"due_time", "title"}
         if disallowed:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Only the due date can be updated for a published assessment.",
+                detail="Only the due date and the title can be updated for a published assessment.",
             )
 
     if "main_question_num" in update_data and update_data["main_question_num"] is not None:
@@ -319,3 +328,217 @@ def delete_assessment(
         raise HTTPException(status_code=500, detail="Database deletion failed")
 
     return {"message": "Assessment deleted successfully."}
+
+
+# Copy assessment
+
+@router.post(
+    "/courses/{course_id}/assessments/{assessment_config_id}/copy",
+    response_model=AssessmentConfigSummary,
+    summary="Copy an assessment to the same or a different course",
+)
+def copy_assessment(
+    course_id: UUID,
+    assessment_config_id: UUID,
+    payload: AssessmentCopyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    # Verify instructor is enrolled in the source course
+    source_enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not source_enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for the source course.")
+
+    # Verify instructor is enrolled in the target course
+    target_enrollment = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == payload.target_course_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
+        .first()
+    )
+    if not target_enrollment:
+        raise HTTPException(status_code=403, detail="You are not an instructor for the target course.")
+
+    # Load source assessment
+    source_config = (
+        db.query(AssessmentConfig)
+        .filter(
+            AssessmentConfig.id == assessment_config_id,
+            AssessmentConfig.course_id == course_id,
+        )
+        .first()
+    )
+    if not source_config:
+        raise HTTPException(status_code=404, detail="Assessment not found.")
+
+    source_rubric = db.query(Rubric).filter(Rubric.id == source_config.rubric_id).first()
+    if not source_rubric:
+        raise HTTPException(status_code=404, detail="Source rubric not found.")
+
+    source_pool = (
+        db.query(QuestionPool)
+        .filter(QuestionPool.assessment_config_id == source_config.id)
+        .first()
+    )
+    if not source_pool:
+        raise HTTPException(status_code=422, detail="Source assessment has no question pool to copy.")
+
+    new_title = payload.title if payload.title else f"Copy of {source_config.title}"
+
+    is_cross_course = payload.target_course_id != course_id
+    new_material_id: UUID | None = None
+    new_storage_key: str | None = None
+
+    pool_material_id = source_pool.material_id
+
+    if is_cross_course:
+        source_material = (
+            db.query(Material).filter(Material.id == source_pool.material_id).first()
+        )
+
+        if not source_material:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Source material no longer exists.",
+            )
+
+        new_material_id = uuid4()
+        new_storage_key = s3_client.generate_key(
+            payload.target_course_id, new_material_id, source_material.filename
+        )
+
+        try:
+            s3_client.copy_object(source_material.storage_key, new_storage_key)
+
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Storage copy failed: {exc}",
+            ) from exc
+
+        pool_material_id = new_material_id
+
+    # Orphan cleanup: if the S3 copy succeeded but DB writes fail, drop the new
+    def _cleanup_orphan_storage() -> None:
+        if new_storage_key is None:
+            return
+        try:
+            s3_client.delete_file(new_storage_key)
+        except Exception:
+            logger.exception(
+                "Orphan S3 object after copy_assessment rollback; "
+                "manual cleanup needed: storage_key=%s",
+                new_storage_key,
+            )
+
+    try:
+        if is_cross_course:
+            new_material = Material(
+                id=new_material_id,
+                course_id=payload.target_course_id,
+                filename=source_material.filename,
+                mime_type=source_material.mime_type,
+                storage_key=new_storage_key,
+                material_category=source_material.material_category,
+            )
+            db.add(new_material)
+
+            source_chunks = (
+                db.query(MaterialChunk)
+                .filter(MaterialChunk.material_id == source_material.id)
+                .order_by(MaterialChunk.chunk_index)
+                .all()
+            )
+
+            db.add_all([
+                MaterialChunk(
+                    material_id=new_material_id,
+                    chunk_index=ch.chunk_index,
+                    chunk_text=ch.chunk_text,
+                    embedding=ch.embedding,
+                )
+                for ch in source_chunks
+            ])
+
+        # Copy rubric (independent from original)
+        new_rubric = Rubric(
+            course_id=payload.target_course_id,
+            total_points=source_rubric.total_points,
+            criteria_data=source_rubric.criteria_data,
+        )
+        db.add(new_rubric)
+        db.flush()
+
+        # Copy assessment config (reset status and dates)
+        new_config = AssessmentConfig(
+            course_id=payload.target_course_id,
+            title=new_title,
+            description=source_config.description,
+            rubric_id=new_rubric.id,
+            total_time_minute=source_config.total_time_minute,
+            main_question_num=source_config.main_question_num,
+            follow_up_num=source_config.follow_up_num,
+            release_time=None,
+            due_time=None,
+            status="draft",
+        )
+        db.add(new_config)
+        db.flush()
+
+        # Copy question pool and its questions
+        new_pool = QuestionPool(
+            assessment_config_id=new_config.id,
+            material_id=pool_material_id,
+            status="draft",
+        )
+        db.add(new_pool)
+        db.flush()
+
+        source_questions = (
+            db.query(Question)
+            .filter(Question.question_pool_id == source_pool.id)
+            .order_by(Question.question_index)
+            .all()
+        )
+        db.add_all([
+            Question(
+                question_pool_id=new_pool.id,
+                question_text=q.question_text,
+                question_index=q.question_index,
+            )
+            for q in source_questions
+        ])
+
+        db.commit()
+        db.refresh(new_config)
+
+    except IntegrityError as exc:
+        db.rollback()
+        logger.warning("copy_assessment integrity violation", exc_info=True)
+        _cleanup_orphan_storage()
+        
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Copy violates a database constraint.",
+        ) from exc
+
+    except Exception as exc:
+        db.rollback()
+        logger.exception("copy_assessment failed")
+        _cleanup_orphan_storage()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to copy assessment.",
+        ) from exc
+
+    return new_config

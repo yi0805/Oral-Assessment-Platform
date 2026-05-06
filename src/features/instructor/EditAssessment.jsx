@@ -1,18 +1,17 @@
 import { useEffect, useState } from "react";
-import { NavLink } from "react-router";
 import toast from "react-hot-toast";
 
-import { useCourses } from "../../hooks/useCourses";
 import { useCourseAssessments } from "./useCourseAssessments";
 import { useAssessmentDetail } from "./useAssessmentDetail";
 import { useUpdateAssessment } from "./useUpdateAssessment";
 import { usePublishAssessment } from "./usePublishAssessment";
 import { useDeleteAssessment } from "./useDeleteAssessment";
+import { useCopyAssessment } from "./useCopyAssessment";
 import { useRubric } from "./useRubric";
 import { useUpdateRubric } from "./useUpdateRubric";
 
-import Spinner from "../../ui/Spinner";
 import ConfirmModal from "../../ui/ConfirmModal";
+import CopyAssessmentModal from "./CopyAssessmentModal";
 import AssessmentConfigForm from "./AssessmentConfigForm";
 import RubricEditor from "./RubricEditor";
 import QuestionEditor from "./QuestionEditor";
@@ -42,8 +41,9 @@ function snapshotKey({ form, rubricRows }) {
   });
 }
 
-export default function EditAssessment() {
-  const [courseId, setCourseId] = useState("");
+// Parent (AssessmentManagement) passes key={courseId}, so this component
+// remounts on course change — no manual state reset needed here.
+export default function EditPanel({ courseId, courses, onSwitchCourse }) {
   const [selectedAssessmentId, setSelectedAssessmentId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -53,11 +53,11 @@ export default function EditAssessment() {
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [rubricRows, setRubricRows] = useState([]);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [initializedFor, setInitializedFor] = useState(null);
 
-  const { courses, isLoading: isCoursesLoading } = useCourses();
   const { assessments, isLoading: isAssessmentsLoading } =
     useCourseAssessments(courseId);
   const { assessment, isLoading: isDetailLoading } = useAssessmentDetail(
@@ -67,31 +67,14 @@ export default function EditAssessment() {
   const { updateAssessment, isPending: isSaving } = useUpdateAssessment();
   const { publishAssessment, isPending: isPublishing } = usePublishAssessment();
   const { deleteAssessment, isDeleting } = useDeleteAssessment();
+  const { copyAssessment, isCopying } = useCopyAssessment();
   const { rubric, isLoading: isRubricLoading } =
     useRubric(selectedAssessmentId);
   const { updateRubric, isPending: isSavingRubric } = useUpdateRubric();
 
   useEffect(() => {
-    if (courses.length > 0 && !courseId) {
-      setCourseId(courses[0].id);
-    }
-  }, [courses, courseId]);
-
-  useEffect(() => {
-    setSelectedAssessmentId("");
-    setAssessmentName("");
-    setNumQuestions("");
-    setAssessmentTime("");
-    setReleaseTime(null);
-    setDueTime(null);
-    setSearchQuery("");
-    setRubricRows([]);
-    setInitialSnapshot(null);
-    setInitializedFor(null);
-  }, [courseId]);
-
-  useEffect(() => {
     setConfirmingDelete(false);
+    setCopyModalOpen(false);
   }, [selectedAssessmentId]);
 
   useEffect(() => {
@@ -125,9 +108,6 @@ export default function EditAssessment() {
     setInitializedFor(selectedAssessmentId);
   }, [assessment, rubric, selectedAssessmentId, initializedFor]);
 
-  if (isCoursesLoading) return <Spinner />;
-
-  const hasCourses = courses.length > 0;
   const filteredAssessments = assessments.filter((a) =>
     a.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
@@ -160,7 +140,7 @@ export default function EditAssessment() {
     isDirty &&
     rubricValid &&
     !isSavingRubric;
-  const canRepublish = formEnabled;
+  const canUpdatePublished = formEnabled;
 
   async function handleSave() {
     if (!canSave) return;
@@ -225,13 +205,30 @@ export default function EditAssessment() {
     }
   }
 
-  function handleRepublish() {
-    if (!canRepublish) return;
+  function handleUpdatePublished() {
+    if (!canUpdatePublished) return;
     updateAssessment({
       courseId,
       assessmentConfigId: selectedAssessmentId,
-      payload: { due_time: dueTime?.toISOString() ?? null },
+      payload: {
+        title: assessmentName,
+        due_time: dueTime?.toISOString() ?? null,
+      },
     });
+  }
+
+  async function handleCopy({ targetCourseId, title }) {
+    await copyAssessment({
+      courseId,
+      assessmentConfigId: selectedAssessmentId,
+      targetCourseId,
+      title,
+    });
+    setCopyModalOpen(false);
+
+    if (targetCourseId !== courseId) {
+      onSwitchCourse?.(targetCourseId);
+    }
   }
 
   async function handleDelete() {
@@ -244,7 +241,7 @@ export default function EditAssessment() {
   }
 
   return (
-    <div className="min-h-screen">
+    <>
       {confirmingDelete && (
         <ConfirmModal
           title="Delete Assessment"
@@ -255,280 +252,284 @@ export default function EditAssessment() {
           onCancel={() => setConfirmingDelete(false)}
         />
       )}
-      <main className="ml-64 px-10 pb-12 pt-24">
-        <div className="mb-10">
-          <NavLink
-            className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
-            to="/home"
-          >
-            <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
-              arrow_back
-            </span>
-            <span className="font-body uppercase tracking-widest">
-              Back to Courses
-            </span>
-          </NavLink>
 
-          <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
-            Edit Assessment
-          </h1>
+      {copyModalOpen && (
+        <CopyAssessmentModal
+          assessment={assessment}
+          courses={courses}
+          currentCourseId={courseId}
+          isCopying={isCopying}
+          onConfirm={handleCopy}
+          onCancel={() => setCopyModalOpen(false)}
+        />
+      )}
 
-          <p className="mt-2 text-sm text-on-surface-variant">
-            Select an assessment and update its details.
-          </p>
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 space-y-6 lg:col-span-6">
+          <AssessmentConfigForm
+            courses={courses}
+            courseId={courseId}
+            onCourseIdChange={() => {}}
+            hideCourseSelect={true}
+            assessmentName={assessmentName}
+            onAssessmentNameChange={setAssessmentName}
+            numQuestions={numQuestions}
+            onNumQuestionsChange={setNumQuestions}
+            assessmentTime={assessmentTime}
+            onAssessmentTimeChange={setAssessmentTime}
+            releaseTime={releaseTime}
+            onReleaseTimeChange={setReleaseTime}
+            dueTime={dueTime}
+            onDueTimeChange={setDueTime}
+            disabled={!formEnabled}
+            onlyDueDate={isPublished}
+            releaseHelperText=""
+          />
         </div>
 
-        {!hasCourses ? (
-          <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-12 text-center">
-            <span
-              className="material-symbols-outlined mb-2 text-3xl text-outline"
-              style={{ verticalAlign: "middle" }}
-            >
-              menu_book
-            </span>
-            <p className="text-base font-bold text-on-surface">
-              No courses yet
-            </p>
-            <p className="mt-1 text-xs text-on-surface-variant">
-              Create a course first to edit assessments.
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-12 gap-6">
-            <div className="col-span-12 space-y-6 lg:col-span-6">
-              <AssessmentConfigForm
-                courses={courses}
-                courseId={courseId}
-                onCourseIdChange={setCourseId}
-                assessmentName={assessmentName}
-                onAssessmentNameChange={setAssessmentName}
-                numQuestions={numQuestions}
-                onNumQuestionsChange={setNumQuestions}
-                assessmentTime={assessmentTime}
-                onAssessmentTimeChange={setAssessmentTime}
-                releaseTime={releaseTime}
-                onReleaseTimeChange={setReleaseTime}
-                dueTime={dueTime}
-                onDueTimeChange={setDueTime}
-                disabled={!formEnabled}
-                onlyDueDate={isPublished}
-                releaseHelperText=""
-              />
+        <div className="col-span-12 lg:col-span-6">
+          <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+            <div className="mb-6 flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <span
+                  className="material-symbols-outlined text-xl"
+                  style={{ verticalAlign: "middle" }}
+                >
+                  edit_note
+                </span>
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-on-surface">
+                  Select Assessment
+                </h3>
+                <p className="mt-1 max-w-md text-xs text-on-surface-variant">
+                  Choose an assessment to edit. Both draft and published
+                  assessments are shown.
+                </p>
+              </div>
             </div>
 
-            <div className="col-span-12 lg:col-span-6">
-              <section className="h-full rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-                <div className="mb-6 flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <span
-                      className="material-symbols-outlined text-xl"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      edit_note
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-on-surface">
-                      Select Assessment
-                    </h3>
-                    <p className="mt-1 max-w-md text-xs text-on-surface-variant">
-                      Choose an assessment to edit. Both draft and published
-                      assessments are shown.
-                    </p>
-                  </div>
-                </div>
+            {isAssessmentsLoading ? (
+              <p className="px-1 py-3 text-sm text-outline">
+                Loading assessments…
+              </p>
+            ) : assessments.length === 0 ? (
+              <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-8 text-center">
+                <span
+                  className="material-symbols-outlined mb-2 text-3xl text-outline"
+                  style={{ verticalAlign: "middle" }}
+                >
+                  assignment
+                </span>
+                <p className="text-sm font-bold text-on-surface">
+                  No assessments yet
+                </p>
+                <p className="mt-1 text-xs text-on-surface-variant">
+                  Generate an assessment for this course first.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <input
+                  className="w-full rounded-xl border-none bg-surface-container-low px-4 py-2.5 text-sm text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+                  placeholder="Search assessments…"
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
 
-                {isAssessmentsLoading ? (
-                  <p className="px-1 py-3 text-sm text-outline">
-                    Loading assessments…
+                {filteredAssessments.length === 0 ? (
+                  <p className="px-1 py-3 text-center text-xs text-outline">
+                    No assessments match &ldquo;{searchQuery}&rdquo;
                   </p>
-                ) : assessments.length === 0 ? (
-                  <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-8 text-center">
-                    <span
-                      className="material-symbols-outlined mb-2 text-3xl text-outline"
-                      style={{ verticalAlign: "middle" }}
-                    >
-                      assignment
-                    </span>
-                    <p className="text-sm font-bold text-on-surface">
-                      No assessments yet
-                    </p>
-                    <p className="mt-1 text-xs text-on-surface-variant">
-                      Generate an assessment for this course first.
-                    </p>
-                  </div>
                 ) : (
-                  <div className="space-y-3">
-                    <input
-                      className="w-full rounded-xl border-none bg-surface-container-low px-4 py-2.5 text-sm text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20"
-                      placeholder="Search assessments…"
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-
-                    {filteredAssessments.length === 0 ? (
-                      <p className="px-1 py-3 text-center text-xs text-outline">
-                        No assessments match &ldquo;{searchQuery}&rdquo;
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {filteredAssessments.map((a) => {
-                          const isSelected = a.id === selectedAssessmentId;
-                          return (
-                            <button
-                              key={a.id}
-                              type="button"
-                              onClick={() => setSelectedAssessmentId(a.id)}
-                              className={`flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all ${
-                                isSelected
-                                  ? "border-primary/30 bg-primary/5 ring-2 ring-primary/20"
-                                  : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/40"
-                              }`}
-                            >
-                              <span className="text-sm font-semibold text-on-surface">
-                                {a.title}
-                              </span>
-                              <span
-                                className={`ml-2 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                                  a.status === "published"
-                                    ? "bg-primary/10 text-primary"
-                                    : "bg-surface-container text-on-surface-variant"
-                                }`}
-                              >
-                                {a.status === "published"
-                                  ? "Published"
-                                  : "Draft"}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {isDetailLoading && selectedAssessmentId && (
-                  <p className="mt-4 px-1 text-xs text-outline">
-                    Loading details…
-                  </p>
-                )}
-              </section>
-            </div>
-
-            {selectedAssessmentId && !isDetailLoading && !isRubricLoading && (
-              <div className="col-span-12">
-                <RubricEditor
-                  rows={rubricRows}
-                  onRowsChange={setRubricRows}
-                  disabled={!formEnabled || isPublished}
-                />
-              </div>
-            )}
-
-            {selectedAssessmentId && !isDetailLoading && !isPublished && (
-              <div className="col-span-12">
-                <QuestionEditor
-                  assessmentConfigId={selectedAssessmentId}
-                  mainQuestionNum={Number(numQuestions) || 0}
-                  disabled={!formEnabled}
-                  onQuestionAdded={(newPoolSize) => {
-                    const current = Number(numQuestions);
-                    if (
-                      current === newPoolSize - 1 &&
-                      newPoolSize <= MAX_QUESTIONS
-                    ) {
-                      setNumQuestions(String(newPoolSize));
-                      toast.success(
-                        `Question count updated to ${newPoolSize}.`,
-                      );
-                    }
-                  }}
-                />
-              </div>
-            )}
-
-            <div className="col-span-12">
-              <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-primary">
-                      {isPublished ? "Republish Assessment" : "Save Changes"}
-                      {isDirty && !isPublished && (
-                        <span className="ml-2 text-xs font-medium text-on-surface-variant">
-                          • Unsaved changes
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[11px] text-on-surface-variant">
-                      {!selectedAssessmentId
-                        ? "Select an assessment above to begin editing."
-                        : isPublished
-                          ? "Update the due date and republish to students."
-                          : "Save your changes after changing the assesment parameters then publish it to make it visible to students."}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {isPublished ? (
-                    <button
-                      className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={!canRepublish || isSaving}
-                      onClick={handleRepublish}
-                    >
-                      {isSaving ? "Saving…" : "Republish Assessment"}
-                    </button>
-                  ) : (
-                    <>
-                      {selectedAssessmentId && (
-                        <>
-                          <button
-                            type="button"
-                            aria-label="Delete assessment"
-                            title="Delete assessment"
-                            className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
-                            disabled={isSaving || isPublishing}
-                            onClick={() => setConfirmingDelete(true)}
+                  <div className="space-y-2">
+                    {filteredAssessments.map((a) => {
+                      const isSelected = a.id === selectedAssessmentId;
+                      return (
+                        <button
+                          key={a.id}
+                          type="button"
+                          onClick={() => setSelectedAssessmentId(a.id)}
+                          className={`flex w-full items-center justify-between rounded-xl border px-4 py-3.5 text-left transition-all ${
+                            isSelected
+                              ? "border-primary/30 bg-primary/5 ring-2 ring-primary/20"
+                              : "border-outline-variant/15 bg-surface-container-low hover:border-outline-variant/40"
+                          }`}
+                        >
+                          <span className="text-sm font-semibold text-on-surface">
+                            {a.title}
+                          </span>
+                          <span
+                            className={`ml-2 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              a.status === "published"
+                                ? "bg-primary/10 text-primary"
+                                : "bg-surface-container text-on-surface-variant"
+                            }`}
                           >
-                            <span
-                              className="material-symbols-outlined text-xl"
-                              style={{ verticalAlign: "middle" }}
-                            >
-                              delete
-                            </span>
-                          </button>
-
-                          <div
-                            aria-hidden="true"
-                            className="mx-1 h-8 w-px bg-outline-variant/30"
-                          />
-                        </>
-                      )}
-
-                      <button
-                        className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={isPublishing || isSaving}
-                        onClick={handlePublish}
-                      >
-                        {isPublishing ? "Publishing…" : "Publish Assessment"}
-                      </button>
-
-                      <button
-                        className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={!canSave || isSaving || isPublishing}
-                        onClick={handleSave}
-                      >
-                        {isSaving ? "Saving…" : "Save Assessment"}
-                      </button>
-                    </>
-                  )}
-                </div>
+                            {a.status === "published" ? "Published" : "Draft"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
+
+            {isDetailLoading && selectedAssessmentId && (
+              <p className="mt-4 px-1 text-xs text-outline">Loading details…</p>
+            )}
+          </section>
+        </div>
+
+        {selectedAssessmentId && !isDetailLoading && !isRubricLoading && (
+          <div className="col-span-12">
+            <RubricEditor
+              rows={rubricRows}
+              onRowsChange={setRubricRows}
+              disabled={!formEnabled || isPublished}
+            />
           </div>
         )}
-      </main>
-    </div>
+
+        {selectedAssessmentId && !isDetailLoading && !isPublished && (
+          <div className="col-span-12">
+            <QuestionEditor
+              assessmentConfigId={selectedAssessmentId}
+              mainQuestionNum={Number(numQuestions) || 0}
+              disabled={!formEnabled}
+              onQuestionAdded={(newPoolSize) => {
+                const current = Number(numQuestions);
+                if (
+                  current === newPoolSize - 1 &&
+                  newPoolSize <= MAX_QUESTIONS
+                ) {
+                  setNumQuestions(String(newPoolSize));
+                  toast.success(`Question count updated to ${newPoolSize}.`);
+                }
+              }}
+            />
+          </div>
+        )}
+
+        <div className="col-span-12">
+          <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="text-sm font-bold text-primary">
+                  {!selectedAssessmentId
+                    ? "Start Editing"
+                    : isPublished
+                      ? "Update Published Assessment"
+                      : "Publish Draft Assessment"}
+
+                  {isDirty && !isPublished && selectedAssessmentId && (
+                    <span className="ml-2 text-xs font-medium text-on-surface-variant">
+                      • Unsaved changes
+                    </span>
+                  )}
+                </p>
+
+                <p className="text-[11px] text-on-surface-variant">
+                  {!selectedAssessmentId
+                    ? "Select an assessment above to begin editing."
+                    : isPublished
+                      ? "Copy published assesments and update name and due date of published assessments."
+                      : "Change assessment parameters, copy and delete assessments and publish to students."}
+                </p>
+              </div>
+            </div>
+
+            {selectedAssessmentId && (
+              <div className="flex items-center gap-3">
+                {isPublished ? (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Copy assessment"
+                      title="Copy assessment"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isCopying}
+                      onClick={() => setCopyModalOpen(true)}
+                    >
+                      <span
+                        className="material-symbols-outlined text-xl"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        content_copy
+                      </span>
+                    </button>
+
+                    <button
+                      className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!canUpdatePublished || isSaving}
+                      onClick={handleUpdatePublished}
+                    >
+                      {isSaving ? "Saving…" : "Update"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Delete assessment"
+                      title="Delete assessment"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isSaving || isPublishing || isCopying}
+                      onClick={() => setConfirmingDelete(true)}
+                    >
+                      <span
+                        className="material-symbols-outlined text-xl"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        delete
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      aria-label="Copy assessment"
+                      title="Copy assessment"
+                      className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isSaving || isPublishing || isCopying}
+                      onClick={() => setCopyModalOpen(true)}
+                    >
+                      <span
+                        className="material-symbols-outlined text-xl"
+                        style={{ verticalAlign: "middle" }}
+                      >
+                        content_copy
+                      </span>
+                    </button>
+
+                    <div
+                      aria-hidden="true"
+                      className="mx-1 h-8 w-px bg-outline-variant/30"
+                    />
+
+                    <button
+                      className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isPublishing || isSaving}
+                      onClick={handlePublish}
+                    >
+                      {isPublishing ? "Publishing…" : "Publish"}
+                    </button>
+
+                    <button
+                      className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={!canSave || isSaving || isPublishing}
+                      onClick={handleSave}
+                    >
+                      {isSaving ? "Saving…" : "Save"}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
