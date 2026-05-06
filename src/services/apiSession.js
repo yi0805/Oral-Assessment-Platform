@@ -112,3 +112,11 @@ export async function completeSession(sessionId) {
   const response = await api.post(`/sessions/${sessionId}/complete`);
   return response.data;
 }
+
+
+export async function unpublishGrade(sessionId, studentId){
+  const response = await api.put(
+    `/sessions/${sessionId}/${studentId}/unpublish/session`,
+  );
+  return response.data;
+}

@@ -120,6 +120,48 @@ def release_all_results(
     return {"message": "All results released successfully"}
 
 
+@router.put(
+    "/sessions/{session_id}/{student_id}/unpublish/session",
+    summary="Unpublish one result"
+)
+def unpublish_result(
+    session_id: UUID,
+    student_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor)
+):
+    sess = _get_session_or_404(db, session_id, student_id)
+
+    if sess.status != "released":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"This session's results is still {sess.status}. "
+            ),
+        )
+
+    feedback = (
+        db.query(SessionFeedback)
+        .filter(SessionFeedback.session_id == session_id)
+        .first()
+    )
+
+    if feedback.status != "published":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"This feedback is still {feedback.status} "
+            ),
+        )
+
+    feedback.status = "draft"
+    sess.status = "under_review"
+
+    db.commit()
+
+    return {"message": f"Result unpublished successfully."}
+
+
 # Update grade
 
 @router.put(

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router";
 import { useGrading } from "../features/instructor/useGrading";
 import { useReleaseResult } from "../features/instructor/useReleaseResult";
 import { useApproveAiGrade } from "../features/instructor/useApproveAiGrade";
+import { useUnpublish } from "../features/instructor/useUnpublish";
 
 function DashboardTable({
   filteredStudents,
@@ -17,6 +18,7 @@ function DashboardTable({
 
   const { updateGrade } = useGrading();
   const { releaseResult } = useReleaseResult();
+  const { unpublish } = useUnpublish();
   const { approveAiGrade, isPending: isApproving } = useApproveAiGrade();
 
   const [approvedAiMap, setApprovedAiMap] = useState({});
@@ -61,6 +63,10 @@ function DashboardTable({
 
   function handleRelease(sessionId, studentId) {
     releaseResult({ sessionId, studentId });
+  }
+
+    function handleUnpublish(sessionId, studentId) {
+    unpublish({sessionId, studentId});
   }
   
   return (
@@ -118,8 +124,11 @@ function DashboardTable({
                           <input
                             className="peer sr-only"
                             type="checkbox"
-                            checked={true}
-                            disabled={true}
+                            checked={isPublished}
+                            disabled={!isPublished}
+                            onChange={() => {
+                              handleUnpublish(student.session_id, student.student_id);
+                            }}
                           />
 
                           <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
