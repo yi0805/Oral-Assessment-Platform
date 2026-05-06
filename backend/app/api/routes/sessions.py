@@ -222,7 +222,6 @@ def pending_Reviews(
             course=CourseInfoOut.model_validate(course),
             aisummary=AISummaryInfoOut(
                 suggested_grade=ai_summary.suggested_grade,
-                summary_text=ai_summary.summary_text,
             ) if ai_summary else None,
             session_feedback=SessionFeedbackOut(
                 final_grade=feedback.final_grade,

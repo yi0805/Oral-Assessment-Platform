@@ -10,7 +10,7 @@ class AISummaryInfoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     suggested_grade: int | None = None
-    summary_text: str | None = None
+    detailed_feedback: str | None = None
 
 
 # Grade / review updates

@@ -263,7 +263,7 @@ def _approve_one_ai_grade(db: Session, session_id: UUID, instructor_id: UUID):
         session_id=session_id,
         user_i_id=instructor_id,
         final_grade=ai_summary.suggested_grade,
-        comments=ai_summary.summary_text,
+        comments=ai_summary.detailed_feedback,
         status="draft",
     )
     db.add(feedback)
