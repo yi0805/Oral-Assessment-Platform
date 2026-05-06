@@ -69,6 +69,11 @@ class ReleaseResponse(BaseModel):
     sessions_created: int
 
 
+class AssessmentCopyRequest(BaseModel):
+    target_course_id: UUID
+    title: str | None = None
+
+
 # Session
 
 class SessionInfoOut(BaseModel):

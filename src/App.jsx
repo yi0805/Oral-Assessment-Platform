@@ -12,12 +12,11 @@ import StudentCourse from "./features/student/StudentCourse";
 import StudentAssessment from "./features/student/StudentAssessment";
 import InstructorDashboard from "./features/instructor/InstructorDashboard";
 import InstructorPendingGrades from "./features/instructor/InstructorPendingGrades";
-import UpdateMaterial from "./features/instructor/UploadMaterial";
 import Transcript from "./features/instructor/Transcript";
 import StudentManagement from "./features/instructor/StudentManagement";
 import ProtectedLayout from "./ui/ProtectedRoute";
 import Setting from "./features/instructor/Setting";
-import EditAssessment from "./features/instructor/EditAssessment"
+import AssessmentManagement from "./features/instructor/AssessmentManagement"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,8 +53,8 @@ function App() {
                 element={<InstructorPendingGrades />}
               />
               <Route
-                path="instructor/updateMaterial"
-                element={<UpdateMaterial />}
+                path="instructor/assessments"
+                element={<AssessmentManagement />}
               />
               <Route
                 path="instructor/transcript/:sessionId"
@@ -64,15 +63,11 @@ function App() {
               <Route
                 path="instructor/studentManagement"
                 element={<StudentManagement/>}
-              />    
+              />
               <Route
                 path="instructor/setting"
                 element={<Setting />}
-              />          
-              <Route
-                path="instructor/editAssessment"
-                element={<EditAssessment />}
-              />  
+              />
             </Route>
 
             <Route

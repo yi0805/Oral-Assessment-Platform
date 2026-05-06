@@ -85,7 +85,7 @@ export default function QuestionEditor({
       {pendingDelete && (
         <ConfirmModal
           title="Delete Question"
-          message={`Are you sure you want to delete this question? This cannot be undone.\n\n"${pendingDelete.question_text}"`}
+          message={`Are you sure you want to delete this question?\n\n"${pendingDelete.question_text}"\n\nThis action cannot be undone.`}
           confirmLabel="Yes, Delete"
           isLoading={isDeleting}
           onConfirm={confirmDelete}
@@ -154,12 +154,28 @@ export default function QuestionEditor({
           {questions.map((question, index) => (
             <div
               key={question.id}
-              className="rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 transition-all hover:border-outline-variant/40"
+              className="group rounded-xl border border-outline-variant/15 bg-surface-container-lowest p-5 transition-all hover:border-outline-variant/40"
             >
               <div className="flex items-start gap-4">
-                <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+                <div className="mt-1 flex shrink-0 flex-col items-center gap-1">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 font-headline text-sm font-bold text-primary">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+
+                  {!disabled && editingId !== question.id && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(question)}
+                      disabled={isDeleting}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-outline transition-all hover:bg-error/10 hover:text-error disabled:cursor-not-allowed disabled:opacity-20 md:opacity-0 md:group-hover:opacity-100"
+                      aria-label="Delete question"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        delete
+                      </span>
+                    </button>
+                  )}
+                </div>
 
                 <div className="min-w-0 flex-1">
                   {editingId === question.id ? (
@@ -205,15 +221,6 @@ export default function QuestionEditor({
                       onClick={() => startEdit(question)}
                     >
                       Edit
-                    </button>
-
-                    <button
-                      type="button"
-                      className="rounded-lg px-3 py-1 text-xs font-bold text-error transition-all hover:bg-error/10 disabled:opacity-50"
-                      onClick={() => handleDelete(question)}
-                      disabled={isDeleting}
-                    >
-                      Delete
                     </button>
                   </div>
                 )}

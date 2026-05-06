@@ -89,3 +89,11 @@ export async function deleteAssessmentConfig(courseId, assessmentConfigId) {
   );
   return response.data;
 }
+
+export async function copyAssessmentConfig(courseId, assessmentConfigId, targetCourseId, title) {
+  const response = await api.post(
+    `/courses/${courseId}/assessments/${assessmentConfigId}/copy`,
+    { target_course_id: targetCourseId, title: title || undefined },
+  );
+  return response.data;
+}
