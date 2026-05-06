@@ -66,9 +66,6 @@ function PendingStudentTable({
           <thead>
             <tr className="border-b border-outline-variant/10 bg-surface-container-low/50">
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                Publish
-              </th>
-              <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Student
               </th>
               <th className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -112,28 +109,12 @@ function PendingStudentTable({
             ) : (
               currentRows.map((review) => {
                 const currentGrade = grades[review.sessionId] ?? "";
-                const canPublish = isValidGrade(currentGrade);
 
                 return (
                   <tr
                     className="group transition-colors hover:bg-surface-container-low/30"
                     key={review.sessionId}
                   >
-                    {/* Publish */}
-                    <td className="px-6 py-5">
-                      <label className="relative inline-flex cursor-pointer items-center">
-                        <input
-                          className="peer sr-only"
-                          type="checkbox"
-                          disabled={!canPublish}
-                          onChange={() =>
-                            handleRelease(review.sessionId, review.studentId)
-                          }
-                        />
-                        <div className="peer h-5 w-10 rounded-full bg-surface-container-highest after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:border after:border-gray-300 after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-white peer-focus:outline-none"></div>
-                      </label>
-                    </td>
-
                     {/* Student */}
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
@@ -210,6 +191,7 @@ function PendingStudentTable({
                       <button
                         className="rounded-lg border border-primary/20 px-4 py-2 text-xs font-bold uppercase tracking-wider text-primary transition-all hover:bg-primary hover:text-white"
                         onClick={() => handleReview(review)}
+                        title="View Transcript"
                       >
                         Review
                       </button>

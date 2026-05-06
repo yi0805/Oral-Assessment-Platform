@@ -19,6 +19,8 @@ function DashboardTable({
   const { releaseResult } = useReleaseResult();
   const { approveAiGrade, isPending: isApproving } = useApproveAiGrade();
 
+  const [approvedAiMap, setApprovedAiMap] = useState({});
+
   const rowsPerPage = 6;
   const totalPages = Math.ceil(filteredStudents.length / rowsPerPage);
 
@@ -60,7 +62,7 @@ function DashboardTable({
   function handleRelease(sessionId, studentId) {
     releaseResult({ sessionId, studentId });
   }
-
+  
   return (
     <>
       <div className="overflow-x-auto">
@@ -91,13 +93,19 @@ function DashboardTable({
           <tbody className="divide-y divide-surface-container">
             {currentRows.length > 0 ? (
               currentRows.map((student) => {
-                const currentGrade = grades[student.session_id] ?? "";
+                const isApprovedAi = approvedAiMap[student.session_id];
+
+                const currentGrade = isApprovedAi ? student.ai_suggested_score : (grades[student.session_id] ?? "");
                 const canPublish = isValidGrade(currentGrade);
 
                 const isPublished = student.status === "published";
                 const isReview = student.status === "review";
                 const isInProgress = student.status === "inprogress";
                 const isOverdue = student.status === "overdue";
+
+                const manualOverride = student.final_grade != null &&
+                  student.ai_suggested_score != null &&
+                  student.final_grade !== student.ai_suggested_score;
                 return (
                   <tr
                     className="group transition-colors hover:bg-surface-container-high/30"
@@ -198,6 +206,10 @@ function DashboardTable({
                           value={currentGrade}
                           onChange={(e) => {
                             const val = e.target.value;
+                            setApprovedAiMap(prev => ({
+                                ...prev,
+                                [student.session_id]: false
+                              }));
 
                             if (val === "" || /^\d+$/.test(val)) {
                               onGradeChange(student.session_id, val);
@@ -260,14 +272,20 @@ function DashboardTable({
                         {isReview && (
                           <button
                             className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-tertiary/30 bg-tertiary-container/40 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
-                            onClick={() =>
-                              approveAiGrade({ sessionId: student.session_id })
-                            }
+                            onClick={async () => {
+                              await approveAiGrade({ sessionId: student.session_id }); 
+                              
+                              setApprovedAiMap(prev => ({
+                                ...prev,
+                                [student.session_id]: true
+                              }));
+                            }}
                             disabled={
                               isApproving ||
-                              student.ai_suggested_score == null
+                              student.ai_suggested_score == null ||
+                              manualOverride
                             }
-                            title="Accept AI suggested grade and release"
+                            title="Accept AI suggested grade"
                           >
                             <span
                               className="material-symbols-outlined text-xs"
@@ -283,6 +301,7 @@ function DashboardTable({
                           <button
                             className="flex items-center gap-1 whitespace-nowrap rounded-md border border-outline-variant/30 px-2 py-1 text-[11px] font-bold text-primary transition-colors hover:bg-surface-container"
                             onClick={() => handleViewAnswer(student)}
+                            title="View transcript"
                           >
                             <span className="material-symbols-outlined text-xs">
                               visibility

@@ -206,6 +206,10 @@ def pending_Reviews(
         .outerjoin(SessionFeedback, SessionFeedback.session_id == AssessmentSession.id)
         .filter(CourseEnrollment.user_id == current_user.id)
         .filter(AssessmentSession.status == "under_review")
+        .filter(
+            (SessionFeedback.id.is_(None)) |
+            (SessionFeedback.final_grade.is_(None))
+        )
         .distinct()
         .all()
     )

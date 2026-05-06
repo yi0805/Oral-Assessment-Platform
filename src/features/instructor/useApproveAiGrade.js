@@ -10,7 +10,7 @@ export function useApproveAiGrade() {
     mutationFn: ({ sessionId }) => approveAiSummary(sessionId),
 
     onSuccess: (data) => {
-      toast.success(data?.message || "AI grade approved and released.");
+      toast.success(data?.message || "AI grade approved.");
 
       queryClient.invalidateQueries({ queryKey: ["transcript"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });

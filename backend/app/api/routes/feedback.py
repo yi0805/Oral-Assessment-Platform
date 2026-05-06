@@ -143,15 +143,24 @@ def update_grade(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found.",
         )
-
-    feedback = SessionFeedback(
-        session_id=session_id,
-        user_i_id=current_user.id,
-        final_grade=payload.grade,
-        status="draft",
+    
+    feedback = (
+        db.query(SessionFeedback)
+        .filter(SessionFeedback.session_id == session_id)
+        .first()
     )
 
-    db.add(feedback)
+    if feedback:
+        feedback.final_grade = payload.grade
+    else:
+        feedback = SessionFeedback(
+            session_id=session_id,
+            user_i_id=current_user.id,
+            final_grade=payload.grade,
+            status="draft",
+        )
+        db.add(feedback)
+
     db.commit()
     db.refresh(feedback)
 

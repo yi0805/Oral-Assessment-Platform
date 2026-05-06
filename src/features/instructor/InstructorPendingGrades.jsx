@@ -17,6 +17,8 @@ function InstructorPendingGrades() {
   const { approveAllAiGrades, isPending: isApprovingAll } =
     useApproveAllAiGrades();
 
+  const [approveAllAi, setApproveAllAi] = useState(false);
+
   useEffect(() => {
     if (!pendingReviews) return;
 
@@ -72,6 +74,7 @@ function InstructorPendingGrades() {
   });
 
   function handleGradeChange(sessionId, grade) {
+    setApproveAllAi(false);
     setGrades((prev) => ({
       ...prev,
       [sessionId]: grade,
@@ -87,12 +90,6 @@ function InstructorPendingGrades() {
     );
   }
 
-  const canPublishAll =
-    filteredReviews.length > 0 &&
-    filteredReviews.every((review) =>
-      isValidGrade(grades[review.sessionId] ?? ""),
-    );
-
   const reviewsWithAiGrade = filteredReviews.filter(
     (r) => r.suggestedGrade != null,
   );
@@ -105,16 +102,6 @@ function InstructorPendingGrades() {
       session_id: review.sessionId,
     }));
     approveAllAiGrades({ assessments });
-  }
-
-  function handlePublishAll() {
-    if (!canPublishAll) return;
-
-    const assessments = filteredReviews.map((review) => ({
-      session_id: review.sessionId,
-      student_id: review.studentId,
-    }));
-    releaseAllResults({ assessments });
   }
 
   return (
@@ -142,27 +129,11 @@ function InstructorPendingGrades() {
         <div className="flex flex-col justify-between gap-4 bg-surface-container-low/30 p-6 md:flex-row md:items-center">
           <div className="flex items-center gap-4">
             <button
-              className="headline-font flex items-center gap-2 rounded-xl bg-primary px-6 py-2.5 font-headline text-sm font-semibold text-on-primary transition-all hover:bg-primary-dim disabled:opacity-50"
-              onClick={handlePublishAll}
-              disabled={!canPublishAll}
-            >
-              <span
-                className="material-symbols-outlined text-lg"
-                style={{
-                  verticalAlign: "middle",
-                  fontVariationSettings: '"FILL" 1',
-                }}
-                data-icon="publish"
-                data-weight="fill"
-              >
-                publish
-              </span>
-              Publish All
-            </button>
-
-            <button
               className="flex items-center gap-2 rounded-xl border-2 border-tertiary/40 bg-tertiary-container/40 px-6 py-2.5 font-headline text-sm font-semibold text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:opacity-50"
-              onClick={handleAcceptAllAi}
+              onClick={() => {
+                handleAcceptAllAi();
+                setApproveAllAi(true);
+              }}
               disabled={!canAcceptAllAi || isApprovingAll}
             >
               <span
