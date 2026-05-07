@@ -6,7 +6,14 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
 
-from app.models import AssessmentSession, SessionFeedback, User, AISummary
+from app.models import (
+    AssessmentSession,
+    SessionFeedback,
+    User,
+    AISummary,
+    AssessmentConfig,
+    CourseEnrollment,
+)
 from app.schemas import ReleaseAllReviews, GradeUpdate, InstructorReviewUpdate, AISummaryInfoOut, ApproveAllAiReviews
 
 router = APIRouter()
@@ -14,12 +21,26 @@ router = APIRouter()
 
 # Helpers
 
-def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> AssessmentSession:
+def _get_session_or_404(
+    db: Session,
+    session_id: UUID,
+    student_id: UUID,
+    instructor_id: UUID,
+) -> AssessmentSession:
     sess = (
         db.query(AssessmentSession)
+        .join(
+            AssessmentConfig,
+            AssessmentSession.assessment_config_id == AssessmentConfig.id,
+        )
+        .join(
+            CourseEnrollment,
+            AssessmentConfig.course_id == CourseEnrollment.course_id,
+        )
         .filter(
             AssessmentSession.id == session_id,
             AssessmentSession.user_s_id == student_id,
+            CourseEnrollment.user_id == instructor_id,
         )
         .first()
     )
@@ -30,8 +51,8 @@ def _get_session_or_404(db: Session, session_id: UUID, student_id: UUID) -> Asse
     return sess
 
 
-def _release_one_result(db: Session, session_id: UUID, student_id: UUID):
-    sess = _get_session_or_404(db, session_id, student_id)
+def _release_one_result(db: Session, session_id: UUID, student_id: UUID, instructor_id: UUID):
+    sess = _get_session_or_404(db, session_id, student_id, instructor_id)
 
     if sess.status != "under_review":
         raise HTTPException(
@@ -85,7 +106,7 @@ def release_result(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
-    _release_one_result(db, session_id, student_id)
+    _release_one_result(db, session_id, student_id, current_user.id)
     db.commit()
 
     return {"message": f"Results released to student."}
@@ -113,6 +134,7 @@ def release_all_results(
             db=db,
             session_id=assessment.session_id,
             student_id=assessment.student_id,
+            instructor_id=current_user.id,
         )
 
     db.commit()
@@ -130,7 +152,7 @@ def unpublish_result(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor)
 ):
-    sess = _get_session_or_404(db, session_id, student_id)
+    sess = _get_session_or_404(db, session_id, student_id, current_user.id)
 
     if sess.status != "released":
         raise HTTPException(
@@ -144,6 +166,12 @@ def unpublish_result(
         db.query(SessionFeedback)
         .filter(SessionFeedback.session_id == session_id)
         .first()
+    )
+
+    if not feedback:
+        raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="Feedback not found.",
     )
 
     if feedback.status != "published":
@@ -176,7 +204,18 @@ def update_grade(
 ):
     session = (
         db.query(AssessmentSession)
-        .filter(AssessmentSession.id == session_id)
+        .join(
+            AssessmentConfig,
+            AssessmentSession.assessment_config_id == AssessmentConfig.id,
+        )
+        .join(
+            CourseEnrollment,
+            AssessmentConfig.course_id == CourseEnrollment.course_id,
+        )
+        .filter(
+            AssessmentSession.id == session_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -185,7 +224,7 @@ def update_grade(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Session not found.",
         )
-    
+
     feedback = (
         db.query(SessionFeedback)
         .filter(SessionFeedback.session_id == session_id)
@@ -220,7 +259,18 @@ def upsert_review(
 ):
     session = (
         db.query(AssessmentSession)
-        .filter(AssessmentSession.id == session_id)
+        .join(
+            AssessmentConfig,
+            AssessmentSession.assessment_config_id == AssessmentConfig.id,
+        )
+        .join(
+            CourseEnrollment,
+            AssessmentConfig.course_id == CourseEnrollment.course_id,
+        )
+        .filter(
+            AssessmentSession.id == session_id,
+            CourseEnrollment.user_id == current_user.id,
+        )
         .first()
     )
 
@@ -261,7 +311,18 @@ def upsert_review(
 def _approve_one_ai_grade(db: Session, session_id: UUID, instructor_id: UUID):
     sess = (
         db.query(AssessmentSession)
-        .filter(AssessmentSession.id == session_id)
+        .join(
+            AssessmentConfig,
+            AssessmentSession.assessment_config_id == AssessmentConfig.id,
+        )
+        .join(
+            CourseEnrollment,
+            AssessmentConfig.course_id == CourseEnrollment.course_id,
+        )
+        .filter(
+            AssessmentSession.id == session_id,
+            CourseEnrollment.user_id == instructor_id,
+        )
         .first()
     )
 
