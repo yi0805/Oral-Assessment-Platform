@@ -65,10 +65,10 @@ function DashboardTable({
     releaseResult({ sessionId, studentId });
   }
 
-    function handleUnpublish(sessionId, studentId) {
-    unpublish({sessionId, studentId});
+  function handleUnpublish(sessionId, studentId) {
+    unpublish({ sessionId, studentId });
   }
-  
+
   return (
     <>
       <div className="overflow-x-auto">
@@ -101,7 +101,9 @@ function DashboardTable({
               currentRows.map((student) => {
                 const isApprovedAi = approvedAiMap[student.session_id];
 
-                const currentGrade = isApprovedAi ? student.ai_suggested_score : (grades[student.session_id] ?? "");
+                const currentGrade = isApprovedAi
+                  ? student.ai_suggested_score
+                  : (grades[student.session_id] ?? "");
                 const canPublish = isValidGrade(currentGrade);
 
                 const isPublished = student.status === "published";
@@ -109,9 +111,7 @@ function DashboardTable({
                 const isInProgress = student.status === "inprogress";
                 const isOverdue = student.status === "overdue";
 
-                const manualOverride = student.final_grade != null &&
-                  student.ai_suggested_score != null &&
-                  student.final_grade !== student.ai_suggested_score;
+                const hasExistingFeedback = student.final_grade != null;
                 return (
                   <tr
                     className="group transition-colors hover:bg-surface-container-high/30"
@@ -127,7 +127,10 @@ function DashboardTable({
                             checked={isPublished}
                             disabled={!isPublished}
                             onChange={() => {
-                              handleUnpublish(student.session_id, student.student_id);
+                              handleUnpublish(
+                                student.session_id,
+                                student.student_id,
+                              );
                             }}
                           />
 
@@ -160,7 +163,7 @@ function DashboardTable({
                       )}
                     </td>
 
-                      {/* Student */}
+                    {/* Student */}
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-3">
                         <img
@@ -182,7 +185,7 @@ function DashboardTable({
                       </div>
                     </td>
 
-                      {/* AI Score */}
+                    {/* AI Score */}
                     <td className="px-8 py-5">
                       <div className="flex items-center gap-2">
                         <span className="font-headline text-sm font-bold text-tertiary">
@@ -195,7 +198,7 @@ function DashboardTable({
                       </div>
                     </td>
 
-                      {/* Final Score */}
+                    {/* Final Score */}
                     <td className="px-8 py-5">
                       {isPublished && (
                         <span className="inline-flex min-w-[3rem] items-center justify-center rounded-lg bg-surface-container px-3 py-1.5 text-sm font-bold text-on-surface shadow-sm">
@@ -215,10 +218,10 @@ function DashboardTable({
                           value={currentGrade}
                           onChange={(e) => {
                             const val = e.target.value;
-                            setApprovedAiMap(prev => ({
-                                ...prev,
-                                [student.session_id]: false
-                              }));
+                            setApprovedAiMap((prev) => ({
+                              ...prev,
+                              [student.session_id]: false,
+                            }));
 
                             if (val === "" || /^\d+$/.test(val)) {
                               onGradeChange(student.session_id, val);
@@ -249,7 +252,7 @@ function DashboardTable({
                       )}
                     </td>
 
-                      {/* Status */}
+                    {/* Status */}
                     <td className="px-8 py-5">
                       {isPublished && (
                         <span className="rounded-full bg-primary-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-primary-container">
@@ -275,24 +278,29 @@ function DashboardTable({
                       )}
                     </td>
 
-                      {/* Action */}
+                    {/* Action */}
                     <td className="px-8 py-5 text-center">
                       <div className="flex items-center justify-end gap-2">
                         {isReview && (
                           <button
                             className="inline-flex items-center gap-1 whitespace-nowrap rounded-md border border-tertiary/30 bg-tertiary-container/40 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-on-tertiary-container transition-all hover:bg-tertiary-container disabled:cursor-not-allowed disabled:opacity-40"
                             onClick={async () => {
-                              await approveAiGrade({ sessionId: student.session_id }); 
-                              
-                              setApprovedAiMap(prev => ({
-                                ...prev,
-                                [student.session_id]: true
-                              }));
+                              try {
+                                await approveAiGrade({
+                                  sessionId: student.session_id,
+                                });
+                                setApprovedAiMap((prev) => ({
+                                  ...prev,
+                                  [student.session_id]: true,
+                                }));
+                              } catch {
+                                // error already shown via toast in mutation onError
+                              }
                             }}
                             disabled={
                               isApproving ||
                               student.ai_suggested_score == null ||
-                              manualOverride
+                              hasExistingFeedback
                             }
                             title="Accept AI suggested grade"
                           >
@@ -331,9 +339,7 @@ function DashboardTable({
                       fact_check
                     </span>
 
-                    <p className="text-sm font-medium">
-                      Nothing to review 
-                    </p>
+                    <p className="text-sm font-medium">Nothing to review</p>
 
                     <p className="text-xs">
                       Please select an assessment at top right corner.

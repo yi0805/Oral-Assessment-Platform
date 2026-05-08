@@ -6,7 +6,7 @@ import { approveAiSummary } from "../../services/apiSession";
 export function useApproveAiGrade() {
   const queryClient = useQueryClient();
 
-  const { mutate: approveAiGrade, isPending } = useMutation({
+  const { mutateAsync: approveAiGrade, isPending } = useMutation({
     mutationFn: ({ sessionId }) => approveAiSummary(sessionId),
 
     onSuccess: (data) => {
