@@ -141,6 +141,7 @@ function PendingStudentTable({
                           className="h-10 w-10 rounded-full object-cover ring-2 ring-white"
                           data-alt="Close up of Elena Mitsotakis, a smiling female student with long brown hair in a bright outdoor campus setting"
                           src={review.image || "/WhereRU.png"}
+                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <div className="headline-font text-sm font-bold text-on-surface">
