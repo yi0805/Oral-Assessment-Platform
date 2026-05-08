@@ -43,7 +43,7 @@ class ApproveAllAiReviews(BaseModel):
 
 class CriterionFeedback(BaseModel):
     feedback: str = Field(min_length=1)
-    suggested_points: int = Field(ge=0, le=100)
+    suggested_grade: int = Field(ge=0, le=100)
 
     @field_validator("suggested_grade", mode="before")
     @classmethod
