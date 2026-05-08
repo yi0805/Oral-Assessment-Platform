@@ -9,6 +9,8 @@ import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 
+import { recordBlurNotification } from "../../services/apiSession";
+
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";
 import { getErrorMessage } from "../../utils/getErrorMessage";
@@ -196,10 +198,20 @@ export default function StudentAssessment() {
     setIsSubmitting(true);
 
     try {
+      if (blurCount > 0 && sessionId) {
+        try {
+          await recordBlurNotification(sessionId, blurCount);
+        } catch (blurError) {
+          console.error("Failed to record blur notification:", blurError);
+        }
+      }
+
       await completeAssessment({ sessionId, courseId });
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 

@@ -112,3 +112,14 @@ export async function completeSession(sessionId) {
   const response = await api.post(`/sessions/${sessionId}/complete`);
   return response.data;
 }
+
+export async function recordBlurNotification(sessionId, blurCount) {
+  const response = await api.post(
+    `/sessions/${sessionId}/blur-notification`,
+    null,
+    {
+      params: {blur_count: blurCount },
+    },
+  );
+  return response.data;
+}
