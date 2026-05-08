@@ -117,7 +117,7 @@ function StudentGradedAssessment() {
               </span>
 
               <p className="text-lg font-medium text-on-surface">
-                No previous assessments found.
+                No graded assessments found.
               </p>
             </div>
           ) : (

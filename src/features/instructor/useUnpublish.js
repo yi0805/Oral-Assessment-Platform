@@ -14,6 +14,8 @@ export function useUnpublish() {
       toast.success(data?.message || "Result unpublished successfully.");
 
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["pendingReviews"] });
+      queryClient.invalidateQueries({ queryKey: ["transcript"] });
     },
 
     onError: (error) => {
