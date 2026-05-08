@@ -1,6 +1,7 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, RootModel, ConfigDict, Field, field_validator
+from typing import Dict
 
 
 #  AI summary
@@ -9,7 +10,7 @@ class AISummaryInfoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     suggested_grade: int | None = None
-    summary_text: str | None = None
+    detailed_feedback: str | None = None
 
 
 # Grade / review updates
@@ -40,11 +41,11 @@ class ApproveAiReview(BaseModel):
 class ApproveAllAiReviews(BaseModel):
     assessments: list[ApproveAiReview]
 
-class _SummaryLLMOutput(BaseModel):
-    summary_text: str = Field(min_length=1)
-    suggested_grade: int = Field(ge=0, le=100)
+class CriterionFeedback(BaseModel):
+    feedback: str = Field(min_length=1)
+    suggested_points: int = Field(ge=0, le=100)
 
-    @field_validator("suggested_grade", mode="before")
+    @field_validator("suggested_points", mode="before")
     @classmethod
     def _coerce_grade(cls, v: object) -> int:
         if v is None:
@@ -57,3 +58,6 @@ class _SummaryLLMOutput(BaseModel):
             return 0
         
         return max(0, min(100, grade))
+
+class _SummaryLLMOutput(RootModel):
+    root: Dict[str, CriterionFeedback]

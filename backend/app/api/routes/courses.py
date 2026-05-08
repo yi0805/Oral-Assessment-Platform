@@ -379,11 +379,6 @@ def get_instructor_dashboard(
                 if ai_summary and ai_summary.suggested_grade is not None
                 else None
             ),
-            ai_summary=(
-                ai_summary.summary_text
-                if ai_summary and ai_summary.summary_text
-                else None
-            ),
             final_grade=final_grade,
             status=dashboard_status(session.status, assessment_config.due_time),
         )

@@ -185,7 +185,7 @@ function Transcript() {
                 </div>
 
                 <p className="mt-4 text-xs font-medium leading-snug text-on-primary-container">
-                  {transcript.ai_summary?.summary_text ||
+                  {transcript.ai_summary?.detailed_feedback ||
                     "No AI summary available for this response."}
                 </p>
               </div>
