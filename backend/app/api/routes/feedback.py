@@ -232,6 +232,15 @@ def update_grade(
     )
 
     if feedback:
+        if feedback.status != "draft":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Cannot update grade: feedback has already been {feedback.status}. "
+                    "Unpublish the result first to edit the grade."
+                ),
+            )
+        
         feedback.final_grade = payload.grade
     else:
         feedback = SessionFeedback(
@@ -415,13 +424,29 @@ def approve_all_ai_grades(
             detail="No sessions provided.",
         )
 
+    approved = 0
+    skipped = 0
+
     for assessment in payload.assessments:
-        _approve_one_ai_grade(
-            db=db,
-            session_id=assessment.session_id,
-            instructor_id=current_user.id,
-        )
+        try:
+            _approve_one_ai_grade(db, assessment.session_id, current_user.id)
+            approved += 1
+
+        except HTTPException as exc:
+            if (
+                exc.status_code == status.HTTP_409_CONFLICT
+                and "Feedback already exists" in (exc.detail if exc.detail else "")
+            ):
+                skipped += 1
+                continue
+            raise
 
     db.commit()
 
-    return {"message": "All AI grades approved successfully."}
+    return {
+        "message": (
+            f"Approved {approved}; skipped {skipped} (already graded)."
+            if skipped
+            else "All AI grades approved successfully."
+        )
+    }
