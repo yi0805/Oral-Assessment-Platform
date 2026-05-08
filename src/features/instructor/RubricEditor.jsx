@@ -202,9 +202,10 @@ export default function RubricEditor({ rows, onRowsChange, disabled = false }) {
                         <input
                           className="w-full min-w-0 rounded-xl border-none bg-transparent px-4 py-3 text-right text-sm font-bold text-on-surface focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                           type="number"
+                          placeholder="0"
                           min="0"
-                          step="1"
-                          value={row.max_points}
+                          step="10"
+                          value={row.max_points === 0 ? "" : row.max_points}
                           disabled={disabled}
                           onChange={(e) =>
                             handleRowChange(index, "max_points", e.target.value)
@@ -213,7 +214,7 @@ export default function RubricEditor({ rows, onRowsChange, disabled = false }) {
                         />
 
                         <span className="text-[10px] font-bold uppercase tracking-widest text-outline">
-                          pts
+                          %
                         </span>
                       </div>
 
