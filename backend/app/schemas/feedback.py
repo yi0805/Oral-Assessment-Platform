@@ -43,9 +43,9 @@ class ApproveAllAiReviews(BaseModel):
 
 class CriterionFeedback(BaseModel):
     feedback: str = Field(min_length=1)
-    suggested_grade: int = Field(ge=0, le=100)
+    suggested_points: int = Field(ge=0, le=100)
 
-    @field_validator("suggested_grade", mode="before")
+    @field_validator("suggested_points", mode="before")
     @classmethod
     def _coerce_grade(cls, v: object) -> int:
         if v is None:
