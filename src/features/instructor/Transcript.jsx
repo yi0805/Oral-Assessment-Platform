@@ -184,10 +184,31 @@ function Transcript() {
                   </span>
                 </div>
 
-                <p className="mt-4 text-xs font-medium leading-snug text-on-primary-container">
-                  {transcript.ai_summary?.detailed_feedback ||
-                    "No AI summary available for this response."}
-                </p>
+                {Object.entries(transcript.ai_summary?.detailed_feedback ?? {}).length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {Object.entries(transcript.ai_summary.detailed_feedback).map(
+                      ([criterion, data]) => (
+                        <div key={criterion} className="space-y-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <h4 className="text-[11px] font-bold uppercase tracking-widest text-on-primary-container">
+                              {criterion}
+                            </h4>
+                            <span className="text-xs font-bold text-on-primary-container opacity-70">
+                              {data?.suggested_points ?? "-"}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium leading-snug text-on-primary-container opacity-90">
+                            {data?.feedback || "No feedback for this criterion."}
+                          </p>
+                        </div>
+                      )
+                    )}
+                  </div>
+                ) : (
+                  <p className="mt-4 text-xs font-medium leading-snug text-on-primary-container">
+                    No AI summary available for this response.
+                  </p>
+                )}
               </div>
             </div>
 
