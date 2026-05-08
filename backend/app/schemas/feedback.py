@@ -4,15 +4,6 @@ from pydantic import BaseModel, RootModel, ConfigDict, Field, field_validator
 from typing import Dict
 
 
-#  AI summary
-
-class AISummaryInfoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    suggested_grade: int | None = None
-    detailed_feedback: str | None = None
-
-
 # Grade / review updates
 
 class GradeUpdate(BaseModel):
@@ -61,3 +52,11 @@ class CriterionFeedback(BaseModel):
 
 class _SummaryLLMOutput(RootModel):
     root: Dict[str, CriterionFeedback]
+
+#  AI summary
+
+class AISummaryInfoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    suggested_grade: int | None = None
+    detailed_feedback: Dict[str, CriterionFeedback]

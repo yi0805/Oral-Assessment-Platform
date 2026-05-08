@@ -227,10 +227,3 @@ def output_format(rubric):
         """
     
     return format_instruction
-
-def join_detailed_feedback(summary):
-    summary_text = " | ".join([
-        f"{title}: {content['feedback']}" 
-        for title, content in summary.detailed_feedback.items()
-    ])
-    return summary_text
