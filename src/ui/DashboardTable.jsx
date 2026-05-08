@@ -332,12 +332,11 @@ function DashboardTable({
                     </span>
 
                     <p className="text-sm font-medium">
-                      Nothing to review right now
+                      Nothing to review 
                     </p>
 
                     <p className="text-xs">
-                      New submissions will appear here when they are ready for
-                      grading.
+                      Please select an assessment at top right corner.
                     </p>
                   </div>
                 </td>
