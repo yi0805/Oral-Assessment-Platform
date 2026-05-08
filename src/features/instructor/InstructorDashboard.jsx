@@ -143,7 +143,9 @@ export default function InstructorDashboard() {
                 className="w-full cursor-pointer appearance-none rounded-xl border border-outline-variant/20 bg-surface-container-lowest px-10 py-3 font-headline text-sm font-semibold text-on-surface transition-colors hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 value={selectedAssessment}
                 onChange={(e) => setSelectedAssessment(e.target.value)}
-              >
+              >                
+                {dashboard.length > 1 ? "" : <option value="No Assessment Selected">No Assessment Selected</option>}
+
                 {dashboard.map((assessment) => (
                   <option
                     key={assessment.assessment_config_id}
