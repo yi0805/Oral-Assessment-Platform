@@ -20,13 +20,14 @@ from app.models import (
     User,
     AssessmentConfig, AssessmentSession,
     CourseEnrollment, Course, AISummary, Question,
-    SessionQuestionItem, TranscriptMessage, SessionFeedback,
+    SessionQuestionItem, TranscriptMessage, SessionFeedback, Notification
 )
 from app.schemas import (
     AssessmentHistoryItemOut, AssessmentHistoryOut,
     PendingReviewOut, TranscriptDetailOut, TranscriptMessageOut, AssessmentTitleOut,
     StudentCourseAssessmentOut, StudentNextQuestionOut,
-    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut,
+    AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut, NotificationOut
 )
 from app.services.ai_gateway import smart_chat_complete
 
@@ -1006,3 +1007,38 @@ def complete_session(
     background_tasks.add_task(_run_ai_summary_background, session_id)
 
     return {"session_id": str(session_id), "status": "under_review"}
+
+@router.post(
+    "/sessions/{session_id}/blur-notification",
+    response_model=NotificationOut,
+    summary="Record blur/tab-switch notification for an assessment session",
+)
+def record_blur_notification(
+    session_id: UUID,
+    blur_count: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    session = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.id == session_id,
+            AssessmentSession.user_s_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Assessment session not found")
+
+    notification = Notification(
+        user_id=current_user.id,
+        session_id=session_id,
+        blur_count=blur_count,
+    )
+
+    db.add(notification)
+    db.commit()
+    db.refresh(notification)
+
+    return notification

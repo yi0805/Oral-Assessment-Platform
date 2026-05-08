@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.dependencies import require_instructor
+from app.core.dependencies import require_instructor, require_student
 
 from app.models import AssessmentConfig, AssessmentSession, CourseEnrollment, User, Question, QuestionPool
 from app.schemas import (

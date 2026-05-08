@@ -149,3 +149,9 @@ class TranscriptDetailOut(BaseModel):
     ai_summary: AISummaryInfoOut | None = None
     session_feedback: SessionFeedbackOut | None = None
     transcript: list[TranscriptMessageOut]
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    session_id: UUID
+    user_id: UUID
+    blur_count: int
