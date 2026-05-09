@@ -204,6 +204,48 @@ export default function StudentAssessment() {
     }
   }
 
+  // Persistence side of the audio flow. Takes a finalized recording Blob
+  // and either (a) routes it through the legacy transcribe-and-save
+  // backend call, or (b) defers to the new edit-before-submit pipeline
+  // when the feature flag is on. Subsequent commits for issue #71 will
+  // replace the flag-on branch with a transcribe-only API call that
+  // populates the answer textarea instead of writing to the DB.
+  async function handleAudioSubmit(blob) {
+    if (isEditBeforeSubmitEnabled()) {
+      console.warn(
+        "[#71] VITE_ENABLE_EDIT_BEFORE_SUBMIT is on, but the new transcribe-then-edit flow is not yet wired up. The recording was captured but not submitted.",
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await submitAudioAnswer({
+        sessionId,
+        audioBlob: blob,
+      });
+
+      if (response.next_question) {
+        setCurrentQuestion(response.next_question);
+      } else {
+        setCurrentQuestion(null);
+        setCanComplete(true);
+      }
+
+      setTypedAnswer("");
+    } catch (err) {
+      setAudioError(
+        getErrorMessage(err, "Failed to submit your audio answer."),
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  // Mic-button lifecycle only. Responsible for starting/stopping the
+  // recorder and producing a Blob; persistence is delegated to
+  // handleAudioSubmit so the two halves can evolve independently.
   async function handleMicClick() {
     if (!currentQuestion) return;
     if (isSubmitting || isTranscribing) return;
@@ -211,51 +253,14 @@ export default function StudentAssessment() {
     setAudioError(null);
 
     if (isRecording) {
-      try {
-        const blob = await stopRecording();
+      const blob = await stopRecording();
 
-        if (!blob || blob.size === 0) {
-          setAudioError("No audio was captured. Please try again.");
-          return;
-        }
-
-        // Issue #71 — Edit-before-submit flow.
-        // When the feature flag is ON, recording stops here and the new
-        // transcribe-only + textarea-edit + manual-submit pipeline takes
-        // over. That pipeline is implemented in subsequent commits; in
-        // Commit 1 we only isolate the legacy call site so it can be
-        // toggled off cleanly.
-        if (isEditBeforeSubmitEnabled()) {
-          console.warn(
-            "[#71] VITE_ENABLE_EDIT_BEFORE_SUBMIT is on, but the new transcribe-then-edit flow is not yet wired up. The recording was captured but not submitted.",
-          );
-          return;
-        }
-
-        // Legacy flow: backend transcribes AND persists the answer in one
-        // request. Preserved unchanged behind the flag for safe rollback.
-        setIsSubmitting(true);
-
-        const response = await submitAudioAnswer({
-          sessionId,
-          audioBlob: blob,
-        });
-
-        if (response.next_question) {
-          setCurrentQuestion(response.next_question);
-        } else {
-          setCurrentQuestion(null);
-          setCanComplete(true);
-        }
-
-        setTypedAnswer("");
-      } catch (err) {
-        setAudioError(
-          getErrorMessage(err, "Failed to submit your audio answer."),
-        );
-      } finally {
-        setIsSubmitting(false);
+      if (!blob || blob.size === 0) {
+        setAudioError("No audio was captured. Please try again.");
+        return;
       }
+
+      await handleAudioSubmit(blob);
       return;
     }
 
