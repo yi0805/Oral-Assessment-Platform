@@ -123,6 +123,7 @@ class Notification(Base):
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("assessment_sessions.id", ondelete="CASCADE"),
+        unique=True,
         nullable=False,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
