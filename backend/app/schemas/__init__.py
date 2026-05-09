@@ -17,7 +17,8 @@ from app.schemas.assessment import (
     AssessmentConfigSummary, AssessmentHistoryItemOut, AssessmentHistoryOut, AssessmentTitleOut,
     SessionFeedbackOut, SessionInfoOut, PendingReviewOut, StudentInfoOut,
     TranscriptMessageOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentNextQuestionOut,
-    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, AssessmentCopyRequest
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, AssessmentCopyRequest,
+    AudioTranscriptionResponse,
 )
 
 from app.schemas.question import (

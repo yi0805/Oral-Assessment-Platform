@@ -27,6 +27,7 @@ from app.schemas import (
     PendingReviewOut, TranscriptDetailOut, TranscriptMessageOut, AssessmentTitleOut,
     StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
+    AudioTranscriptionResponse,
 )
 from app.services.ai_gateway import smart_chat_complete
 
@@ -968,6 +969,142 @@ async def submit_response_audio(
         db=db,
         current_user=current_user,
     )
+
+
+# Issue #71 — Edit-before-submit transcribe-only endpoint.
+# Mirrors the validate→upload→transcribe→cleanup pipeline of
+# /respond/audio but returns just the transcript text. The client is
+# then responsible for showing the text in the answer input, allowing
+# the student to correct it, and submitting via /respond when the
+# student clicks "Submit Answer". Crucially this endpoint never writes
+# to the Transcript table and never advances the session.
+
+@router.post(
+    "/sessions/{session_id}/transcribe/audio",
+    response_model=AudioTranscriptionResponse,
+    summary="Transcribe a student's voice answer without persisting it",
+)
+async def transcribe_response_audio(
+    session_id: UUID,
+    audio: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    # Validate audio extension up-front (cheap fail)
+    filename = audio.filename or ""
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if not is_audio_extension(ext):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported audio format: {ext!r}. Supported: mp3, mp4, m4a, wav, flac, ogg, webm, amr.",
+        )
+
+    # Validate session
+    session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
+
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if session.user_s_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session.",
+        )
+
+    if session.status != "in_progress":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session is not in progress.",
+        )
+
+    config = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.id == session.assessment_config_id)
+        .first()
+    )
+
+    # Time check
+    if session.started_at and config and config.total_time_minute:
+        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The time limit for this assessment has expired.",
+            )
+
+    # Enforce upload size limit (25 MB) — same as /respond/audio
+    max_audio_bytes = 25 * 1024 * 1024
+    content_length = audio.headers.get("content-length") if audio.headers else None
+
+    if content_length is not None:
+        try:
+            declared_size = int(content_length)
+
+        except ValueError:
+            declared_size = None
+
+        if declared_size is not None and declared_size > max_audio_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail="Audio file exceeds the 25 MB upload limit.",
+            )
+
+    # Read audio bytes
+    audio_bytes = await audio.read()
+
+    if not audio_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The uploaded audio is empty.",
+        )
+
+    if len(audio_bytes) > max_audio_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Audio file exceeds the 25 MB upload limit.",
+        )
+
+    # Upload to S3 under an ephemeral key (Transcribe requires an S3 source)
+    storage_key = f"sessions/{session_id}/audio/{uuid4()}.{ext}"
+    content_type = audio.content_type or _AUDIO_MIME_MAP.get(ext, "application/octet-stream")
+
+    try:
+        s3_client.upload_file(audio_bytes, storage_key, content_type=content_type)
+
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Audio upload failed: {exc}",
+        ) from exc
+
+    # Transcribe (blocking call — run off the event loop)
+    try:
+        result = await asyncio.to_thread(transcribe_audio_from_s3, storage_key, ext)
+
+    except Exception as exc:
+        logger.exception("Session %s: transcription failed for %s", session_id, storage_key)
+        # Best-effort cleanup before surfacing the error
+        try:
+            s3_client.delete_file(storage_key)
+
+        except Exception:
+            logger.warning("Session %s: also failed to clean up audio %s", session_id, storage_key)
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Transcription failed: {exc}",
+        ) from exc
+
+    # Delete the audio now that we have the text (best-effort)
+    try:
+        s3_client.delete_file(storage_key)
+
+    except Exception:
+        logger.warning("Session %s: failed to delete session audio %s", session_id, storage_key)
+
+    return AudioTranscriptionResponse(transcript=result.text or "")
 
 
 # Complete session

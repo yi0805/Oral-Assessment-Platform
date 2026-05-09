@@ -117,6 +117,15 @@ class StudentResponseRequest(BaseModel):
 class StudentResponseResponse(BaseModel):
     next_question: StudentNextQuestionOut | None = None
 
+class AudioTranscriptionResponse(BaseModel):
+    """Issue #71 — transcript-only result for the edit-before-submit flow.
+
+    Returned by the transcribe-audio endpoint. The transcript is NOT
+    persisted to the database; the client populates it into the answer
+    input and submits separately via the standard text response endpoint.
+    """
+    transcript: str
+
 # Assessment history
 
 class AssessmentHistoryItemOut(BaseModel):
