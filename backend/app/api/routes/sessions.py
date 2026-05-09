@@ -74,6 +74,69 @@ def _get_main_question_by_order(
     return questions[idx] if 0 <= idx < len(questions) else None
 
 
+def _validate_session_for_transcribe(
+    session_id: UUID,
+    current_user: User,
+    db: Session,
+) -> AssessmentSession:
+    """
+    Shared session-level validation for the transcribe routes.
+
+    Looks up the assessment session, verifies that ``current_user`` owns
+    it, that the session is currently in progress, and that the
+    assessment time limit (if any) has not expired. Raises
+    ``HTTPException`` with the appropriate status codes on any failure.
+
+    Returns the validated ``AssessmentSession`` so callers that need
+    properties of the session (e.g. ``session.id``) can use it without
+    re-querying.
+
+    Extracted from ``transcribe_response_audio`` so the upcoming
+    streaming route (``/sessions/{id}/transcribe/stream``, issue #72)
+    can reuse the exact same checks.
+    """
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    if session.user_s_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session.",
+        )
+
+    if session.status != "in_progress":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session is not in progress.",
+        )
+
+    config = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.id == session.assessment_config_id)
+        .first()
+    )
+
+    if session.started_at and config and config.total_time_minute:
+        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The time limit for this assessment has expired.",
+            )
+
+    return session
+
+
 async def _generate_ai_followup(
     db: Session,
     session: AssessmentSession,
@@ -1012,7 +1075,8 @@ async def transcribe_response_audio(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    # Validate audio extension up-front (cheap fail)
+    # Validate audio extension up-front (cheap fail; route-specific so
+    # not part of _validate_session_for_transcribe).
     filename = audio.filename or ""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
@@ -1022,39 +1086,9 @@ async def transcribe_response_audio(
             detail=f"Unsupported audio format: {ext!r}. Supported: mp3, mp4, m4a, wav, flac, ogg, webm, amr.",
         )
 
-    # Validate session
-    session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
-
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
-    if session.user_s_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this session.",
-        )
-
-    if session.status != "in_progress":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Session is not in progress.",
-        )
-
-    config = (
-        db.query(AssessmentConfig)
-        .filter(AssessmentConfig.id == session.assessment_config_id)
-        .first()
-    )
-
-    # Time check
-    if session.started_at and config and config.total_time_minute:
-        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
-
-        if datetime.now(timezone.utc) > expires_at:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="The time limit for this assessment has expired.",
-            )
+    # Session-level validation (ownership, status, time limit). Shared
+    # with the upcoming streaming route — see _validate_session_for_transcribe.
+    _validate_session_for_transcribe(session_id, current_user, db)
 
     # Enforce upload size limit (25 MB) — same as /respond/audio
     max_audio_bytes = 25 * 1024 * 1024
