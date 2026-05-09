@@ -144,6 +144,7 @@ function Transcript() {
                       alt="Student avatar"
                       className="h-full w-full rounded-full object-cover"
                       src={transcript.student.image || "/WhereRU.png"}
+                      referrerPolicy="no-referrer"
                     />
                   </div>
 
