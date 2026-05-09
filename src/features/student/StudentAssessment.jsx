@@ -5,6 +5,7 @@ import { useStartSession } from "./useStartSession";
 import { useCourses } from "../../hooks/useCourses";
 import { useSubmitAnswer } from "./useSubmitAnswer";
 import { useSubmitAudioAnswer } from "./useSubmitAudioAnswer";
+import { useTranscribeAudio } from "./useTranscribeAudio";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
@@ -48,8 +49,10 @@ export default function StudentAssessment() {
 
   const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
-  const { submitAudioAnswer, isPending: isTranscribing } =
+  const { submitAudioAnswer, isPending: isLegacyAudioSubmitting } =
     useSubmitAudioAnswer();
+  const { transcribeAudio, isPending: isTranscribingOnly } =
+    useTranscribeAudio();
   const {
     status: recordingStatus,
     isSupported: isAudioSupported,
@@ -62,6 +65,9 @@ export default function StudentAssessment() {
   const { logout } = useLogout();
 
   const isRecording = recordingStatus === "recording";
+  // Either path (legacy auto-save or new transcribe-only) shows the same
+  // "Transcribing…" UI. Combined here so existing JSX keeps working.
+  const isTranscribing = isLegacyAudioSubmitting || isTranscribingOnly;
   const audioBusy = isRecording || isTranscribing;
 
   useEffect(() => {
@@ -206,15 +212,38 @@ export default function StudentAssessment() {
 
   // Persistence side of the audio flow. Takes a finalized recording Blob
   // and either (a) routes it through the legacy transcribe-and-save
-  // backend call, or (b) defers to the new edit-before-submit pipeline
-  // when the feature flag is on. Subsequent commits for issue #71 will
-  // replace the flag-on branch with a transcribe-only API call that
-  // populates the answer textarea instead of writing to the DB.
+  // backend call, or (b) when the feature flag is on, runs the
+  // edit-before-submit pipeline: transcribe-only, populate the textarea,
+  // and let the student review/correct before clicking "Submit Answer".
   async function handleAudioSubmit(blob) {
     if (isEditBeforeSubmitEnabled()) {
-      console.warn(
-        "[#71] VITE_ENABLE_EDIT_BEFORE_SUBMIT is on, but the new transcribe-then-edit flow is not yet wired up. The recording was captured but not submitted.",
-      );
+      // Issue #71 — transcribe-then-edit flow.
+      // Transcribe the recording, drop the result into the answer
+      // textarea, and stop. The DB write happens later when the student
+      // clicks "Submit Answer" (existing handleSubmitAnswer path).
+      try {
+        const transcript = await transcribeAudio({
+          sessionId,
+          audioBlob: blob,
+        });
+
+        if (!transcript || !transcript.trim()) {
+          // Don't clobber any existing typed text the student already
+          // wrote — just surface a hint and leave the textarea alone.
+          setAudioError(
+            "We didn't catch any speech. Please try recording again.",
+          );
+          return;
+        }
+
+        // Overwrite (not append) so each new recording fully replaces
+        // the previous draft. The student can then edit.
+        setTypedAnswer(transcript);
+      } catch (err) {
+        setAudioError(
+          getErrorMessage(err, "Failed to transcribe your audio."),
+        );
+      }
       return;
     }
 
