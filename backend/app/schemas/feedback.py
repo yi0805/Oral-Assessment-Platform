@@ -59,4 +59,4 @@ class AISummaryInfoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     suggested_grade: int | None = None
-    detailed_feedback: Dict[str, CriterionFeedback]
+    detailed_feedback: Dict[str, CriterionFeedback] | None = None
