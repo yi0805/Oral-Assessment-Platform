@@ -176,12 +176,22 @@ export default function StudentAssessment() {
   }
 
   async function handleSubmitAnswer() {
-    if (!typedAnswer.trim() || isSubmitting) return;
+    // Trim once at the boundary so what the server stores matches what
+    // the student saw. Re-checks isSubmitting for the (rare) case where
+    // a click slips through before the disabled prop renders.
+    const trimmedAnswer = typedAnswer.trim();
+    if (!trimmedAnswer || isSubmitting) return;
 
+    // Clear any lingering transcription error so it doesn't sit on the
+    // page after a successful submit (#71).
+    setAudioError(null);
     setIsSubmitting(true);
 
     try {
-      const response = await submitAnswer({ sessionId, answer: typedAnswer });
+      const response = await submitAnswer({
+        sessionId,
+        answer: trimmedAnswer,
+      });
 
       setTypedAnswer("");
 

@@ -628,6 +628,27 @@ async def submit_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    # Issue #71 — server-side answer validation. The frontend disables the
+    # Submit Answer button on whitespace-only input, but we revalidate
+    # here because (a) we can't trust the client, and (b) the legacy
+    # /respond/audio path also routes through here with whatever AWS
+    # Transcribe returned, which may be an empty string for silent audio.
+    answer_text = (payload.answer_text or "").strip()
+
+    if not answer_text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Answer cannot be empty.",
+        )
+
+    _MAX_ANSWER_CHARS = 10000
+
+    if len(answer_text) > _MAX_ANSWER_CHARS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Answer is too long (max {_MAX_ANSWER_CHARS} characters).",
+        )
+
     # Validate session
     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
 
@@ -706,7 +727,7 @@ async def submit_response(
         session_question_item_id=last_question_item.id,
         message_type="student_answer",
         sequence_no=next_seq,
-        content=payload.answer_text,
+        content=answer_text,
     )
 
     db.add(answer_msg)
