@@ -4,6 +4,51 @@ Audio transcription utility using AWS Transcribe.
 Starts a transcription job against an audio file already stored in S3
 (the same bucket used by the materials pipeline), polls until the job
 finishes, then downloads and parses the JSON transcript.
+
+Poll-interval rationale (issue #72)
+-----------------------------------
+This module uses AWS Transcribe's *batch* API: submit a job, then call
+``GetTranscriptionJob`` repeatedly until ``COMPLETED``. Total latency
+is therefore ``submit_time + N * poll_interval + fetch_time`` where N
+depends on how long AWS takes — a value we cannot observe except by
+polling for it.
+
+Per-stage instrumentation across 8 sample recordings (~10s of speech,
+"testing 1 … testing 10", WebM/Opus, ap-southeast-2) showed the poll
+loop dominated end-to-end latency:
+
+    metric              | value
+    --------------------|----------------
+    median total        | 18.21s
+    poll-loop median    | 12.83s  (70%+ of total in every run)
+    poll-loop range     | 10.25s – 56.07s
+    polls per run       | 3 – 12
+    s3 upload median    | 0.40s
+    submit-job median   | 0.89s
+    transcript fetch    | 0.22s
+
+Audio size did *not* correlate with latency (a 373 KB clip ran in
+12.1s while a 260 KB clip in the same batch took 57.7s), confirming
+the variance comes from AWS-side queue/processing time rather than
+anything we control client-side.
+
+Because AWS Transcribe regularly finishes between two of our sleep
+ticks, an interval of ``T`` seconds wastes up to ``T - 1`` seconds of
+pure idle wait per request. The original interval was 5s, costing as
+much as ~4s on every short clip. Dropping the default to 1s narrows
+that worst-case waste to ~1s while only marginally increasing API
+call volume (``GetTranscriptionJob`` is rate-limited generously and
+costs nothing meaningful).
+
+The interval is exposed as ``settings.transcribe_poll_interval_seconds``
+(env var ``TRANSCRIBE_POLL_INTERVAL_SECONDS``) so different
+deployments / regions can override the default without a code change.
+
+This is an interim optimisation. The longer-term fix tracked under
+issue #72 is to switch the student answer path to AWS Transcribe
+*Streaming* (``StartStreamTranscription``), which removes the batch
+queue entirely and returns partial results within ~300ms. The work
+here only smooths out the worst case of the existing batch pipeline.
 """
 from __future__ import annotations
 
