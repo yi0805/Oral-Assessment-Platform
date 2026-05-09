@@ -8,6 +8,7 @@ import { useSubmitAudioAnswer } from "./useSubmitAudioAnswer";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
+import { useRecordBlurNotification } from "./useRecordBlurNotification";
 
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";
@@ -18,16 +19,25 @@ export default function StudentAssessment() {
 
   const { courseId, assessmentConfigId } = useParams();
 
-  const [sessionId, setSessionId] = useState(null);
-  const [assessmentTitle, setAssessmentTitle] = useState("");
+  const {
+    session,
+    isLoading: isSessionLoading,
+    isFetching: isSessionFetching,
+    error: sessionError,
+    refetch: refetchSession,
+  } = useStartSession(assessmentConfigId);
 
-  const [expiresAt, setExpiresAt] = useState(null);
+  const sessionId = session?.session_id ?? null;
+  const assessmentTitle = session?.assessment_title ?? "";
+  const expiresAtIso = session?.expires_at ?? null;
+  const maxMainQuestions = session?.main_question_num ?? 0;
+  const maxFollowupsPerMain = session?.follow_up_num ?? 0;
+
   const [timeLeft, setTimeLeft] = useState(null);
 
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [typedAnswer, setTypedAnswer] = useState("");
 
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [error, setError] = useState(null);
@@ -37,15 +47,11 @@ export default function StudentAssessment() {
 
   const [blurCount, setBlurCount] = useState(0);
 
-  const [maxMainQuestions, setMaxMainQuestions] = useState(0);
-  const [maxFollowupsPerMain, setMaxFollowupsPerMain] = useState(0);
-
   const hasAutoCompleted = useRef(false);
 
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const course = courses.find((c) => c.id === courseId);
 
-  const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
   const { submitAudioAnswer, isPending: isTranscribing } =
     useSubmitAudioAnswer();
@@ -57,6 +63,7 @@ export default function StudentAssessment() {
     reset: resetRecorder,
   } = useAudioRecorder();
   const { completeAssessment } = useCompleteAssessment();
+  const { recordBlurNotification } = useRecordBlurNotification();
 
   const { logout } = useLogout();
 
@@ -64,41 +71,20 @@ export default function StudentAssessment() {
   const audioBusy = isRecording || isTranscribing;
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function init() {
-      try {
-        const Response = await startSession({ assessmentConfigId });
-        if (cancelled) return;
-
-        setSessionId(Response.session_id);
-        setAssessmentTitle(Response.assessment_title);
-        setExpiresAt(new Date(Response.expires_at));
-        setCurrentQuestion(Response.current_question);
-        setCanComplete(Response.can_complete ?? false);
-        setMaxMainQuestions(Response.main_question_num ?? 0);
-        setMaxFollowupsPerMain(Response.follow_up_num ?? 0);
-      } catch (err) {
-        if (cancelled) return;
-        setError(getErrorMessage(err, "Failed to start the assessment."));
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    }
-
-    init();
-    return () => {
-      cancelled = true;
-    };
-  }, [assessmentConfigId, startSession]);
+    if (!session) return;
+    setCurrentQuestion(session.current_question);
+    setCanComplete(session.can_complete ?? false);
+  }, [session]);
 
   useEffect(() => {
-    if (!expiresAt) return;
+    if (!expiresAtIso) return;
+
+    const expiresAtMs = new Date(expiresAtIso).getTime();
 
     function tick() {
       const remaining = Math.max(
         0,
-        Math.floor((expiresAt.getTime() - Date.now()) / 1000),
+        Math.floor((expiresAtMs - Date.now()) / 1000),
       );
       setTimeLeft(remaining);
     }
@@ -106,7 +92,7 @@ export default function StudentAssessment() {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [expiresAt]);
+  }, [expiresAtIso]);
 
   useEffect(() => {
     function handleVisibilityChange() {
@@ -135,6 +121,16 @@ export default function StudentAssessment() {
 
     async function autoComplete() {
       try {
+        if (blurCount > 0) {
+          try {
+            await recordBlurNotification({ sessionId, blurCount });
+          } catch (blurError) {
+            setError(
+              getErrorMessage(blurError, "Failed to record tab-switch notification."),
+            );
+          }
+        }
+
         await completeAssessment({ sessionId, courseId });
         navigate(`/student/${courseId}`);
       } catch (error) {
@@ -151,11 +147,19 @@ export default function StudentAssessment() {
     isSubmitting,
     isTranscribing,
     completeAssessment,
+    recordBlurNotification,
+    blurCount,
     navigate,
     courseId,
   ]);
 
-  if (isLoading || isCoursesLoading) return <Loading />;
+  if (isSessionLoading || isCoursesLoading) return <Loading />;
+
+  const displayedError =
+    error ||
+    (sessionError
+      ? getErrorMessage(sessionError, "Failed to start the assessment.")
+      : null);
 
   function formatTime(seconds) {
     if (seconds == null) return "--:--";
@@ -196,10 +200,22 @@ export default function StudentAssessment() {
     setIsSubmitting(true);
 
     try {
+      if (blurCount > 0 && sessionId) {
+        try {
+          await recordBlurNotification({ sessionId, blurCount });
+        } catch (blurError) {
+          setError(
+            getErrorMessage(blurError, "Failed to record tab-switch notification."),
+          );
+        }
+      }
+
       await completeAssessment({ sessionId, courseId });
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -210,6 +226,7 @@ export default function StudentAssessment() {
     setAudioError(null);
 
     if (isRecording) {
+      let didStartSubmitting = false;
       try {
         const blob = await stopRecording();
 
@@ -219,6 +236,7 @@ export default function StudentAssessment() {
         }
 
         setIsSubmitting(true);
+        didStartSubmitting = true;
 
         const response = await submitAudioAnswer({
           sessionId,
@@ -238,7 +256,7 @@ export default function StudentAssessment() {
           getErrorMessage(err, "Failed to submit your audio answer."),
         );
       } finally {
-        setIsSubmitting(false);
+        if (didStartSubmitting) setIsSubmitting(false);
       }
       return;
     }
@@ -346,7 +364,7 @@ export default function StudentAssessment() {
               </div>
             )}
 
-            {error && (
+            {displayedError && (
               <div className="relative overflow-hidden rounded-xl border border-error/15 bg-error-container/40 p-8 shadow-sm">
                 <div className="absolute left-0 top-0 h-full w-2 bg-error"></div>
 
@@ -364,8 +382,22 @@ export default function StudentAssessment() {
                     </h2>
 
                     <p className="text-sm leading-relaxed text-on-surface-variant">
-                      {error}
+                      {displayedError}
                     </p>
+
+                    {sessionError && !session && (
+                      <button
+                        type="button"
+                        onClick={() => refetchSession()}
+                        disabled={isSessionFetching}
+                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-sm transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-sm">
+                          refresh
+                        </span>
+                        {isSessionFetching ? "Retrying..." : "Try again"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

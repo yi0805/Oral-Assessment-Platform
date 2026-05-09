@@ -76,3 +76,4 @@ class TranscriptMessage(Base):
 
     def __repr__(self) -> str:
         return f"<Message #{self.sequence_no} {self.content[:40]}...>"
+    
