@@ -20,6 +20,11 @@ passlib[bcrypt]==1.7.4
 
 # AWS
 boto3==1.35.0
+# Issue #72: AWS Transcribe Streaming SDK. Used by the upcoming
+# /sessions/{id}/transcribe/stream WebSocket endpoint to forward PCM
+# frames to AWS in real time and receive partial transcripts. Pulls in
+# aws-crt and amazon-transcribe-events-* as transitive deps.
+amazon-transcribe==0.6.2
 
 # File processing
 pandas==3.0.2
