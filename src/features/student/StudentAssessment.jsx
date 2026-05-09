@@ -546,6 +546,32 @@ export default function StudentAssessment() {
                   )}
                 </div>
 
+                {/*
+                  Issue #71 — anti-cheat surface for the answer textarea.
+
+                  Programmatic insertions (the transcript populated by
+                  setTypedAnswer) bypass all of these handlers because
+                  they aren't user input events, so the new flow keeps
+                  working. The handlers only block USER paths:
+
+                    - onCopy / onCut / onPaste:  clipboard via menus + keys
+                    - onKeyDown:                 Ctrl/Cmd+C/V/X, Shift+Insert,
+                                                 Ctrl+Insert, Shift+Delete
+                    - onContextMenu:             right-click "Paste" menu
+                    - onDrop / onDragOver:       drag-and-drop text/files
+                    - onBeforeInput:             cross-browser InputEvent
+                                                 belt-and-suspenders for
+                                                 paths that bypass onPaste
+                                                 (async Clipboard API,
+                                                 some mobile keyboards,
+                                                 undo-restore-of-paste)
+                    - onChange rate limit:       blocks bulk insertion if
+                                                 anything above slips through
+                    - data-gramm* attrs:         disable Grammarly extension
+                    - data-lt-active="false":    disable LanguageTool
+                    - autoComplete + name="":    disable browser autofill
+                    - autoCorrect / spellCheck:  disable native suggestions
+                */}
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
                     <span className="material-symbols-outlined text-outline">
@@ -567,6 +593,21 @@ export default function StudentAssessment() {
                     onCopy={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
+                    onBeforeInput={(e) => {
+                      // Block insertions whose origin is paste or drop —
+                      // catches paths that don't fire onPaste/onDrop on
+                      // some browsers (Safari async Clipboard API, mobile
+                      // long-press paste, undo of a prior paste).
+                      const inputType = e.nativeEvent?.inputType || "";
+                      if (
+                        inputType === "insertFromPaste" ||
+                        inputType === "insertFromPasteAsQuotation" ||
+                        inputType === "insertFromDrop" ||
+                        inputType === "insertFromYank"
+                      ) {
+                        e.preventDefault();
+                      }
+                    }}
                     onKeyDown={(e) => {
                       const key = e.key?.toLowerCase();
                       if (
@@ -587,9 +628,15 @@ export default function StudentAssessment() {
                     onDrop={(e) => e.preventDefault()}
                     onDragOver={(e) => e.preventDefault()}
                     onContextMenu={(e) => e.preventDefault()}
+                    name=""
                     autoComplete="off"
                     autoCorrect="off"
+                    autoCapitalize="off"
                     spellCheck={false}
+                    data-gramm="false"
+                    data-gramm_editor="false"
+                    data-enable-grammarly="false"
+                    data-lt-active="false"
                   ></textarea>
                 </div>
               </div>
