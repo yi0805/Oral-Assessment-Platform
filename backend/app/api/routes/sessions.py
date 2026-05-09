@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
@@ -1072,8 +1073,13 @@ async def transcribe_response_audio(
                 detail="Audio file exceeds the 25 MB upload limit.",
             )
 
+    # [STT Instrumentation - issue #72]
+    # Per-stage timings so we can attribute the perceived latency.
+    _t_handler_start = time.monotonic()
+
     # Read audio bytes
     audio_bytes = await audio.read()
+    _t_after_read = time.monotonic()
 
     if not audio_bytes:
         raise HTTPException(
@@ -1100,6 +1106,8 @@ async def transcribe_response_audio(
             detail=f"Audio upload failed: {exc}",
         ) from exc
 
+    _t_after_s3 = time.monotonic()
+
     # Transcribe (blocking call — run off the event loop)
     try:
         result = await asyncio.to_thread(transcribe_audio_from_s3, storage_key, ext)
@@ -1118,12 +1126,29 @@ async def transcribe_response_audio(
             detail=f"Transcription failed: {exc}",
         ) from exc
 
+    _t_after_transcribe = time.monotonic()
+
     # Delete the audio now that we have the text (best-effort)
     try:
         s3_client.delete_file(storage_key)
 
     except Exception:
         logger.warning("Session %s: failed to delete session audio %s", session_id, storage_key)
+
+    # [STT Instrumentation - issue #72]
+    # Single grep-able line. Pair this with the [STT timings] line emitted
+    # by audio_transcriber.py to get the full picture (submit/poll/fetch).
+    logger.info(
+        "[STT timings] phase=route session=%s bytes=%d ext=%s "
+        "read=%.3fs s3=%.3fs transcribe=%.3fs total=%.3fs",
+        session_id,
+        len(audio_bytes),
+        ext,
+        _t_after_read - _t_handler_start,
+        _t_after_s3 - _t_after_read,
+        _t_after_transcribe - _t_after_s3,
+        _t_after_transcribe - _t_handler_start,
+    )
 
     return AudioTranscriptionResponse(transcript=result.text or "")
 

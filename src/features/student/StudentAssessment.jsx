@@ -8,6 +8,7 @@ import { useTranscribeAudio } from "./useTranscribeAudio";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
+import SttDebugOverlay from "./SttDebugOverlay";
 
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";
@@ -755,6 +756,9 @@ export default function StudentAssessment() {
           </div>
         </div>
       </main>
+
+      {/* [STT Instrumentation - issue #72] Renders only when ?debugStt=1 */}
+      <SttDebugOverlay />
     </div>
   );
 }
