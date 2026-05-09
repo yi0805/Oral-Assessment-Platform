@@ -11,12 +11,22 @@ exposes a small async API around AWS Transcribe Streaming
   * stream partial + final transcripts back to the browser within
     ~300 ms of the audio arriving.
 
-This file is the **public API surface only** — every method raises
-``NotImplementedError``. The AWS integration (``amazon-transcribe``
-SDK calls, the result-handler wiring, error mapping) lands in the
-next commit. Splitting the change in two keeps each PR small enough
-to review and lets us land the WebSocket route against this contract
-without waiting for the AWS code to be finished.
+Implementation notes
+~~~~~~~~~~~~~~~~~~~~
+The :mod:`amazon_transcribe` SDK is callback-driven — you subclass
+``TranscriptResultStreamHandler`` and override
+``handle_transcript_event``. To present a Pythonic async iterator
+instead, this module bridges those callbacks into an
+``asyncio.Queue``: a small internal handler pushes
+:class:`StreamResult` objects onto the queue, and :meth:`results`
+yields them out. The handler runs on its own task spawned in
+:meth:`__aenter__` and torn down in :meth:`__aexit__`.
+
+AWS credentials come from the standard botocore credential chain
+(env vars, ``~/.aws/credentials``, instance profile, etc.). For local
+SSO development with a named profile, set ``AWS_PROFILE`` in your
+shell before starting uvicorn — the streaming SDK does *not* read
+``settings.aws_profile_name`` directly the way the batch path does.
 
 Intended call shape::
 
@@ -41,12 +51,23 @@ handler can run them as two concurrent tasks.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from types import TracebackType
-from typing import AsyncIterator, Optional, Type
+from typing import Any, AsyncIterator, Optional, Type
+
+from amazon_transcribe.client import TranscribeStreamingClient
+from amazon_transcribe.handlers import TranscriptResultStreamHandler
+from amazon_transcribe.model import TranscriptEvent
 
 logger = logging.getLogger(__name__)
+
+# Internal sentinel pushed onto the result queue by the handler task
+# when the AWS output stream closes. ``results()`` uses it to know when
+# to terminate cleanly.
+_END_OF_RESULTS: Any = object()
 
 # AWS Transcribe Streaming expects raw signed 16-bit little-endian PCM.
 # 16 kHz mono is the recommended rate for English speech models and
@@ -89,6 +110,47 @@ class StreamResult:
     timestamp: float
 
 
+class _ResultPump(TranscriptResultStreamHandler):
+    """
+    Internal bridge between the SDK's callback-driven handler and an
+    :class:`asyncio.Queue`.
+
+    The SDK calls :meth:`handle_transcript_event` for every transcript
+    event delivered over the bidirectional stream. We translate each
+    event into one or more :class:`StreamResult` objects and push them
+    onto a queue that :meth:`TranscribeStreamer.results` drains.
+    """
+
+    def __init__(
+        self,
+        transcript_result_stream: Any,
+        queue: "asyncio.Queue[Any]",
+        t_start: float,
+    ) -> None:
+        super().__init__(transcript_result_stream)
+        self._queue = queue
+        self._t_start = t_start
+
+    async def handle_transcript_event(
+        self,
+        transcript_event: TranscriptEvent,
+    ) -> None:
+        for result in transcript_event.transcript.results:
+            text = ""
+            if result.alternatives:
+                # AWS sorts alternatives by descending confidence — the
+                # first one is the most likely transcription.
+                text = result.alternatives[0].transcript or ""
+
+            await self._queue.put(
+                StreamResult(
+                    text=text,
+                    is_partial=bool(result.is_partial),
+                    timestamp=time.monotonic() - self._t_start,
+                )
+            )
+
+
 class TranscribeStreamer:
     """
     Async wrapper around AWS Transcribe Streaming.
@@ -106,10 +168,11 @@ class TranscribeStreamer:
     (one feeding audio in, one consuming results out) — the AWS SDK's
     bidirectional model supports this naturally.
 
-    *Skeleton only* — every method raises :class:`NotImplementedError`
-    until the AWS integration commit lands. Constructing the object
-    and entering/exiting the context manager fail loudly so callers
-    written against this contract can be type-checked but not yet run.
+    Internally a background task drives the SDK's event loop and
+    pushes :class:`StreamResult` objects onto an :class:`asyncio.Queue`
+    that :meth:`results` drains. If the background task fails, the
+    exception is re-raised the next time :meth:`results` is awaited
+    so the caller doesn't have to plumb error handling separately.
     """
 
     def __init__(
@@ -136,10 +199,20 @@ class TranscribeStreamer:
         self._region = region
         self._language_code = language_code
         self._sample_rate_hz = sample_rate_hz
-        # The actual AWS streaming objects (client, session handle,
-        # result-handler task) are populated in __aenter__ once the
-        # implementation commit lands.
+        # AWS streaming state — populated in __aenter__.
+        self._client: Optional[TranscribeStreamingClient] = None
+        self._stream: Any = None
+        self._queue: Optional["asyncio.Queue[Any]"] = None
+        self._handler_task: Optional[asyncio.Task[None]] = None
+        # If the handler task fails, the exception is stored here and
+        # re-raised by results() once the queue drains. Keeping it on
+        # the instance (rather than enqueuing it directly) makes
+        # results() easier to reason about — it sees a single sentinel
+        # value rather than two distinct ones.
+        self._handler_error: Optional[BaseException] = None
+        self._t_start: Optional[float] = None
         self._opened = False
+        self._input_ended = False
 
     async def __aenter__(self) -> "TranscribeStreamer":
         """
@@ -149,10 +222,61 @@ class TranscribeStreamer:
         Raises :class:`TranscribeStreamError` if the connection cannot
         be established (auth failure, network error, etc.).
         """
-        raise NotImplementedError(
-            "TranscribeStreamer.__aenter__ is wired up in the next commit "
-            "(issue #72)."
+        try:
+            self._client = TranscribeStreamingClient(region=self._region)
+            self._stream = await self._client.start_stream_transcription(
+                language_code=self._language_code,
+                media_sample_rate_hz=self._sample_rate_hz,
+                media_encoding="pcm",
+            )
+        except Exception as exc:  # noqa: BLE001 — wrap any SDK error
+            logger.exception(
+                "[TranscribeStream] start_stream_transcription failed"
+            )
+            raise TranscribeStreamError(
+                f"Could not open AWS Transcribe stream: {exc}"
+            ) from exc
+
+        self._t_start = time.monotonic()
+        self._queue = asyncio.Queue()
+        pump = _ResultPump(
+            self._stream.output_stream, self._queue, self._t_start
         )
+        self._handler_task = asyncio.create_task(self._run_handler(pump))
+        self._opened = True
+        logger.info(
+            "[TranscribeStream] opened region=%s lang=%s rate=%dHz",
+            self._region,
+            self._language_code,
+            self._sample_rate_hz,
+        )
+        return self
+
+    async def _run_handler(self, pump: _ResultPump) -> None:
+        """
+        Drive the SDK's event loop on a background task. Pushes
+        :data:`_END_OF_RESULTS` onto the queue when AWS closes the
+        output stream so :meth:`results` knows to stop iterating.
+
+        Cancellation propagates so :meth:`__aexit__` can tear the task
+        down quickly if the route hits an error mid-stream.
+        """
+        try:
+            await pump.handle_events()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # noqa: BLE001 — surface via results()
+            self._handler_error = exc
+            logger.exception("[TranscribeStream] handler task failed")
+        finally:
+            # Always signal results() to terminate, even on cancellation.
+            # Default asyncio.Queue is unbounded, so put_nowait can't
+            # block or raise QueueFull in practice.
+            assert self._queue is not None
+            try:
+                self._queue.put_nowait(_END_OF_RESULTS)
+            except asyncio.QueueFull:  # pragma: no cover
+                pass
 
     async def __aexit__(
         self,
@@ -165,10 +289,34 @@ class TranscribeStreamer:
         automatically when leaving the ``async with`` block. Idempotent
         — safe to call after :meth:`end_input` or after an error.
         """
-        raise NotImplementedError(
-            "TranscribeStreamer.__aexit__ is wired up in the next commit "
-            "(issue #72)."
-        )
+        # Best-effort end_stream so AWS can flush remaining results.
+        if (
+            self._opened
+            and self._stream is not None
+            and not self._input_ended
+        ):
+            try:
+                await self._stream.input_stream.end_stream()
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "[TranscribeStream] failed to end input on exit",
+                    exc_info=True,
+                )
+            finally:
+                self._input_ended = True
+
+        # Cancel the handler task if it's still running. handle_events()
+        # naturally returns once AWS closes the output stream after
+        # end_stream(), so on the happy path the cancel is a no-op.
+        if self._handler_task is not None and not self._handler_task.done():
+            self._handler_task.cancel()
+            try:
+                await self._handler_task
+            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                pass
+
+        self._opened = False
+        logger.info("[TranscribeStream] closed")
 
     async def send_pcm(self, frame: bytes) -> None:
         """
@@ -183,10 +331,20 @@ class TranscribeStreamer:
         Raises :class:`TranscribeStreamError` if the streamer is
         closed or AWS rejects the frame.
         """
-        raise NotImplementedError(
-            "TranscribeStreamer.send_pcm is wired up in the next commit "
-            "(issue #72)."
-        )
+        if not self._opened or self._stream is None:
+            raise TranscribeStreamError(
+                "send_pcm called on a closed streamer"
+            )
+        if self._input_ended:
+            raise TranscribeStreamError(
+                "send_pcm called after end_input()"
+            )
+        try:
+            await self._stream.input_stream.send_audio_event(
+                audio_chunk=frame
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise TranscribeStreamError(f"send_pcm failed: {exc}") from exc
 
     async def end_input(self) -> None:
         """
@@ -200,15 +358,21 @@ class TranscribeStreamer:
         Idempotent. Safe to call from a different task than
         :meth:`send_pcm`.
         """
-        raise NotImplementedError(
-            "TranscribeStreamer.end_input is wired up in the next commit "
-            "(issue #72)."
-        )
+        if (
+            not self._opened
+            or self._stream is None
+            or self._input_ended
+        ):
+            return
+        try:
+            await self._stream.input_stream.end_stream()
+        finally:
+            self._input_ended = True
 
-    def results(self) -> AsyncIterator[StreamResult]:
+    async def results(self) -> AsyncIterator[StreamResult]:
         """
-        Return an async iterator over :class:`StreamResult` chunks as
-        AWS produces them.
+        Async generator yielding :class:`StreamResult` chunks as AWS
+        produces them.
 
         The iterator terminates once :meth:`end_input` has been called
         *and* AWS has flushed all remaining results. Iterate it from a
@@ -221,8 +385,21 @@ class TranscribeStreamer:
         span of audio — the most recent one supersedes earlier ones.
         Once a span is finalised AWS sends a single ``is_partial=False``
         result for it.
+
+        Raises :class:`TranscribeStreamError` if the background handler
+        task crashed (e.g. AWS dropped the connection mid-stream).
         """
-        raise NotImplementedError(
-            "TranscribeStreamer.results is wired up in the next commit "
-            "(issue #72)."
-        )
+        if self._queue is None:
+            raise TranscribeStreamError(
+                "results() called before __aenter__"
+            )
+
+        while True:
+            item = await self._queue.get()
+            if item is _END_OF_RESULTS:
+                if self._handler_error is not None:
+                    raise TranscribeStreamError(
+                        f"AWS streaming handler failed: {self._handler_error}"
+                    ) from self._handler_error
+                return
+            yield item
