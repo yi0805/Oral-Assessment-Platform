@@ -284,3 +284,167 @@ async def test_results_terminates_when_no_events_arrive(patched_streamer):
             received.append(result)
 
     assert received == []
+
+
+# ---------------------------------------------------------------------------
+# Error and timeout paths
+# ---------------------------------------------------------------------------
+
+
+async def test_aenter_wraps_aws_error_in_transcribe_stream_error(monkeypatch):
+    """
+    If ``start_stream_transcription`` fails (auth issue, network error,
+    region misconfiguration, etc.), :meth:`TranscribeStreamer.__aenter__`
+    must surface a :class:`TranscribeStreamError` rather than letting
+    the SDK exception leak — otherwise the WebSocket route handler
+    would have to know about every botocore exception type.
+    """
+    from app.utils import audio_streamer
+
+    failing_client = MagicMock()
+    failing_client.start_stream_transcription = AsyncMock(
+        side_effect=RuntimeError("simulated AWS connection failure")
+    )
+    monkeypatch.setattr(
+        audio_streamer,
+        "TranscribeStreamingClient",
+        MagicMock(return_value=failing_client),
+    )
+
+    streamer = audio_streamer.TranscribeStreamer(region="us-east-1")
+
+    with pytest.raises(audio_streamer.TranscribeStreamError) as excinfo:
+        await streamer.__aenter__()
+
+    # The original cause is chained so debugging logs can find it.
+    assert isinstance(excinfo.value.__cause__, RuntimeError)
+    assert "simulated AWS connection failure" in str(excinfo.value.__cause__)
+
+
+async def test_send_pcm_before_open_raises():
+    """
+    Calling :meth:`send_pcm` on a freshly-constructed but unentered
+    streamer is a programmer error. The wrapper should fail loudly
+    rather than silently dropping the frame.
+    """
+    from app.utils.audio_streamer import (
+        TranscribeStreamer,
+        TranscribeStreamError,
+    )
+
+    streamer = TranscribeStreamer(region="us-east-1")
+
+    with pytest.raises(TranscribeStreamError, match="closed streamer"):
+        await streamer.send_pcm(b"\x00\x01" * 100)
+
+
+async def test_results_before_open_raises():
+    """
+    Iterating :meth:`results` before :meth:`__aenter__` should raise,
+    not hang waiting on a queue that doesn't exist yet.
+    """
+    from app.utils.audio_streamer import (
+        TranscribeStreamer,
+        TranscribeStreamError,
+    )
+
+    streamer = TranscribeStreamer(region="us-east-1")
+
+    with pytest.raises(TranscribeStreamError, match="before __aenter__"):
+        # The exception is raised on the first ``__anext__``, which is
+        # what ``async for`` triggers under the hood. Materialising via
+        # an explicit ``async for`` keeps the test honest about the
+        # caller-visible behaviour.
+        async for _ in streamer.results():
+            pass
+
+
+async def test_send_pcm_after_end_input_raises(patched_streamer):
+    """
+    Once :meth:`end_input` has been called, no further frames may be
+    sent. AWS will reject them and the wrapper should reject them
+    earlier with a clear message.
+    """
+    from app.utils.audio_streamer import TranscribeStreamError
+
+    async with patched_streamer.TranscribeStreamer(region="us-east-1") as s:
+        await s.end_input()
+
+        with pytest.raises(TranscribeStreamError, match="after end_input"):
+            await s.send_pcm(b"\x00\x01" * 100)
+
+
+async def test_send_pcm_wraps_sdk_error(patched_streamer, fake_aws_stream):
+    """
+    If ``input_stream.send_audio_event`` raises mid-stream (AWS dropped
+    the connection, frame was malformed, rate-limit, etc.) the wrapper
+    must convert the SDK exception into :class:`TranscribeStreamError`.
+    """
+    from app.utils.audio_streamer import TranscribeStreamError
+
+    fake_aws_stream.input_stream.send_audio_event = AsyncMock(
+        side_effect=ConnectionError("AWS pipe broken mid-frame")
+    )
+
+    async with patched_streamer.TranscribeStreamer(region="us-east-1") as s:
+        with pytest.raises(TranscribeStreamError, match="send_pcm failed"):
+            await s.send_pcm(b"\x00\x01" * 100)
+
+
+async def test_results_re_raises_handler_task_failure(monkeypatch, patched_streamer):
+    """
+    If the background handler task crashes (e.g. AWS sends malformed
+    output mid-stream), the failure must surface to the caller of
+    :meth:`results`. The wrapper stashes the exception and re-raises
+    it as :class:`TranscribeStreamError` once the queue drains.
+    """
+    from app.utils.audio_streamer import _ResultPump, TranscribeStreamError
+
+    async def crashing_handle_events(self):
+        raise RuntimeError("malformed transcript event from AWS")
+
+    monkeypatch.setattr(_ResultPump, "handle_events", crashing_handle_events)
+
+    async with patched_streamer.TranscribeStreamer(region="us-east-1") as s:
+        await s.end_input()
+
+        with pytest.raises(TranscribeStreamError, match="handler failed"):
+            async for _ in s.results():
+                pass  # pragma: no cover — exception fires before any yield
+
+
+async def test_aexit_cancels_long_running_handler(monkeypatch, patched_streamer):
+    """
+    If the WebSocket route bails out mid-stream (e.g. the student
+    closes their browser tab), :meth:`__aexit__` must cancel the
+    background handler task rather than leaking it forever.
+
+    Simulated by patching ``handle_events`` with a coroutine that
+    awaits a never-resolving future.
+    """
+    from app.utils.audio_streamer import _ResultPump
+
+    started = asyncio.Event()
+
+    async def long_running_handle_events(self):
+        started.set()
+        # Never resolves — only escapes via cancellation.
+        await asyncio.Future()
+
+    monkeypatch.setattr(_ResultPump, "handle_events", long_running_handle_events)
+
+    streamer = patched_streamer.TranscribeStreamer(region="us-east-1")
+    await streamer.__aenter__()
+
+    # Ensure the handler task actually got scheduled before we cancel.
+    await asyncio.wait_for(started.wait(), timeout=1.0)
+    handler_task = streamer._handler_task
+    assert handler_task is not None
+    assert not handler_task.done()
+
+    await streamer.__aexit__(None, None, None)
+
+    # __aexit__ must wait for the cancellation to take effect — so the
+    # task is fully done by the time it returns, no orphans left behind.
+    assert handler_task.done()
+    assert streamer._opened is False
