@@ -12,6 +12,7 @@ import { useCompleteAssessment } from "./useCompleteAssessment";
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";
 import { getErrorMessage } from "../../utils/getErrorMessage";
+import { isEditBeforeSubmitEnabled } from "../../utils/featureFlags";
 
 export default function StudentAssessment() {
   const navigate = useNavigate();
@@ -218,6 +219,21 @@ export default function StudentAssessment() {
           return;
         }
 
+        // Issue #71 — Edit-before-submit flow.
+        // When the feature flag is ON, recording stops here and the new
+        // transcribe-only + textarea-edit + manual-submit pipeline takes
+        // over. That pipeline is implemented in subsequent commits; in
+        // Commit 1 we only isolate the legacy call site so it can be
+        // toggled off cleanly.
+        if (isEditBeforeSubmitEnabled()) {
+          console.warn(
+            "[#71] VITE_ENABLE_EDIT_BEFORE_SUBMIT is on, but the new transcribe-then-edit flow is not yet wired up. The recording was captured but not submitted.",
+          );
+          return;
+        }
+
+        // Legacy flow: backend transcribes AND persists the answer in one
+        // request. Preserved unchanged behind the flag for safe rollback.
         setIsSubmitting(true);
 
         const response = await submitAudioAnswer({
