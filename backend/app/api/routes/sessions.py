@@ -27,7 +27,8 @@ from app.schemas import (
     PendingReviewOut, TranscriptDetailOut, TranscriptMessageOut, AssessmentTitleOut,
     StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut,
-    AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut, NotificationOut
+    AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
+    BlurNotificationRequest, NotificationOut
 )
 from app.services.ai_gateway import smart_chat_complete
 
@@ -1016,7 +1017,7 @@ def complete_session(
 )
 def record_blur_notification(
     session_id: UUID,
-    blur_count: int,
+    payload: BlurNotificationRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
@@ -1035,7 +1036,7 @@ def record_blur_notification(
     notification = Notification(
         user_id=current_user.id,
         session_id=session_id,
-        blur_count=blur_count,
+        blur_count=payload.blur_count,
     )
 
     db.add(notification)

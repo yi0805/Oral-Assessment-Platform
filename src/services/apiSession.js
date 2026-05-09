@@ -119,12 +119,8 @@ export async function unpublishGrade(sessionId, studentId) {
 }
 
 export async function recordBlurNotification(sessionId, blurCount) {
-  const response = await api.post(
-    `/sessions/${sessionId}/blur-notification`,
-    null,
-    {
-      params: { blur_count: blurCount },
-    },
-  );
+  const response = await api.post(`/sessions/${sessionId}/blur-notification`, {
+    blur_count: blurCount,
+  });
   return response.data;
 }

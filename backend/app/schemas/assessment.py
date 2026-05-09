@@ -157,6 +157,9 @@ class TranscriptDetailOut(BaseModel):
     session_feedback: SessionFeedbackOut | None = None
     transcript: list[TranscriptMessageOut]
 
+class BlurNotificationRequest(BaseModel):
+    blur_count: int
+
 class NotificationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     session_id: UUID
