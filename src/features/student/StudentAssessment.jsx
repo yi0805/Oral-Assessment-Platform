@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useStartSession } from "./useStartSession";
 import { useCourses } from "../../hooks/useCourses";
 import { useSubmitAnswer } from "./useSubmitAnswer";
-import { useSubmitAudioAnswer } from "./useSubmitAudioAnswer";
 import { useTranscribeAudio } from "./useTranscribeAudio";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
@@ -13,7 +12,6 @@ import { useCompleteAssessment } from "./useCompleteAssessment";
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";
 import { getErrorMessage } from "../../utils/getErrorMessage";
-import { isEditBeforeSubmitEnabled } from "../../utils/featureFlags";
 
 export default function StudentAssessment() {
   const navigate = useNavigate();
@@ -49,10 +47,7 @@ export default function StudentAssessment() {
 
   const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
-  const { submitAudioAnswer, isPending: isLegacyAudioSubmitting } =
-    useSubmitAudioAnswer();
-  const { transcribeAudio, isPending: isTranscribingOnly } =
-    useTranscribeAudio();
+  const { transcribeAudio, isPending: isTranscribing } = useTranscribeAudio();
   const {
     status: recordingStatus,
     isSupported: isAudioSupported,
@@ -65,9 +60,6 @@ export default function StudentAssessment() {
   const { logout } = useLogout();
 
   const isRecording = recordingStatus === "recording";
-  // Either path (legacy auto-save or new transcribe-only) shows the same
-  // "Transcribing…" UI. Combined here so existing JSX keeps working.
-  const isTranscribing = isLegacyAudioSubmitting || isTranscribingOnly;
   const audioBusy = isRecording || isTranscribing;
 
   useEffect(() => {
@@ -220,65 +212,34 @@ export default function StudentAssessment() {
     }
   }
 
-  // Persistence side of the audio flow. Takes a finalized recording Blob
-  // and either (a) routes it through the legacy transcribe-and-save
-  // backend call, or (b) when the feature flag is on, runs the
-  // edit-before-submit pipeline: transcribe-only, populate the textarea,
-  // and let the student review/correct before clicking "Submit Answer".
+  // Issue #71 — transcribe-then-edit flow.
+  //
+  // Takes a finalized recording Blob, runs it through the transcribe-only
+  // backend endpoint, and drops the result into the answer textarea. The
+  // DB write happens later when the student clicks "Submit Answer" via
+  // handleSubmitAnswer. This function never persists or advances the
+  // session by itself.
   async function handleAudioSubmit(blob) {
-    if (isEditBeforeSubmitEnabled()) {
-      // Issue #71 — transcribe-then-edit flow.
-      // Transcribe the recording, drop the result into the answer
-      // textarea, and stop. The DB write happens later when the student
-      // clicks "Submit Answer" (existing handleSubmitAnswer path).
-      try {
-        const transcript = await transcribeAudio({
-          sessionId,
-          audioBlob: blob,
-        });
-
-        if (!transcript || !transcript.trim()) {
-          // Don't clobber any existing typed text the student already
-          // wrote — just surface a hint and leave the textarea alone.
-          setAudioError(
-            "We didn't catch any speech. Please try recording again.",
-          );
-          return;
-        }
-
-        // Overwrite (not append) so each new recording fully replaces
-        // the previous draft. The student can then edit.
-        setTypedAnswer(transcript);
-      } catch (err) {
-        setAudioError(
-          getErrorMessage(err, "Failed to transcribe your audio."),
-        );
-      }
-      return;
-    }
-
-    setIsSubmitting(true);
-
     try {
-      const response = await submitAudioAnswer({
+      const transcript = await transcribeAudio({
         sessionId,
         audioBlob: blob,
       });
 
-      if (response.next_question) {
-        setCurrentQuestion(response.next_question);
-      } else {
-        setCurrentQuestion(null);
-        setCanComplete(true);
+      if (!transcript || !transcript.trim()) {
+        // Don't clobber any existing typed text the student already
+        // wrote — just surface a hint and leave the textarea alone.
+        setAudioError(
+          "We didn't catch any speech. Please try recording again.",
+        );
+        return;
       }
 
-      setTypedAnswer("");
+      // Overwrite (not append) so each new recording fully replaces the
+      // previous draft. The student can then edit.
+      setTypedAnswer(transcript);
     } catch (err) {
-      setAudioError(
-        getErrorMessage(err, "Failed to submit your audio answer."),
-      );
-    } finally {
-      setIsSubmitting(false);
+      setAudioError(getErrorMessage(err, "Failed to transcribe your audio."));
     }
   }
 
