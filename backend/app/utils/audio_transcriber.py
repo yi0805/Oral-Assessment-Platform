@@ -25,12 +25,12 @@ logger = logging.getLogger(__name__)
 # https://docs.aws.amazon.com/transcribe/latest/dg/how-input.html
 SUPPORTED_AUDIO_EXTENSIONS = {"amr", "flac", "m4a", "mp3", "mp4", "ogg", "wav", "webm"}
 
-# Poll tuning — see issue #72 for measurements.
-# Was 5s; reduced to 1s after the per-stage instrumentation showed the
-# poll loop dominated total latency and that AWS Transcribe regularly
-# finishes between sleep ticks (so the loop spent up to 4s idling on
-# answers it could already have read).
-_POLL_INTERVAL_SECONDS = 1
+# Poll tuning.
+# The interval is read from settings.transcribe_poll_interval_seconds so
+# different deployments / regions can tune without a code change. See
+# issue #72 for the measurements that motivate the 1s default — the
+# original 5s value left the loop idling for up to 4s on answers AWS
+# had already finished.
 _MAX_WAIT_SECONDS = 60 * 30  # 30 minutes upper bound
 
 
@@ -140,7 +140,7 @@ def transcribe_audio_from_s3(
                     f"Transcription job did not complete within {_MAX_WAIT_SECONDS} seconds"
                 )
 
-            time.sleep(_POLL_INTERVAL_SECONDS)
+            time.sleep(settings.transcribe_poll_interval_seconds)
 
         _t_poll_end = time.monotonic()
         _poll_seconds = _t_poll_end - _t_submit_end
@@ -178,7 +178,7 @@ def transcribe_audio_from_s3(
             _submit_seconds,
             _poll_seconds,
             _poll_count,
-            _POLL_INTERVAL_SECONDS,
+            settings.transcribe_poll_interval_seconds,
             _fetch_seconds,
             _submit_seconds + _poll_seconds + _fetch_seconds,
         )

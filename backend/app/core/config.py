@@ -5,10 +5,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str 
 
-    storage_backend: str 
+    storage_backend: str
     s3_bucket_name: str
-    aws_region: str 
-    aws_profile_name: str 
+    aws_region: str
+    aws_profile_name: str
+
+    # Issue #72: poll interval (seconds) for batch AWS Transcribe jobs.
+    # Lower values return results sooner; slightly more API calls. 1s is
+    # a sensible default; values above ~5s materially hurt perceived
+    # latency. Override per-deployment via TRANSCRIBE_POLL_INTERVAL_SECONDS.
+    transcribe_poll_interval_seconds: int = 1
 
     gemini_api_key: str
     openrouter_api_key: str
