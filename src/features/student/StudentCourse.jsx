@@ -62,11 +62,10 @@ export default function StudentCourse() {
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
             to="/home"
           >
-            <span className="material-symbols-outlined mb-5 text-sm transition-transform group-hover:-translate-x-1">
+            <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
               arrow_back
             </span>
-
-            <span className="mb-5 font-body uppercase tracking-widest">
+            <span className="font-body uppercase tracking-widest">
               Back to Courses
             </span>
           </NavLink>

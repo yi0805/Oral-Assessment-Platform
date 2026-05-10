@@ -121,17 +121,15 @@ function InstructorPendingGrades() {
     <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
       <div className="mb-8">
         <NavLink
-          className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-on-surface-variant transition-colors hover:text-primary"
+          className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
           to="/home"
         >
-          <span
-            className="material-symbols-outlined text-sm"
-            style={{ verticalAlign: "middle" }}
-            data-icon="arrow_back"
-          >
+          <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
             arrow_back
           </span>
-          BACK TO COURSES
+          <span className="font-body uppercase tracking-widest">
+            Back to Courses
+          </span>
         </NavLink>
         <h1 className="mt-4 font-headline text-4xl font-extrabold tracking-tight text-on-surface">
           Review Submissions
