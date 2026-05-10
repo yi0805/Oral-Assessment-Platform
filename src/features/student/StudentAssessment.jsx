@@ -48,6 +48,8 @@ export default function StudentAssessment() {
   const [blurCount, setBlurCount] = useState(0);
 
   const hasAutoCompleted = useRef(false);
+  const autoRetryTimerRef = useRef(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const course = courses.find((c) => c.id === courseId);
@@ -121,12 +123,23 @@ export default function StudentAssessment() {
 
     async function autoComplete() {
       try {
+        if (typedAnswer.trim() && !isRecording && !isTranscribing) {
+          try {
+            await submitAnswer({ sessionId, answer: typedAnswer });
+          } catch {
+            //do not block completion
+          }
+        }
+
         if (blurCount > 0) {
           try {
             await recordBlurNotification({ sessionId, blurCount });
           } catch (blurError) {
             setError(
-              getErrorMessage(blurError, "Failed to record tab-switch notification."),
+              getErrorMessage(
+                blurError,
+                "Failed to record tab-switch notification.",
+              ),
             );
           }
         }
@@ -134,9 +147,15 @@ export default function StudentAssessment() {
         await completeAssessment({ sessionId, courseId });
         navigate(`/student/${courseId}`);
       } catch (error) {
-        hasAutoCompleted.current = false;
         setError(getErrorMessage(error, "Failed to submit assessment."));
         setIsSubmitting(false);
+        if (retryNonce < 2) {
+          const delay = retryNonce === 0 ? 5000 : 15000;
+          autoRetryTimerRef.current = setTimeout(() => {
+            hasAutoCompleted.current = false;
+            setRetryNonce((n) => n + 1);
+          }, delay);
+        }
       }
     }
 
@@ -146,12 +165,23 @@ export default function StudentAssessment() {
     sessionId,
     isSubmitting,
     isTranscribing,
+    isRecording,
     completeAssessment,
     recordBlurNotification,
+    submitAnswer,
     blurCount,
+    typedAnswer,
     navigate,
     courseId,
+    retryNonce,
   ]);
+
+  useEffect(
+    () => () => {
+      if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+    },
+    [],
+  );
 
   if (isSessionLoading || isCoursesLoading) return <Loading />;
 
@@ -205,7 +235,10 @@ export default function StudentAssessment() {
           await recordBlurNotification({ sessionId, blurCount });
         } catch (blurError) {
           setError(
-            getErrorMessage(blurError, "Failed to record tab-switch notification."),
+            getErrorMessage(
+              blurError,
+              "Failed to record tab-switch notification.",
+            ),
           );
         }
       }
@@ -292,6 +325,7 @@ export default function StudentAssessment() {
   const mainGroupNo = currentQuestion?.main_group_no ?? 0;
   const followupNo = currentQuestion?.followup_no ?? 0;
   const isFollowupQuestion = currentQuestion?.question_kind === "followup";
+  const timerExpired = timeLeft != null && timeLeft <= 0;
 
   const questionKindLabel = isFollowupQuestion
     ? `Follow-up Question ${toRoman(followupNo) || ""}`.trim()
@@ -352,6 +386,10 @@ export default function StudentAssessment() {
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-primary">
             {assessmentTitle || "Assessment Title Not Available"}
           </h1>
+
+          <p className="mt-2 text-xs text-on-surface-variant">
+            The exam clock continues running while you are away from this page.
+          </p>
         </div>
 
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
@@ -688,7 +726,7 @@ export default function StudentAssessment() {
                 </button>
               )}
 
-              {canComplete && !currentQuestion && (
+              {((canComplete && !currentQuestion) || timerExpired) && (
                 <button
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-secondary py-4 font-bold text-on-secondary shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                   onClick={handleCompleteSession}
