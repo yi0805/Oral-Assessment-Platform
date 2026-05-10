@@ -1,9 +1,12 @@
 import { NavLink } from "react-router";
 
 import { useUser } from "../features/authentication/useUser";
+import { useActiveCourseId } from "../hooks/useActiveCourseId";
+import CourseSwitcher from "./CourseSwitcher";
 
 function Sidebar() {
   const { user } = useUser();
+  const activeCourseId = useActiveCourseId();
 
   return (
     <aside className="fixed left-0 top-0 z-30 hidden h-screen w-64 flex-col gap-y-2 bg-[#eaeff1] pr-4 pt-20 dark:bg-slate-800/50 md:flex">
@@ -37,12 +40,17 @@ function Sidebar() {
           )}
         </div>
       </div>
+
+      {user.role === "instructor" && <CourseSwitcher />}
+
       <nav className="flex flex-col gap-y-1">
         <NavLink
           className={({ isActive }) =>
             `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
-              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+              isActive
+                ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+            }`
           }
           to="/home"
         >
@@ -57,10 +65,12 @@ function Sidebar() {
         {user.role === "student" && (
           <NavLink
             className={({ isActive }) =>
-            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
-              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
-          }
+              `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+                isActive
+                  ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                  : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+              }`
+            }
             to="/student/gradedAssessments"
           >
             <span
@@ -72,47 +82,71 @@ function Sidebar() {
             <span>Graded Assessments</span>
           </NavLink>
         )}
-        {user.role === "instructor" && (
-          <NavLink
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
-              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
-            }
-            to="/instructor/studentManagement"
+        {user.role === "instructor" && activeCourseId && (
+          <>
+            <NavLink
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+                  isActive
+                    ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                    : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+                }`
+              }
+              to={`/instructor/${activeCourseId}/dashboard`}
             >
-            <span
-              className="material-symbols-outlined text-[20px]"
-              data-icon="people"
+              <span
+                className="material-symbols-outlined text-[20px]"
+                data-icon="dashboard"
               >
-              people
-            </span>
-            <span>Users & Records</span>
-          </NavLink>
-        )}
-        {user.role === "instructor" && (
-          <NavLink
-            className={({ isActive }) =>
-            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-              isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
-              : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
-            }
-            to="/instructor/assessments"
-          >
-            <span
-              className="material-symbols-outlined text-[20px]"
-              data-icon="assignment"
+                dashboard
+              </span>
+              <span>Dashboard</span>
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+                  isActive
+                    ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                    : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+                }`
+              }
+              to={`/instructor/${activeCourseId}/users`}
             >
-              assignment
-            </span>
-            <span>Assessments</span>
-          </NavLink>
+              <span
+                className="material-symbols-outlined text-[20px]"
+                data-icon="people"
+              >
+                people
+              </span>
+              <span>Users & Records</span>
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+                  isActive
+                    ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                    : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+                }`
+              }
+              to={`/instructor/${activeCourseId}/assessments`}
+            >
+              <span
+                className="material-symbols-outlined text-[20px]"
+                data-icon="assignment"
+              >
+                assignment
+              </span>
+              <span>Assessments</span>
+            </NavLink>
+          </>
         )}
         <NavLink
           className={({ isActive }) =>
-          `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-            isActive ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white" 
-            : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"}`
+            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+              isActive
+                ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+            }`
           }
           to="/instructor/setting"
         >
@@ -124,7 +158,6 @@ function Sidebar() {
           </span>
           <span>Settings</span>
         </NavLink>
-        
       </nav>
     </aside>
   );

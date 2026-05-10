@@ -17,6 +17,7 @@ import StudentManagement from "./features/instructor/StudentManagement";
 import ProtectedLayout from "./ui/ProtectedRoute";
 import Setting from "./features/instructor/Setting";
 import AssessmentManagement from "./features/instructor/AssessmentManagement"
+import InstructorCourseLayout from "./ui/InstructorCourseLayout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,29 +46,35 @@ function App() {
               />
 
               <Route
-                path="instructor/:courseId"
-                element={<InstructorDashboard />}
-              />
-              <Route
                 path="instructor/pendingGrades"
                 element={<InstructorPendingGrades />}
-              />
-              <Route
-                path="instructor/assessments"
-                element={<AssessmentManagement />}
               />
               <Route
                 path="instructor/transcript/:sessionId"
                 element={<Transcript />}
               />
               <Route
-                path="instructor/studentManagement"
-                element={<StudentManagement/>}
-              />
-              <Route
                 path="instructor/setting"
                 element={<Setting />}
               />
+              <Route path="instructor" element={<InstructorCourseLayout />}>
+                <Route
+                  path=":courseId"
+                  element={<Navigate replace to="dashboard" />}
+                />
+                <Route
+                  path=":courseId/dashboard"
+                  element={<InstructorDashboard />}
+                />
+                <Route
+                  path=":courseId/users"
+                  element={<StudentManagement />}
+                />
+                <Route
+                  path=":courseId/assessments"
+                  element={<AssessmentManagement />}
+                />
+              </Route>
             </Route>
 
             <Route

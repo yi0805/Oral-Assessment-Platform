@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { NavLink } from "react-router";
+import { NavLink, useParams } from "react-router";
 
-import { useCourses } from "../../hooks/useCourses";
 import { useDashboard } from "./useDashboard";
 import { useImportStudents } from "./useImportStudents";
 import { useExportResults } from "./useExportResults";
 import { useEnrolUser } from "./useEnrolUser";
 import { useDeleteEnrolment } from "./useDeleteEnrolment";
 
-import Spinner from "../../ui/Spinner";
-
 export default function StudentManagement() {
-  const [courseId, setCourseId] = useState("");
+  const { courseId } = useParams();
   const [csvFile, setCsvFile] = useState(null);
   const fileInputRef = useRef(null);
 
@@ -21,7 +18,6 @@ export default function StudentManagement() {
   const [upiRemove, setUpiRemove] = useState("");
   const [role, setRole] = useState("student");
 
-  const { courses, isLoading } = useCourses();
   const { dashboard = [], isLoading: isDashboardLoading } =
     useDashboard(courseId);
 
@@ -32,18 +28,8 @@ export default function StudentManagement() {
   const { deleteEnrolment, isPending: isDeleting } = useDeleteEnrolment();
 
   useEffect(() => {
-    if (courses.length > 0 && !courseId) {
-      setCourseId(courses[0].id);
-    }
-  }, [courses, courseId]);
-
-  useEffect(() => {
     setSelectedAssessment("");
   }, [courseId]);
-
-  if (isLoading) return <Spinner />;
-
-  const hasCourses = courses.length > 0;
 
   const canImport = Boolean(courseId && csvFile && !isImporting);
   const canEnrol = Boolean(courseId && upiAdd.trim() && !isEnroling);
@@ -110,65 +96,6 @@ export default function StudentManagement() {
             Manage course enrolments and export assessment results.
           </p>
         </header>
-
-        <section className="mb-8 rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-          <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-on-surface">
-            <span
-              className="material-symbols-outlined text-primary"
-              data-icon="school"
-              style={{ verticalAlign: "middle" }}
-            >
-              school
-            </span>
-            Select Course
-          </h2>
-
-          {hasCourses ? (
-            <div className="space-y-2">
-              <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-                Course
-              </label>
-              <div className="relative max-w-lg">
-                <select
-                  className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 pr-10 text-on-surface transition-all focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  value={courseId}
-                  onChange={(e) => setCourseId(e.target.value)}
-                >
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.course_code} — {c.course_name}
-                    </option>
-                  ))}
-                </select>
-                <span
-                  className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
-                  data-icon="expand_more"
-                  style={{ verticalAlign: "middle" }}
-                >
-                  expand_more
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-8 text-center">
-              <span
-                className="material-symbols-outlined mb-2 text-3xl text-outline"
-                data-icon="menu_book"
-                style={{ verticalAlign: "middle" }}
-              >
-                menu_book
-              </span>
-
-              <p className="text-base font-bold text-on-surface">
-                No courses yet
-              </p>
-
-              <p className="mt-1 text-xs text-on-surface-variant">
-                Create a course first to manage enrolments.
-              </p>
-            </div>
-          )}
-        </section>
 
         <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
