@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     # latency. Override per-deployment via TRANSCRIBE_POLL_INTERVAL_SECONDS.
     transcribe_poll_interval_seconds: int = 1
 
+    # Issue #72: feature flag for the WebSocket streaming-transcription
+    # route (/sessions/{id}/transcribe/stream). Default off so the route
+    # can be deployed dark while the frontend changes are in review.
+    # Flip to true via STT_STREAMING_ENABLED=1 once the rollout is ready.
+    stt_streaming_enabled: bool = False
+
     gemini_api_key: str
     openrouter_api_key: str
     aws_bearer_token_bedrock: str

@@ -1,20 +1,34 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import require_instructor, require_student
+from app.core.ws_auth import authenticate_ws_student
 from app.services import s3_client
 from app.services._prompt_safety import sanitize_untrusted
+from app.utils.audio_streamer import TranscribeStreamer, TranscribeStreamError
 from app.utils.audio_transcriber import is_audio_extension, transcribe_audio_from_s3
 
 from app.models import (
@@ -1185,6 +1199,167 @@ async def transcribe_response_audio(
     )
 
     return AudioTranscriptionResponse(transcript=result.text or "")
+
+
+# Issue #72 — streaming-transcription WebSocket endpoint.
+# Companion to /sessions/{id}/transcribe/audio. Receives raw 16 kHz mono
+# LE16 PCM frames from the browser, forwards them to AWS Transcribe
+# Streaming via TranscribeStreamer, and sends back partial + final
+# transcripts as JSON messages. Does not touch S3 and does not write to
+# the Transcript table — the client edits the final text and submits it
+# through the existing /respond endpoint, same as the batch path.
+#
+# Client protocol:
+#   Client -> server:
+#     - binary PCM frames (audio_chunk; ~3200 bytes / 100 ms recommended)
+#     - text frame {"type": "stop"} to flush remaining results without
+#       closing the socket
+#     - WebSocket disconnect is treated as an implicit stop
+#   Server -> client (JSON):
+#     - {"type": "partial", "text": "...", "timestamp": float}
+#     - {"type": "final",   "text": "...", "timestamp": float}
+#     - {"type": "error",   "message": "transcription_failed"}
+#
+# Close codes:
+#   1000 normal completion
+#   1008 auth / validation / feature-flag rejection (uniform with ws_auth)
+#   1011 server error during streaming (e.g. AWS dropped the connection)
+
+@router.websocket("/sessions/{session_id}/transcribe/stream")
+async def transcribe_response_stream(
+    websocket: WebSocket,
+    session_id: UUID,
+    db: Session = Depends(get_db),
+):
+    # 1. Feature flag. Reject before doing any work so an accidentally
+    # exposed endpoint doesn't burn AWS quotas in unfinished deployments.
+    if not settings.stt_streaming_enabled:
+        await websocket.close(
+            code=1008, reason="streaming transcription not enabled"
+        )
+        return
+
+    # 2. Auth. authenticate_ws_student closes and raises on failure.
+    try:
+        current_user = await authenticate_ws_student(websocket, db)
+    except WebSocketDisconnect:
+        return
+
+    # 3. Session-level validation, shared with the batch route. The
+    # helper raises HTTPException — we catch and translate to a WS close.
+    try:
+        _validate_session_for_transcribe(session_id, current_user, db)
+    except HTTPException as exc:
+        await websocket.close(code=1008, reason=str(exc.detail))
+        return
+
+    # 4. Accept the connection only after all checks have passed, so a
+    # rejected handshake never appears as "connected then immediately
+    # closed" to the client.
+    await websocket.accept()
+    logger.info(
+        "[StreamRoute] accepted session=%s user=%s",
+        session_id,
+        current_user.id,
+    )
+
+    # 5. Run the streaming session. The TranscribeStreamer context
+    # manager handles AWS open/close; we just bridge frames and results
+    # between the WebSocket and the streamer.
+    try:
+        async with TranscribeStreamer(region=settings.aws_region) as streamer:
+
+            async def feed() -> None:
+                """Pull frames off the WebSocket, push them into AWS."""
+                try:
+                    while True:
+                        msg = await websocket.receive()
+                        if msg.get("type") == "websocket.disconnect":
+                            return
+                        chunk = msg.get("bytes")
+                        if chunk:
+                            await streamer.send_pcm(chunk)
+                            continue
+                        text = msg.get("text")
+                        if not text:
+                            continue
+                        # Optional control message — currently only
+                        # {"type": "stop"} is supported.
+                        try:
+                            payload = json.loads(text)
+                        except json.JSONDecodeError:
+                            continue
+                        if payload.get("type") == "stop":
+                            return
+                finally:
+                    # Always signal AWS we're done so it flushes the
+                    # last partial-or-final result, even if the loop
+                    # exits via cancellation.
+                    await streamer.end_input()
+
+            async def drain() -> None:
+                """Forward AWS results back to the WebSocket."""
+                async for result in streamer.results():
+                    try:
+                        await websocket.send_json(
+                            {
+                                "type": "partial" if result.is_partial else "final",
+                                "text": result.text,
+                                "timestamp": result.timestamp,
+                            }
+                        )
+                    except Exception:  # noqa: BLE001
+                        # WebSocket closed under us mid-send. Stop
+                        # draining; the streamer context manager will
+                        # clean up the AWS side.
+                        return
+
+            feed_task = asyncio.create_task(feed())
+            drain_task = asyncio.create_task(drain())
+
+            # FIRST_COMPLETED rather than gather() so we don't hang on
+            # the feed loop if drain finishes first (e.g. AWS closes the
+            # output stream abruptly).
+            _done, pending = await asyncio.wait(
+                {feed_task, drain_task},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+            # Surface any unexpected exceptions from either task without
+            # letting them mask each other.
+            await asyncio.gather(
+                feed_task, drain_task, return_exceptions=True
+            )
+
+    except TranscribeStreamError:
+        logger.exception(
+            "[StreamRoute] streaming failed session=%s", session_id
+        )
+        try:
+            await websocket.send_json(
+                {"type": "error", "message": "transcription_failed"}
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            await websocket.close(code=1011, reason="transcription error")
+        except Exception:  # noqa: BLE001
+            pass
+        return
+
+    except WebSocketDisconnect:
+        logger.info(
+            "[StreamRoute] client disconnected session=%s", session_id
+        )
+        return
+
+    # 6. Best-effort clean close on the happy path.
+    try:
+        await websocket.close(code=1000)
+    except Exception:  # noqa: BLE001
+        pass
+    logger.info("[StreamRoute] closed session=%s", session_id)
 
 
 # Complete session
