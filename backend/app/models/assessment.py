@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -132,6 +133,11 @@ class Notification(Base):
     blur_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="false",
     )
     def __repr__(self) -> str:
         return f"<Session: {self.session_id}, student:{self.user_id}, exitCount:{self.blur_count}>"
