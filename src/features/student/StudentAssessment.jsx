@@ -190,6 +190,31 @@ export default function StudentAssessment() {
     );
   }, [speech.error]);
 
+  // [STT #72] Elapsed-time counter for the "Transcribing…" indicator.
+  // This is the cheapest fix for the "frozen UI" symptom in the
+  // original issue: even if the underlying latency is still there, a
+  // ticking timer signals the system is working, not stuck. Driven by
+  // the derived isTranscribing, so it covers both the batch path
+  // (waiting for AWS Transcribe job to complete) and the streaming
+  // path (waiting for the final flush after the user hits stop).
+  const [transcribingElapsedSec, setTranscribingElapsedSec] = useState(0);
+  useEffect(() => {
+    if (!isTranscribing) {
+      setTranscribingElapsedSec(0);
+      return undefined;
+    }
+    // performance.now() rather than Date.now() so the counter is
+    // unaffected by the user's system clock drifting / changing.
+    const startMs = performance.now();
+    setTranscribingElapsedSec(0);
+    const id = setInterval(() => {
+      setTranscribingElapsedSec(
+        Math.floor((performance.now() - startMs) / 1000),
+      );
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isTranscribing]);
+
   if (isLoading || isCoursesLoading) return <Loading />;
 
   function formatTime(seconds) {
@@ -555,11 +580,29 @@ export default function StudentAssessment() {
               <div className="space-y-6">
                 <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low p-10">
                   <p className="mb-8 font-medium text-on-surface-variant">
-                    {isTranscribing
-                      ? "Transcribing your answer…"
-                      : isRecording
-                        ? "Recording… tap the button again to stop and submit"
-                        : "Tap the microphone to speak your answer"}
+                    {isTranscribing ? (
+                      // [STT #72] Inline elapsed-time counter so the
+                      // student can see the system is making progress
+                      // even when transcription takes several seconds.
+                      <>
+                        Transcribing your answer…{" "}
+                        <span
+                          className="font-mono tabular-nums"
+                          aria-live="polite"
+                          data-testid="stt-transcribing-elapsed"
+                        >
+                          {Math.floor(transcribingElapsedSec / 60)}:
+                          {String(transcribingElapsedSec % 60).padStart(
+                            2,
+                            "0",
+                          )}
+                        </span>
+                      </>
+                    ) : isRecording ? (
+                      "Recording… tap the button again to stop and submit"
+                    ) : (
+                      "Tap the microphone to speak your answer"
+                    )}
                   </p>
 
                   <div className="relative">
