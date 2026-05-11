@@ -28,7 +28,11 @@ from app.core.dependencies import require_instructor, require_student
 from app.core.ws_auth import authenticate_ws_student
 from app.services import s3_client
 from app.services._prompt_safety import sanitize_untrusted
-from app.utils.audio_streamer import TranscribeStreamer, TranscribeStreamError
+from app.utils.audio_streamer import (
+    TranscribeStreamer,
+    TranscribeStreamError,
+    fmt_optional_seconds,
+)
 from app.utils.audio_transcriber import is_audio_extension, transcribe_audio_from_s3
 
 from app.models import (
@@ -1279,8 +1283,13 @@ async def transcribe_response_stream(
     # 5. Run the streaming session. The TranscribeStreamer context
     # manager handles AWS open/close; we just bridge frames and results
     # between the WebSocket and the streamer.
+    #
+    # ``streamer`` is bound before the ``async with`` so the finally
+    # block can read its stats (ttfp / partials / finals) after
+    # __aexit__ has run.
+    streamer = TranscribeStreamer(region=settings.aws_region)
     try:
-        async with TranscribeStreamer(region=settings.aws_region) as streamer:
+        async with streamer:
 
             async def feed() -> None:
                 """Pull frames off the WebSocket, push them into AWS."""
@@ -1414,12 +1423,23 @@ async def transcribe_response_stream(
         # [STT Instrumentation - issue #72] One grep-able line per
         # stream session. ``disconnected=true`` distinguishes a
         # browser-tab close from a clean stop; ``outcome`` tracks
-        # whether AWS bailed mid-stream.
+        # whether AWS bailed mid-stream. ``ttfp`` / ``ttfr`` /
+        # ``partials`` / ``finals`` come from the streamer's stats
+        # (mutated by the result pump as events arrive). They're "-"
+        # when no result of that kind ever arrived for the session.
+        ttfp = fmt_optional_seconds(streamer.time_to_first_partial)
+        ttfr = fmt_optional_seconds(streamer.time_to_first_final)
         logger.info(
-            "[STT timings] phase=stream session=%s outcome=%s disconnected=%s duration=%.3fs",
+            "[STT timings] phase=stream session=%s outcome=%s "
+            "disconnected=%s ttfp=%s ttfr=%s partials=%d finals=%d "
+            "duration=%.3fs",
             session_id,
             _stream_outcome,
             "true" if _disconnected else "false",
+            ttfp,
+            ttfr,
+            streamer.partial_count,
+            streamer.final_count,
             time.monotonic() - _t_stream_start,
         )
 

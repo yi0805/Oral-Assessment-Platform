@@ -76,6 +76,20 @@ _END_OF_RESULTS: Any = object()
 DEFAULT_SAMPLE_RATE_HZ = 16000
 
 
+def fmt_optional_seconds(t: Optional[float]) -> str:
+    """Format an Optional[float] of seconds for the [STT timings] line.
+
+    None → "-" so the streaming log line stays single-token-per-field
+    and grep-able. Concrete values get the same 3-decimal "X.XXXs"
+    format the rest of the issue #72 instrumentation uses.
+
+    Exported (rather than the conventional ``_``-prefixed private name)
+    because the WebSocket route in ``app.api.routes.sessions`` imports
+    it to format ttfp/ttfr in its own log line.
+    """
+    return f"{t:.3f}s" if t is not None else "-"
+
+
 class TranscribeStreamError(RuntimeError):
     """
     Raised by :class:`TranscribeStreamer` when the underlying AWS
@@ -126,10 +140,16 @@ class _ResultPump(TranscriptResultStreamHandler):
         transcript_result_stream: Any,
         queue: "asyncio.Queue[Any]",
         t_start: float,
+        stats: Optional[dict[str, Any]] = None,
     ) -> None:
         super().__init__(transcript_result_stream)
         self._queue = queue
         self._t_start = t_start
+        # Shared mutable dict owned by the TranscribeStreamer — see the
+        # _stats initialiser there for the schema. Pump increments
+        # counters and records the first-result timestamps as events
+        # arrive; the streamer / route read them at __aexit__ time.
+        self._stats = stats
 
     async def handle_transcript_event(
         self,
@@ -142,11 +162,27 @@ class _ResultPump(TranscriptResultStreamHandler):
                 # first one is the most likely transcription.
                 text = result.alternatives[0].transcript or ""
 
+            is_partial = bool(result.is_partial)
+            elapsed = time.monotonic() - self._t_start
+
+            # [STT Instrumentation - issue #72] Record stats so the
+            # route can log time-to-first-partial / time-to-first-final
+            # alongside outcome + duration in one structured line.
+            if self._stats is not None:
+                if is_partial:
+                    self._stats["partial_count"] += 1
+                    if self._stats["first_partial_at"] is None:
+                        self._stats["first_partial_at"] = elapsed
+                else:
+                    self._stats["final_count"] += 1
+                    if self._stats["first_final_at"] is None:
+                        self._stats["first_final_at"] = elapsed
+
             await self._queue.put(
                 StreamResult(
                     text=text,
-                    is_partial=bool(result.is_partial),
-                    timestamp=time.monotonic() - self._t_start,
+                    is_partial=is_partial,
+                    timestamp=elapsed,
                 )
             )
 
@@ -213,6 +249,18 @@ class TranscribeStreamer:
         self._t_start: Optional[float] = None
         self._opened = False
         self._input_ended = False
+        # [STT Instrumentation - issue #72] Stats are mutated by the
+        # _ResultPump as transcript events arrive and read by the
+        # route (and by __aexit__ for the phase=streamer log line).
+        # Stored as a plain dict rather than separate fields so we can
+        # share the same object reference with the pump without a
+        # back-pointer or weakref.
+        self._stats: dict[str, Any] = {
+            "first_partial_at": None,  # seconds since open, or None
+            "first_final_at": None,    # seconds since open, or None
+            "partial_count": 0,
+            "final_count": 0,
+        }
 
     async def __aenter__(self) -> "TranscribeStreamer":
         """
@@ -240,7 +288,10 @@ class TranscribeStreamer:
         self._t_start = time.monotonic()
         self._queue = asyncio.Queue()
         pump = _ResultPump(
-            self._stream.output_stream, self._queue, self._t_start
+            self._stream.output_stream,
+            self._queue,
+            self._t_start,
+            stats=self._stats,
         )
         self._handler_task = asyncio.create_task(self._run_handler(pump))
         self._opened = True
@@ -316,7 +367,55 @@ class TranscribeStreamer:
                 pass
 
         self._opened = False
-        logger.info("[TranscribeStream] closed")
+
+        # [STT Instrumentation - issue #72] One grep-able timing line
+        # per streamer lifecycle. Companion to the route's
+        # ``phase=stream`` line — same pattern as audio_transcriber.py
+        # emitting ``phase=transcribe`` alongside the route's
+        # ``phase=route``. ``ttfp`` and ``ttfr`` are "-" when no result
+        # of that kind arrived during the session (e.g. AWS closed
+        # before any speech was recognised).
+        if self._t_start is not None:
+            total = time.monotonic() - self._t_start
+            logger.info(
+                "[STT timings] phase=streamer ttfp=%s ttfr=%s "
+                "partials=%d finals=%d total=%.3fs",
+                fmt_optional_seconds(self._stats["first_partial_at"]),
+                fmt_optional_seconds(self._stats["first_final_at"]),
+                self._stats["partial_count"],
+                self._stats["final_count"],
+                total,
+            )
+        else:
+            logger.info("[TranscribeStream] closed (never opened)")
+
+    # ------------------------------------------------------------------
+    # Public stats accessors — read-only views over the shared dict that
+    # the result pump mutates. Used by the WebSocket route to extend
+    # its ``phase=stream`` log line with ttfp / partials / finals.
+    # ------------------------------------------------------------------
+
+    @property
+    def time_to_first_partial(self) -> Optional[float]:
+        """Monotonic seconds from open to the first ``is_partial=True``
+        result, or ``None`` if none ever arrived."""
+        return self._stats["first_partial_at"]
+
+    @property
+    def time_to_first_final(self) -> Optional[float]:
+        """Monotonic seconds from open to the first ``is_partial=False``
+        result, or ``None`` if none ever arrived."""
+        return self._stats["first_final_at"]
+
+    @property
+    def partial_count(self) -> int:
+        """Total number of ``is_partial=True`` results received."""
+        return self._stats["partial_count"]
+
+    @property
+    def final_count(self) -> int:
+        """Total number of ``is_partial=False`` results received."""
+        return self._stats["final_count"]
 
     async def send_pcm(self, frame: bytes) -> None:
         """
