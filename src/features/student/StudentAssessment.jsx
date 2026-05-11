@@ -50,6 +50,13 @@ export default function StudentAssessment() {
 
   const hasAutoCompleted = useRef(false);
 
+  // [STT #72] Set to true when the student presses Esc during an
+  // in-flight batch transcription. The fetch can't actually be
+  // aborted client-side, but checking this ref after the await lets
+  // us discard the eventual transcript instead of clobbering the
+  // textarea with stale text.
+  const transcribeCancelledRef = useRef(false);
+
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const course = courses.find((c) => c.id === courseId);
 
@@ -215,6 +222,42 @@ export default function StudentAssessment() {
     return () => clearInterval(id);
   }, [isTranscribing]);
 
+  // [STT #72] Esc-to-cancel for the in-flight recording / transcription.
+  // Cancellation semantics differ per path:
+  //   - streaming: speech.cancel() drops the mic and the WS without
+  //     flushing, then reset() clears any partial/final.
+  //   - batch / recording: resetRecorder() releases the mic and
+  //     discards the audio blob before it ever goes to the server.
+  //   - batch / transcribing: the HTTP request can't be aborted
+  //     client-side, but transcribeCancelledRef tells handleAudioSubmit
+  //     to discard the result when it eventually arrives.
+  // No-ops if nothing is in flight, so Esc on the page is otherwise
+  // free for the browser / other components to handle.
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key !== "Escape") return;
+      if (!isRecording && !isTranscribing) return;
+
+      event.preventDefault();
+      transcribeCancelledRef.current = true;
+
+      if (STREAMING_ENABLED) {
+        speech.cancel();
+        speech.reset();
+      } else if (isRecording) {
+        // Drop the recorder + mic stream. The blob produced by stop()
+        // (if any) was never going to be sent — handleAudioSubmit
+        // wasn't called yet, so there's nothing else to undo.
+        resetRecorder();
+      }
+
+      setAudioError(null);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isRecording, isTranscribing, resetRecorder, speech]);
+
   if (isLoading || isCoursesLoading) return <Loading />;
 
   function formatTime(seconds) {
@@ -284,11 +327,22 @@ export default function StudentAssessment() {
   // handleSubmitAnswer. This function never persists or advances the
   // session by itself.
   async function handleAudioSubmit(blob) {
+    // [STT #72] Reset the cancel flag for this attempt. Pressing Esc
+    // during the await below will flip it back to true and we'll
+    // discard the result when it finally arrives.
+    transcribeCancelledRef.current = false;
     try {
       const transcript = await transcribeAudio({
         sessionId,
         audioBlob: blob,
       });
+
+      if (transcribeCancelledRef.current) {
+        // The student cancelled mid-flight. Drop the transcript on
+        // the floor — the cancel handler already cleared error state
+        // and the UI has returned to "Tap the microphone to speak".
+        return;
+      }
 
       if (!transcript || !transcript.trim()) {
         // Don't clobber any existing typed text the student already
@@ -303,6 +357,10 @@ export default function StudentAssessment() {
       // previous draft. The student can then edit.
       setTypedAnswer(transcript);
     } catch (err) {
+      // If the cancel happened to race with a network failure, prefer
+      // the cancel — silent is the right UX when the student asked
+      // us to stop.
+      if (transcribeCancelledRef.current) return;
       setAudioError(getErrorMessage(err, "Failed to transcribe your audio."));
     }
   }
