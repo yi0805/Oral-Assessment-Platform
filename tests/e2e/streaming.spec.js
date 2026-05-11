@@ -98,6 +98,59 @@ test.describe("streaming transcription — happy path", () => {
       window.AudioContext = FakeAudioContext;
       window.webkitAudioContext = FakeAudioContext;
       window.AudioWorkletNode = FakeAudioWorkletNode;
+
+      // Fake MediaRecorder so the parallel buffered recorder used by
+      // the streaming → batch fallback (issue #72 commit 20) can open
+      // against the fake MediaStream above. The real Chromium impl
+      // would reject our zero-track stream; this stub goes through the
+      // happy motions so that recorder.stop() resolves with a small
+      // but non-empty Blob that the fallback can POST to the batch
+      // transcribe endpoint.
+      class FakeMediaRecorder {
+        constructor(stream, options) {
+          this.stream = stream;
+          this.mimeType =
+            (options && options.mimeType) || "audio/webm;codecs=opus";
+          this.state = "inactive";
+          this._listeners = new Map();
+        }
+        static isTypeSupported() {
+          return true;
+        }
+        addEventListener(type, fn) {
+          if (!this._listeners.has(type)) this._listeners.set(type, []);
+          this._listeners.get(type).push(fn);
+        }
+        removeEventListener(type, fn) {
+          const arr = this._listeners.get(type);
+          if (!arr) return;
+          const i = arr.indexOf(fn);
+          if (i >= 0) arr.splice(i, 1);
+        }
+        _emit(type, event) {
+          const arr = this._listeners.get(type) || [];
+          for (const fn of arr) fn(event);
+        }
+        start() {
+          this.state = "recording";
+        }
+        stop() {
+          if (this.state === "inactive") return;
+          this.state = "inactive";
+          // Asynchronous to mirror the real API. ~4 fake bytes of
+          // "webm" data — small but non-empty so the orchestrator's
+          // size-zero guard doesn't trip.
+          setTimeout(() => {
+            const data = new Blob(
+              [new Uint8Array([0x1a, 0x45, 0xdf, 0xa3])],
+              { type: this.mimeType },
+            );
+            this._emit("dataavailable", { data });
+            this._emit("stop", {});
+          }, 0);
+        }
+      }
+      window.MediaRecorder = FakeMediaRecorder;
     });
 
     // ---- 3. Stub the backend HTTP surface that StudentAssessment
@@ -252,5 +305,125 @@ test.describe("streaming transcription — happy path", () => {
     await expect(textarea).toHaveValue(FIXTURE_FINAL, { timeout: 3000 });
     const finalLatencyMs = Date.now() - t1;
     expect(finalLatencyMs).toBeLessThan(3000);
+  });
+
+  // ----------------------------------------------------------------------
+  // Fallback path — exercises the streaming → batch transition added in
+  // issue #72 commit 20. When the WebSocket reports an error mid-session
+  // the orchestrator drains the parallel MediaRecorder, POSTs the
+  // captured blob to /transcribe/audio, and resolves the pending stop()
+  // with the batch transcript. The student gets text either way; they
+  // never have to re-record.
+  // ----------------------------------------------------------------------
+
+  test("falls back to batch transcribe when WS errors mid-session", async ({
+    page,
+  }) => {
+    const FIXTURE_BATCH_FINAL =
+      "transcribed by the batch fallback after streaming failed";
+
+    // Track whether the batch endpoint actually got called — gives a
+    // stronger assertion than just checking the textarea (which could
+    // be filled by stale state).
+    let batchEndpointHits = 0;
+
+    // Register the more-specific batch route AFTER the wildcard from
+    // beforeEach so Playwright's reverse-precedence picks ours.
+    await page.route(
+      `**/api/sessions/${FAKE_SESSION_ID}/transcribe/audio`,
+      async (route) => {
+        batchEndpointHits += 1;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ transcript: FIXTURE_BATCH_FINAL }),
+        });
+      },
+    );
+
+    // The WS opens, dribbles one partial, then — when the client
+    // sends its "stop" text frame — responds with a {type:"error"}
+    // message and closes. That mirrors the real backend's
+    // TranscribeStreamError path (commit 21 server-side).
+    await page.routeWebSocket(/\/transcribe\/stream/, (ws) => {
+      const partialTimer = setTimeout(() => {
+        ws.send(
+          JSON.stringify({
+            type: "partial",
+            text: FIXTURE_PARTIAL,
+            timestamp: 0.25,
+          }),
+        );
+      }, 250);
+
+      ws.onMessage((message) => {
+        if (typeof message !== "string") return;
+        let payload;
+        try {
+          payload = JSON.parse(message);
+        } catch {
+          return;
+        }
+        if (payload.type === "stop") {
+          setTimeout(() => {
+            ws.send(
+              JSON.stringify({
+                type: "error",
+                message: "transcription_failed",
+              }),
+            );
+            // Close with 1011 (server error) to mirror what the real
+            // route does on TranscribeStreamError.
+            setTimeout(() => ws.close(1011, "transcription error"), 50);
+          }, 100);
+        }
+      });
+
+      ws.onClose(() => clearTimeout(partialTimer));
+    });
+
+    await page.goto(STUDENT_URL);
+
+    const micButton = page.getByRole("button", {
+      name: /start recording/i,
+    });
+    await expect(micButton).toBeVisible();
+    await micButton.click();
+
+    // Partial visible before we hit stop — same SLA as the happy path.
+    const partialPreview = page.getByTestId("stt-partial-preview");
+    await expect(partialPreview).toContainText(FIXTURE_PARTIAL, {
+      timeout: 1500,
+    });
+
+    // User clicks stop. The WS mock will respond with an error,
+    // which triggers the orchestrator's fallback path. The
+    // batch-transcribe POST below should then fire.
+    const stopButton = page.getByRole("button", {
+      name: /stop recording/i,
+    });
+    const t1 = Date.now();
+    await stopButton.click();
+
+    // The fallback transcript should land in the textarea —
+    // generous 5 s timeout to absorb the batch round-trip plus the
+    // recorder.stop() async dataavailable emit.
+    const textarea = page.locator("textarea");
+    await expect(textarea).toHaveValue(FIXTURE_BATCH_FINAL, {
+      timeout: 5000,
+    });
+    const fallbackLatencyMs = Date.now() - t1;
+    // Confirm the batch endpoint was actually hit (not just that
+    // typedAnswer happened to contain the fixture string somehow).
+    expect(batchEndpointHits).toBe(1);
+    // Sanity ceiling — fallback should comfortably beat 5 s.
+    expect(fallbackLatencyMs).toBeLessThan(5000);
+
+    // No error banner should be showing once the fallback succeeded
+    // — the orchestrator masks wsError while fallbackPhase === "ok"
+    // (issue #72 commit 20). audioError is the field that surfaces
+    // streaming failures via the existing banner; absence of a
+    // visible error region is the consumer-visible side of that.
+    await expect(partialPreview).toBeHidden();
   });
 });
