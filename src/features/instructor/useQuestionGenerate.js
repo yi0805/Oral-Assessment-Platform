@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 
 import { questionGenerate as questionGenerateApi } from "../../services/apiQuestion";
+import { getErrorMessage } from "../../utils/getErrorMessage";
 
 export function useQuestionGenerate() {
   const queryClient = useQueryClient();
@@ -15,7 +16,7 @@ export function useQuestionGenerate() {
       numQuestions,
       totalTime,
       releaseTime,
-      dueTime
+      dueTime,
     }) =>
       questionGenerateApi(
         courseId,
@@ -25,21 +26,18 @@ export function useQuestionGenerate() {
         totalTime,
         numQuestions,
         releaseTime,
-        dueTime
+        dueTime,
       ),
 
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["courseAssessments", variables.courseId] });
+      queryClient.invalidateQueries({
+        queryKey: ["courseAssessments", variables.courseId],
+      });
       toast.success(data?.message || "Create assessment successfully.");
     },
 
     onError: (error) => {
-      const message =
-        error?.response?.data?.detail ||
-        error.message ||
-        "Failed to create assessment.";
-
-      toast.error(message);
+      toast.error(getErrorMessage(error, "Failed to create assessment."));
     },
   });
 
