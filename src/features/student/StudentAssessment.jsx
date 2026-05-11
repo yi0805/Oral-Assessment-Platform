@@ -9,6 +9,13 @@ import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 import SttDebugOverlay from "./SttDebugOverlay";
+import { useStudentSpeechStream } from "./useStudentSpeechStream";
+
+// [STT #72] Streaming path is opt-in via env var so the new flow can
+// ship behind a flag while we soak-test it. When false (the default),
+// the existing batch flow runs untouched. Set VITE_STT_STREAMING=1 in
+// .env.local to flip it on locally.
+const STREAMING_ENABLED = import.meta.env.VITE_STT_STREAMING === "1";
 
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";
@@ -48,7 +55,8 @@ export default function StudentAssessment() {
 
   const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
-  const { transcribeAudio, isPending: isTranscribing } = useTranscribeAudio();
+  const { transcribeAudio, isPending: batchIsTranscribing } =
+    useTranscribeAudio();
   const {
     status: recordingStatus,
     isSupported: isAudioSupported,
@@ -58,9 +66,23 @@ export default function StudentAssessment() {
   } = useAudioRecorder();
   const { completeAssessment } = useCompleteAssessment();
 
+  // [STT #72] Streaming hook is always instantiated so React's
+  // rules-of-hooks stay happy; the rest of the component branches on
+  // STREAMING_ENABLED to decide whether to use it.
+  const speech = useStudentSpeechStream();
+
   const { logout } = useLogout();
 
-  const isRecording = recordingStatus === "recording";
+  // [STT #72] Unified "isRecording" / "isTranscribing" derived from
+  // whichever flow is active. Downstream UI (mic-button styling,
+  // textarea disabled state, audioBusy guards) reads these names
+  // exactly as before, so the JSX below doesn't have to branch.
+  const isRecording = STREAMING_ENABLED
+    ? speech.status === "connecting" || speech.status === "streaming"
+    : recordingStatus === "recording";
+  const isTranscribing = STREAMING_ENABLED
+    ? speech.status === "stopping"
+    : batchIsTranscribing;
   const audioBusy = isRecording || isTranscribing;
 
   useEffect(() => {
@@ -155,6 +177,19 @@ export default function StudentAssessment() {
     courseId,
   ]);
 
+  // [STT #72] Surface streaming errors (e.g. AWS dropped the
+  // connection mid-stream) into the existing audioError banner so the
+  // student isn't left wondering why partials stopped appearing.
+  // handleMicClick also catches errors at start/stop boundaries; this
+  // effect covers the in-between case.
+  useEffect(() => {
+    if (!STREAMING_ENABLED) return;
+    if (!speech.error) return;
+    setAudioError(
+      getErrorMessage(speech.error, "Streaming transcription error."),
+    );
+  }, [speech.error]);
+
   if (isLoading || isCoursesLoading) return <Loading />;
 
   function formatTime(seconds) {
@@ -187,6 +222,9 @@ export default function StudentAssessment() {
       });
 
       setTypedAnswer("");
+      // [STT #72] Clear any stale partial/final from the previous
+      // question so the next one starts fresh.
+      if (STREAMING_ENABLED) speech.reset();
 
       if (response.next_question) {
         setCurrentQuestion(response.next_question);
@@ -244,12 +282,90 @@ export default function StudentAssessment() {
     }
   }
 
+  // [STT #72] Streaming variant of the mic-button flow. Connects the
+  // WebSocket, opens the mic, and (on second click) flushes the
+  // server's remaining results before dropping the final transcript
+  // into typedAnswer. Behaviourally a drop-in replacement for the
+  // batch flow below; we keep them as siblings so the feature flag
+  // can flip back to batch with a single env-var change.
+  async function handleMicClickStreaming() {
+    if (
+      speech.status === "connecting" ||
+      speech.status === "stopping"
+    ) {
+      return;
+    }
+
+    setAudioError(null);
+
+    if (speech.status === "streaming") {
+      try {
+        const finalText = await speech.stop();
+        if (finalText && finalText.trim()) {
+          // Overwrite typedAnswer to match the batch flow's behaviour
+          // (handleAudioSubmit), so each new recording fully replaces
+          // the previous draft and the student can edit from there.
+          setTypedAnswer(finalText.trim());
+        } else {
+          setAudioError(
+            "We didn't catch any speech. Please try recording again.",
+          );
+        }
+      } catch (err) {
+        setAudioError(
+          getErrorMessage(err, "Streaming transcription failed."),
+        );
+      } finally {
+        speech.reset();
+      }
+      return;
+    }
+
+    if (!speech.isSupported) {
+      setAudioError(
+        "Real-time transcription isn't supported in this browser. Please type your answer instead.",
+      );
+      return;
+    }
+
+    try {
+      speech.reset();
+      await speech.start(sessionId);
+    } catch (err) {
+      const name = err && err.name;
+
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setAudioError(
+          "Microphone access was blocked. Please allow microphone access in your browser and try again.",
+        );
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setAudioError(
+          "No microphone was detected. Please connect one and try again.",
+        );
+      } else {
+        setAudioError(
+          getErrorMessage(err, "Failed to start streaming transcription."),
+        );
+      }
+    }
+  }
+
   // Mic-button lifecycle only. Responsible for starting/stopping the
   // recorder and producing a Blob; persistence is delegated to
   // handleAudioSubmit so the two halves can evolve independently.
   async function handleMicClick() {
     if (!currentQuestion) return;
-    if (isSubmitting || isTranscribing) return;
+    if (isSubmitting) return;
+
+    // [STT #72] When streaming is enabled, the whole mic flow is
+    // delegated to handleMicClickStreaming and the batch path below
+    // is unreachable.
+    if (STREAMING_ENABLED) {
+      await handleMicClickStreaming();
+      return;
+    }
+
+    if (isTranscribing) return;
 
     setAudioError(null);
 
@@ -544,6 +660,31 @@ export default function StudentAssessment() {
                     - autoComplete + name="":    disable browser autofill
                     - autoCorrect / spellCheck:  disable native suggestions
                 */}
+                {/* [STT #72] Live streaming preview. Renders only when
+                    the feature flag is on AND we either have a partial
+                    in flight or we're actively streaming. The italic-
+                    grey treatment signals "this text may still change"
+                    so the student knows the textarea is the source of
+                    truth. */}
+                {STREAMING_ENABLED &&
+                  (speech.status === "connecting" ||
+                    speech.status === "streaming" ||
+                    speech.status === "stopping" ||
+                    speech.partial) && (
+                    <div
+                      className="mb-2 min-h-[2.5rem] rounded-xl border border-outline-variant/20 bg-surface-container px-3 py-2 font-body text-sm italic text-outline"
+                      aria-live="polite"
+                      data-testid="stt-partial-preview"
+                    >
+                      {speech.partial ||
+                        (speech.status === "connecting"
+                          ? "Connecting…"
+                          : speech.status === "stopping"
+                            ? "Finalising…"
+                            : "Listening…")}
+                    </div>
+                  )}
+
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
                     <span className="material-symbols-outlined text-outline">
