@@ -11,11 +11,12 @@ import { useCompleteAssessment } from "./useCompleteAssessment";
 import SttDebugOverlay from "./SttDebugOverlay";
 import { useStudentSpeechStream } from "./useStudentSpeechStream";
 
-// [STT #72] Streaming path is opt-in via env var so the new flow can
-// ship behind a flag while we soak-test it. When false (the default),
-// the existing batch flow runs untouched. Set VITE_STT_STREAMING=1 in
-// .env.local to flip it on locally.
-const STREAMING_ENABLED = import.meta.env.VITE_STT_STREAMING === "1";
+// [STT #72] Streaming path is the default after the rollout in
+// commit 28 of feature/audio-to-text. Set VITE_STT_STREAMING=0 in
+// .env.local to force the legacy batch-only behaviour for debugging
+// (the batch path is intact and used as the automatic fallback when
+// the WebSocket errors — see useStudentSpeechStream.js).
+const STREAMING_ENABLED = import.meta.env.VITE_STT_STREAMING !== "0";
 
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";

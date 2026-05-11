@@ -17,10 +17,14 @@ class Settings(BaseSettings):
     transcribe_poll_interval_seconds: int = 1
 
     # Issue #72: feature flag for the WebSocket streaming-transcription
-    # route (/sessions/{id}/transcribe/stream). Default off so the route
-    # can be deployed dark while the frontend changes are in review.
-    # Flip to true via STT_STREAMING_ENABLED=1 once the rollout is ready.
-    stt_streaming_enabled: bool = False
+    # route (/sessions/{id}/transcribe/stream). Default ON after the
+    # rollout in commit 28 of the feature/audio-to-text branch — the
+    # streaming path delivers partials within ~300 ms and the batch
+    # path is retained as the automatic fallback (see
+    # useStudentSpeechStream.js + audio_transcriber.py). Set
+    # STT_STREAMING_ENABLED=0 to force the legacy batch-only behaviour
+    # if a regression turns up post-merge.
+    stt_streaming_enabled: bool = True
 
     # Issue #72: hard cap (seconds) on a single streaming-transcribe
     # WebSocket session. Mirrors the 25 MB upload cap on the batch
