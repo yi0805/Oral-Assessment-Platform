@@ -1263,6 +1263,17 @@ async def transcribe_response_stream(
         current_user.id,
     )
 
+    # [STT Instrumentation - issue #72] Stream session bookkeeping.
+    # The finally block at the bottom of the route always emits a
+    # single grep-able timing line, regardless of which exit path
+    # ran. AWS-side cleanup happens via the TranscribeStreamer's
+    # async-context-manager __aexit__ no matter how we leave the
+    # try block, so a browser tab closing mid-stream cannot leak
+    # an AWS streaming connection.
+    _t_stream_start = time.monotonic()
+    _stream_outcome = "ok"  # "ok" | "stream_error" | "unexpected"
+    _disconnected = False
+
     # 5. Run the streaming session. The TranscribeStreamer context
     # manager handles AWS open/close; we just bridge frames and results
     # between the WebSocket and the streamer.
@@ -1327,12 +1338,19 @@ async def transcribe_response_stream(
             for task in pending:
                 task.cancel()
             # Surface any unexpected exceptions from either task without
-            # letting them mask each other.
-            await asyncio.gather(
+            # letting them mask each other. Capture the results so we
+            # can spot a WebSocketDisconnect that bubbled out of feed()
+            # — return_exceptions swallows the exception (so the outer
+            # ``except WebSocketDisconnect`` would never fire for that
+            # path) and we want it reflected in the timing log below.
+            results = await asyncio.gather(
                 feed_task, drain_task, return_exceptions=True
             )
+            if any(isinstance(r, WebSocketDisconnect) for r in results):
+                _disconnected = True
 
     except TranscribeStreamError:
+        _stream_outcome = "stream_error"
         logger.exception(
             "[StreamRoute] streaming failed session=%s", session_id
         )
@@ -1346,12 +1364,33 @@ async def transcribe_response_stream(
             await websocket.close(code=1011, reason="transcription error")
         except Exception:  # noqa: BLE001
             pass
-        return
 
     except WebSocketDisconnect:
+        # Reached when the disconnect propagates straight out of the
+        # ``async with`` (rather than being caught inside feed()'s
+        # gather). Either way the streamer's __aexit__ has already run.
+        _disconnected = True
+
+    finally:
+        # [STT Instrumentation - issue #72] One grep-able line per
+        # stream session. ``disconnected=true`` distinguishes a
+        # browser-tab close from a clean stop; ``outcome`` tracks
+        # whether AWS bailed mid-stream.
         logger.info(
-            "[StreamRoute] client disconnected session=%s", session_id
+            "[STT timings] phase=stream session=%s outcome=%s disconnected=%s duration=%.3fs",
+            session_id,
+            _stream_outcome,
+            "true" if _disconnected else "false",
+            time.monotonic() - _t_stream_start,
         )
+
+    if _stream_outcome != "ok":
+        # We already sent the error frame and closed the socket in
+        # the except branch — nothing more to do.
+        return
+
+    if _disconnected:
+        # Peer is already gone; close() would just raise.
         return
 
     # 6. Best-effort clean close on the happy path.
@@ -1359,7 +1398,6 @@ async def transcribe_response_stream(
         await websocket.close(code=1000)
     except Exception:  # noqa: BLE001
         pass
-    logger.info("[StreamRoute] closed session=%s", session_id)
 
 
 # Complete session
