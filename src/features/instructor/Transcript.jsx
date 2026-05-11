@@ -156,10 +156,15 @@ function Transcript() {
                     {transcript.assessment.title || "Unknown Assessment"}
                   </p>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap justify-center gap-2">
                     <span className="rounded-full bg-tertiary-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-tertiary-container">
                       Active Enrollment
                     </span>
+                    {transcript.blur_count != null && transcript.blur_count >= 3 && (
+                      <span className="rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-error-container">
+                        Tab Switches · {transcript.blur_count}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
