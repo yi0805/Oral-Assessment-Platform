@@ -5,14 +5,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str 
 
-    storage_backend: str 
+    storage_backend: str
     s3_bucket_name: str
-    aws_region: str 
-    aws_profile_name: str 
+    aws_region: str
+    aws_profile_name: str | None = None
 
     gemini_api_key: str
     openrouter_api_key: str
-    aws_bearer_token_bedrock: str
+    aws_bearer_token_bedrock: str | None = None
 
     google_instructor_domains: str
     google_instructor_allowlist: str
@@ -22,9 +22,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str 
     jwt_expire_minutes: int
  
-    rate_limit_default: int  
+    rate_limit_default: int
 
     cors_origins: str
+
+    cookie_secure: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",
