@@ -1222,7 +1222,9 @@ async def transcribe_response_audio(
 #
 # Close codes:
 #   1000 normal completion
-#   1008 auth / validation / feature-flag rejection (uniform with ws_auth)
+#   1008 auth / validation / feature-flag rejection (uniform with ws_auth);
+#        also used for session-timeout (reason="session_timeout") so the
+#        client can disambiguate via the reason field
 #   1011 server error during streaming (e.g. AWS dropped the connection)
 
 @router.websocket("/sessions/{session_id}/transcribe/stream")
@@ -1271,7 +1273,7 @@ async def transcribe_response_stream(
     # try block, so a browser tab closing mid-stream cannot leak
     # an AWS streaming connection.
     _t_stream_start = time.monotonic()
-    _stream_outcome = "ok"  # "ok" | "stream_error" | "unexpected"
+    _stream_outcome = "ok"  # "ok" | "stream_error" | "timeout"
     _disconnected = False
 
     # 5. Run the streaming session. The TranscribeStreamer context
@@ -1331,10 +1333,19 @@ async def transcribe_response_stream(
             # FIRST_COMPLETED rather than gather() so we don't hang on
             # the feed loop if drain finishes first (e.g. AWS closes the
             # output stream abruptly).
+            #
+            # The ``timeout=`` cap is the per-stream duration limit
+            # (settings.stt_streaming_max_seconds, default 300 s). If
+            # neither task finishes within that window, asyncio.wait
+            # returns with an empty ``done`` set — we treat that as a
+            # server-side timeout, mirroring the batch route's 25 MB
+            # upload cap.
             _done, pending = await asyncio.wait(
                 {feed_task, drain_task},
                 return_when=asyncio.FIRST_COMPLETED,
+                timeout=settings.stt_streaming_max_seconds,
             )
+            timed_out = len(_done) == 0
             for task in pending:
                 task.cancel()
             # Surface any unexpected exceptions from either task without
@@ -1348,6 +1359,34 @@ async def transcribe_response_stream(
             )
             if any(isinstance(r, WebSocketDisconnect) for r in results):
                 _disconnected = True
+
+            if timed_out:
+                _stream_outcome = "timeout"
+                logger.warning(
+                    "[StreamRoute] session=%s exceeded "
+                    "stt_streaming_max_seconds=%ds — tearing down",
+                    session_id,
+                    settings.stt_streaming_max_seconds,
+                )
+                # Best-effort notify the client so the UI can recover
+                # to "Tap the microphone" rather than spinning forever.
+                try:
+                    await websocket.send_json(
+                        {
+                            "type": "timeout",
+                            "message": "session_timeout",
+                            "max_seconds": settings.stt_streaming_max_seconds,
+                        }
+                    )
+                except Exception:  # noqa: BLE001
+                    # Peer may already have gone away — fine.
+                    pass
+                try:
+                    await websocket.close(
+                        code=1008, reason="session_timeout"
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
 
     except TranscribeStreamError:
         _stream_outcome = "stream_error"
@@ -1385,8 +1424,8 @@ async def transcribe_response_stream(
         )
 
     if _stream_outcome != "ok":
-        # We already sent the error frame and closed the socket in
-        # the except branch — nothing more to do.
+        # stream_error and timeout branches already sent their error
+        # frames and closed the socket — nothing more to do here.
         return
 
     if _disconnected:

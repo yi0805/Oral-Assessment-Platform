@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     # Flip to true via STT_STREAMING_ENABLED=1 once the rollout is ready.
     stt_streaming_enabled: bool = False
 
+    # Issue #72: hard cap (seconds) on a single streaming-transcribe
+    # WebSocket session. Mirrors the 25 MB upload cap on the batch
+    # route — protects against a stuck mic stream / runaway client
+    # holding an AWS Transcribe Streaming connection open indefinitely.
+    # 300s (5 minutes) is roomy for any realistic single-question
+    # answer; the assessment-wide time limit (config.total_time_minute)
+    # is enforced separately by _validate_session_for_transcribe.
+    stt_streaming_max_seconds: int = 300
+
     gemini_api_key: str
     openrouter_api_key: str
     aws_bearer_token_bedrock: str
