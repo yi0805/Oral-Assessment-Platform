@@ -1227,9 +1227,23 @@ async def transcribe_response_audio(
 # Close codes:
 #   1000 normal completion
 #   1008 auth / validation / feature-flag rejection (uniform with ws_auth);
-#        also used for session-timeout (reason="session_timeout") so the
+#        also used for session-timeout (reason="session_timeout") and the
+#        per-user concurrency cap (reason="stream_already_active") so the
 #        client can disambiguate via the reason field
 #   1011 server error during streaming (e.g. AWS dropped the connection)
+
+# [STT #72] In-process set of user IDs (stringified) that currently
+# have an active streaming-transcribe WebSocket. Used to enforce a
+# one-concurrent-stream-per-user cap so a runaway tab can't open
+# dozens of parallel AWS Transcribe Streaming connections.
+#
+# In-memory rather than Redis-backed because (a) a single uvicorn
+# worker can comfortably handle the project's load, and (b) crash
+# recovery is automatic — the set is gone when the process dies, so
+# there are no stale entries blocking future connections after a
+# restart. A multi-worker deployment would need a shared store; this
+# is documented as a known limitation rather than papered over.
+_active_stream_users: set[str] = set()
 
 @router.websocket("/sessions/{session_id}/transcribe/stream")
 async def transcribe_response_stream(
@@ -1259,204 +1273,235 @@ async def transcribe_response_stream(
         await websocket.close(code=1008, reason=str(exc.detail))
         return
 
-    # 4. Accept the connection only after all checks have passed, so a
-    # rejected handshake never appears as "connected then immediately
-    # closed" to the client.
-    await websocket.accept()
-    logger.info(
-        "[StreamRoute] accepted session=%s user=%s",
-        session_id,
-        current_user.id,
-    )
+    # 4. Per-user concurrency cap. Reject if this user already has an
+    # open streaming session — one tab speaking at a time is plenty,
+    # and this stops a runaway client from holding multiple AWS
+    # connections open in parallel. Safe without a lock because the
+    # check and the add are both synchronous and asyncio doesn't
+    # context-switch between them.
+    user_key = str(current_user.id)
+    if user_key in _active_stream_users:
+        logger.info(
+            "[StreamRoute] rejected — already streaming session=%s user=%s",
+            session_id,
+            current_user.id,
+        )
+        await websocket.close(
+            code=1008, reason="stream_already_active"
+        )
+        return
+    _active_stream_users.add(user_key)
 
-    # [STT Instrumentation - issue #72] Stream session bookkeeping.
-    # The finally block at the bottom of the route always emits a
-    # single grep-able timing line, regardless of which exit path
-    # ran. AWS-side cleanup happens via the TranscribeStreamer's
-    # async-context-manager __aexit__ no matter how we leave the
-    # try block, so a browser tab closing mid-stream cannot leak
-    # an AWS streaming connection.
-    _t_stream_start = time.monotonic()
-    _stream_outcome = "ok"  # "ok" | "stream_error" | "timeout"
-    _disconnected = False
-
-    # 5. Run the streaming session. The TranscribeStreamer context
-    # manager handles AWS open/close; we just bridge frames and results
-    # between the WebSocket and the streamer.
-    #
-    # ``streamer`` is bound before the ``async with`` so the finally
-    # block can read its stats (ttfp / partials / finals) after
-    # __aexit__ has run.
-    streamer = TranscribeStreamer(region=settings.aws_region)
     try:
-        async with streamer:
+        # 5. Accept the connection only after all checks have passed,
+        # so a rejected handshake never appears as "connected then
+        # immediately closed" to the client.
+        await websocket.accept()
+        logger.info(
+            "[StreamRoute] accepted session=%s user=%s",
+            session_id,
+            current_user.id,
+        )
 
-            async def feed() -> None:
-                """Pull frames off the WebSocket, push them into AWS."""
-                try:
-                    while True:
-                        msg = await websocket.receive()
-                        if msg.get("type") == "websocket.disconnect":
-                            return
-                        chunk = msg.get("bytes")
-                        if chunk:
-                            await streamer.send_pcm(chunk)
-                            continue
-                        text = msg.get("text")
-                        if not text:
-                            continue
-                        # Optional control message — currently only
-                        # {"type": "stop"} is supported.
+        # [STT Instrumentation - issue #72] Stream session bookkeeping.
+        # The inner finally block emits a single grep-able timing line
+        # regardless of which exit path ran. AWS-side cleanup happens
+        # via the TranscribeStreamer's async-context-manager __aexit__
+        # no matter how we leave the inner try, so a browser tab
+        # closing mid-stream cannot leak an AWS streaming connection.
+        _t_stream_start = time.monotonic()
+        _stream_outcome = "ok"  # "ok" | "stream_error" | "timeout"
+        _disconnected = False
+
+        # 6. Run the streaming session. The TranscribeStreamer context
+        # manager handles AWS open/close; we just bridge frames and
+        # results between the WebSocket and the streamer.
+        #
+        # ``streamer`` is bound before the ``async with`` so the
+        # finally block can read its stats (ttfp / partials / finals)
+        # after __aexit__ has run.
+        streamer = TranscribeStreamer(region=settings.aws_region)
+        try:
+            async with streamer:
+
+                async def feed() -> None:
+                    """Pull frames off the WebSocket, push them into AWS."""
+                    try:
+                        while True:
+                            msg = await websocket.receive()
+                            if msg.get("type") == "websocket.disconnect":
+                                return
+                            chunk = msg.get("bytes")
+                            if chunk:
+                                await streamer.send_pcm(chunk)
+                                continue
+                            text = msg.get("text")
+                            if not text:
+                                continue
+                            # Optional control message — currently only
+                            # {"type": "stop"} is supported.
+                            try:
+                                payload = json.loads(text)
+                            except json.JSONDecodeError:
+                                continue
+                            if payload.get("type") == "stop":
+                                return
+                    finally:
+                        # Always signal AWS we're done so it flushes the
+                        # last partial-or-final result, even if the loop
+                        # exits via cancellation.
+                        await streamer.end_input()
+
+                async def drain() -> None:
+                    """Forward AWS results back to the WebSocket."""
+                    async for result in streamer.results():
                         try:
-                            payload = json.loads(text)
-                        except json.JSONDecodeError:
-                            continue
-                        if payload.get("type") == "stop":
+                            await websocket.send_json(
+                                {
+                                    "type": "partial" if result.is_partial else "final",
+                                    "text": result.text,
+                                    "timestamp": result.timestamp,
+                                }
+                            )
+                        except Exception:  # noqa: BLE001
+                            # WebSocket closed under us mid-send. Stop
+                            # draining; the streamer context manager
+                            # will clean up the AWS side.
                             return
-                finally:
-                    # Always signal AWS we're done so it flushes the
-                    # last partial-or-final result, even if the loop
-                    # exits via cancellation.
-                    await streamer.end_input()
 
-            async def drain() -> None:
-                """Forward AWS results back to the WebSocket."""
-                async for result in streamer.results():
+                feed_task = asyncio.create_task(feed())
+                drain_task = asyncio.create_task(drain())
+
+                # FIRST_COMPLETED rather than gather() so we don't hang
+                # on the feed loop if drain finishes first (e.g. AWS
+                # closes the output stream abruptly).
+                #
+                # The ``timeout=`` cap is the per-stream duration limit
+                # (settings.stt_streaming_max_seconds, default 300 s).
+                # If neither task finishes within that window,
+                # asyncio.wait returns with an empty ``done`` set —
+                # we treat that as a server-side timeout, mirroring
+                # the batch route's 25 MB upload cap.
+                _done, pending = await asyncio.wait(
+                    {feed_task, drain_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                    timeout=settings.stt_streaming_max_seconds,
+                )
+                timed_out = len(_done) == 0
+                for task in pending:
+                    task.cancel()
+                # Surface any unexpected exceptions from either task
+                # without letting them mask each other. Capture the
+                # results so we can spot a WebSocketDisconnect that
+                # bubbled out of feed() — return_exceptions swallows
+                # the exception (so the outer ``except
+                # WebSocketDisconnect`` would never fire for that path)
+                # and we want it reflected in the timing log below.
+                results = await asyncio.gather(
+                    feed_task, drain_task, return_exceptions=True
+                )
+                if any(isinstance(r, WebSocketDisconnect) for r in results):
+                    _disconnected = True
+
+                if timed_out:
+                    _stream_outcome = "timeout"
+                    logger.warning(
+                        "[StreamRoute] session=%s exceeded "
+                        "stt_streaming_max_seconds=%ds — tearing down",
+                        session_id,
+                        settings.stt_streaming_max_seconds,
+                    )
+                    # Best-effort notify the client so the UI can
+                    # recover to "Tap the microphone" rather than
+                    # spinning forever.
                     try:
                         await websocket.send_json(
                             {
-                                "type": "partial" if result.is_partial else "final",
-                                "text": result.text,
-                                "timestamp": result.timestamp,
+                                "type": "timeout",
+                                "message": "session_timeout",
+                                "max_seconds": settings.stt_streaming_max_seconds,
                             }
                         )
                     except Exception:  # noqa: BLE001
-                        # WebSocket closed under us mid-send. Stop
-                        # draining; the streamer context manager will
-                        # clean up the AWS side.
-                        return
+                        # Peer may already have gone away — fine.
+                        pass
+                    try:
+                        await websocket.close(
+                            code=1008, reason="session_timeout"
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
 
-            feed_task = asyncio.create_task(feed())
-            drain_task = asyncio.create_task(drain())
-
-            # FIRST_COMPLETED rather than gather() so we don't hang on
-            # the feed loop if drain finishes first (e.g. AWS closes the
-            # output stream abruptly).
-            #
-            # The ``timeout=`` cap is the per-stream duration limit
-            # (settings.stt_streaming_max_seconds, default 300 s). If
-            # neither task finishes within that window, asyncio.wait
-            # returns with an empty ``done`` set — we treat that as a
-            # server-side timeout, mirroring the batch route's 25 MB
-            # upload cap.
-            _done, pending = await asyncio.wait(
-                {feed_task, drain_task},
-                return_when=asyncio.FIRST_COMPLETED,
-                timeout=settings.stt_streaming_max_seconds,
+        except TranscribeStreamError:
+            _stream_outcome = "stream_error"
+            logger.exception(
+                "[StreamRoute] streaming failed session=%s", session_id
             )
-            timed_out = len(_done) == 0
-            for task in pending:
-                task.cancel()
-            # Surface any unexpected exceptions from either task without
-            # letting them mask each other. Capture the results so we
-            # can spot a WebSocketDisconnect that bubbled out of feed()
-            # — return_exceptions swallows the exception (so the outer
-            # ``except WebSocketDisconnect`` would never fire for that
-            # path) and we want it reflected in the timing log below.
-            results = await asyncio.gather(
-                feed_task, drain_task, return_exceptions=True
-            )
-            if any(isinstance(r, WebSocketDisconnect) for r in results):
-                _disconnected = True
-
-            if timed_out:
-                _stream_outcome = "timeout"
-                logger.warning(
-                    "[StreamRoute] session=%s exceeded "
-                    "stt_streaming_max_seconds=%ds — tearing down",
-                    session_id,
-                    settings.stt_streaming_max_seconds,
+            try:
+                await websocket.send_json(
+                    {"type": "error", "message": "transcription_failed"}
                 )
-                # Best-effort notify the client so the UI can recover
-                # to "Tap the microphone" rather than spinning forever.
-                try:
-                    await websocket.send_json(
-                        {
-                            "type": "timeout",
-                            "message": "session_timeout",
-                            "max_seconds": settings.stt_streaming_max_seconds,
-                        }
-                    )
-                except Exception:  # noqa: BLE001
-                    # Peer may already have gone away — fine.
-                    pass
-                try:
-                    await websocket.close(
-                        code=1008, reason="session_timeout"
-                    )
-                except Exception:  # noqa: BLE001
-                    pass
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                await websocket.close(code=1011, reason="transcription error")
+            except Exception:  # noqa: BLE001
+                pass
 
-    except TranscribeStreamError:
-        _stream_outcome = "stream_error"
-        logger.exception(
-            "[StreamRoute] streaming failed session=%s", session_id
-        )
-        try:
-            await websocket.send_json(
-                {"type": "error", "message": "transcription_failed"}
+        except WebSocketDisconnect:
+            # Reached when the disconnect propagates straight out of
+            # the ``async with`` (rather than being caught inside
+            # feed()'s gather). Either way the streamer's __aexit__
+            # has already run.
+            _disconnected = True
+
+        finally:
+            # [STT Instrumentation - issue #72] One grep-able line per
+            # stream session. ``disconnected=true`` distinguishes a
+            # browser-tab close from a clean stop; ``outcome`` tracks
+            # whether AWS bailed mid-stream. ``ttfp`` / ``ttfr`` /
+            # ``partials`` / ``finals`` come from the streamer's stats
+            # (mutated by the result pump as events arrive). They're
+            # "-" when no result of that kind ever arrived for the
+            # session.
+            ttfp = fmt_optional_seconds(streamer.time_to_first_partial)
+            ttfr = fmt_optional_seconds(streamer.time_to_first_final)
+            logger.info(
+                "[STT timings] phase=stream session=%s outcome=%s "
+                "disconnected=%s ttfp=%s ttfr=%s partials=%d finals=%d "
+                "duration=%.3fs",
+                session_id,
+                _stream_outcome,
+                "true" if _disconnected else "false",
+                ttfp,
+                ttfr,
+                streamer.partial_count,
+                streamer.final_count,
+                time.monotonic() - _t_stream_start,
             )
-        except Exception:  # noqa: BLE001
-            pass
-        try:
-            await websocket.close(code=1011, reason="transcription error")
-        except Exception:  # noqa: BLE001
-            pass
 
-    except WebSocketDisconnect:
-        # Reached when the disconnect propagates straight out of the
-        # ``async with`` (rather than being caught inside feed()'s
-        # gather). Either way the streamer's __aexit__ has already run.
-        _disconnected = True
+        if _stream_outcome != "ok":
+            # stream_error and timeout branches already sent their
+            # error frames and closed the socket — nothing more to do
+            # here.
+            return
+
+        if _disconnected:
+            # Peer is already gone; close() would just raise.
+            return
+
+        # 7. Best-effort clean close on the happy path.
+        try:
+            await websocket.close(code=1000)
+        except Exception:  # noqa: BLE001
+            pass
 
     finally:
-        # [STT Instrumentation - issue #72] One grep-able line per
-        # stream session. ``disconnected=true`` distinguishes a
-        # browser-tab close from a clean stop; ``outcome`` tracks
-        # whether AWS bailed mid-stream. ``ttfp`` / ``ttfr`` /
-        # ``partials`` / ``finals`` come from the streamer's stats
-        # (mutated by the result pump as events arrive). They're "-"
-        # when no result of that kind ever arrived for the session.
-        ttfp = fmt_optional_seconds(streamer.time_to_first_partial)
-        ttfr = fmt_optional_seconds(streamer.time_to_first_final)
-        logger.info(
-            "[STT timings] phase=stream session=%s outcome=%s "
-            "disconnected=%s ttfp=%s ttfr=%s partials=%d finals=%d "
-            "duration=%.3fs",
-            session_id,
-            _stream_outcome,
-            "true" if _disconnected else "false",
-            ttfp,
-            ttfr,
-            streamer.partial_count,
-            streamer.final_count,
-            time.monotonic() - _t_stream_start,
-        )
-
-    if _stream_outcome != "ok":
-        # stream_error and timeout branches already sent their error
-        # frames and closed the socket — nothing more to do here.
-        return
-
-    if _disconnected:
-        # Peer is already gone; close() would just raise.
-        return
-
-    # 6. Best-effort clean close on the happy path.
-    try:
-        await websocket.close(code=1000)
-    except Exception:  # noqa: BLE001
-        pass
+        # Concurrency-cap cleanup. Runs no matter how we exit the
+        # route body — exception, early return, or normal completion
+        # — so a half-built session never leaves a stale entry that
+        # would lock the user out of opening a new stream.
+        _active_stream_users.discard(user_key)
 
 
 # Complete session
