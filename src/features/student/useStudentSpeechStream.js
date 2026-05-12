@@ -195,6 +195,23 @@ export function useStudentSpeechStream() {
     // ---------- 2. Error with no fallback → surface it ----------
     const err = wsError || audioError;
     if (err && !fallbackTriggeredRef.current) {
+      // Release the mic stream so the recorder doesn't keep
+      // capturing past the failure. Best-effort — stopAudio() is
+      // idempotent and the inner try/catches guard against
+      // partially-built pipelines, so calling it here is safe even
+      // if the audio pipeline never fully opened.
+      stopAudio();
+      // Drop the parallel recorder handle too. Without a recorder we
+      // have nothing to fall back to, but we still need to release
+      // the underlying tracks rather than leaving them hot.
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.dispose();
+        } catch {
+          /* recorder may already be torn down */
+        }
+        recorderRef.current = null;
+      }
       setStatus("error");
 
       if (stopRejecterRef.current) {
