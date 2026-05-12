@@ -105,6 +105,13 @@ export function useStudentSpeechStream() {
   const sessionIdRef = useRef(null);
   const fallbackTriggeredRef = useRef(false);
 
+  // Auto-stop bookkeeping. Set when the WS dies before the user has
+  // pressed stop (server timeout, abnormal close, etc.). The consumer
+  // reads this to detect "the recording ended on its own" and
+  // populate the answer textarea + surface a banner, since there's
+  // no awaited stop() promise to resolve.
+  const [autoStopReason, setAutoStopReason] = useState(null);
+
   useEffect(() => {
     finalRef.current = final;
   }, [final]);
@@ -134,6 +141,15 @@ export function useStudentSpeechStream() {
       fallbackTriggeredRef.current = true;
       setFallbackPhase("pending");
       setStatus("stopping");
+      // Capture whether the user was already awaiting stop(). If not,
+      // this is an auto-stop (server timeout / abnormal close while
+      // the student is still speaking) and the consumer needs to be
+      // told so it can show the transcript in the textarea.
+      const userInitiatedStop = stopResolverRef.current !== null;
+      const reason =
+        wsError && wsError.code === "session_timeout"
+          ? "session_timeout"
+          : "stream_error";
       // Clear the underlying WS-hook error synchronously so the
       // orchestrator's `error` field stops surfacing it on the very
       // next render — keeps the brief "error flashes then recovers"
@@ -170,6 +186,10 @@ export function useStudentSpeechStream() {
           finalRef.current = text;
           setFallbackPhase("ok");
           setStatus("idle");
+
+          if (!userInitiatedStop) {
+            setAutoStopReason(reason);
+          }
 
           if (stopResolverRef.current) {
             const resolve = stopResolverRef.current;
@@ -239,6 +259,7 @@ export function useStudentSpeechStream() {
       setFallbackFinal("");
       setFallbackPhase("none");
       fallbackTriggeredRef.current = false;
+      setAutoStopReason(null);
       sessionIdRef.current = sessionId;
 
       // 1. Open the parallel batch recorder first. Best effort — if
@@ -362,6 +383,7 @@ export function useStudentSpeechStream() {
     setFallbackFinal("");
     setFallbackPhase("none");
     fallbackTriggeredRef.current = false;
+    setAutoStopReason(null);
     setStatus("idle");
   }, [resetWs]);
 
@@ -389,5 +411,11 @@ export function useStudentSpeechStream() {
     stop,
     cancel,
     reset,
+    // Truthy ("session_timeout" | "stream_error") when the stream
+    // ended without a user-initiated stop. Cleared on reset() /
+    // start(). Consumers read this to differentiate "the student
+    // pressed stop and got a transcript" from "the server stopped
+    // them and we recovered a transcript".
+    autoStopReason,
   };
 }
