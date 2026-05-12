@@ -85,21 +85,42 @@ class _BotoProfileCredentialResolver(CredentialResolver):
 
     boto3 *does* understand SSO profiles, so we just delegate: ask the
     boto3 session for a frozen credential snapshot and wrap it in the
-    ``Credentials`` shape the streaming SDK expects. Resolution runs
-    every time the streamer opens (cheap — boto3 caches the SSO token
-    on disk), so an SSO refresh while the server is up just works on
-    the next streaming session.
+    ``Credentials`` shape the streaming SDK expects.
+
+    **One resolver instance per stream.** The amazon_transcribe SDK
+    calls ``get_credentials()`` once for the HTTP handshake AND once
+    for every audio event (see ``AudioStream._sign_event`` in
+    eventstream.py). If the same resolver is asked twice and returns
+    snapshots whose ``secret_access_key`` differ even slightly (e.g.
+    boto3 refreshed the SSO token between calls), the per-event
+    chained signature derived with the new key fails AWS's check
+    against the access key from the handshake, surfacing as::
+
+        BadRequestException: The request signature we calculated does
+        not match the signature you provided.
+
+    The default ``AwsCrtCredentialResolver`` avoids this because the
+    underlying awscrt provider caches credentials internally; the
+    boto3 path doesn't, so we cache on first call.
     """
 
     def __init__(self, profile_name: str, region: str) -> None:
         self._profile_name = profile_name
         self._region = region
+        # Frozen snapshot taken on first get_credentials() call. All
+        # subsequent calls in the stream's lifetime return this exact
+        # instance, keeping the per-event signing chain consistent
+        # with the handshake.
+        self._cached: Optional[Credentials] = None
 
     async def get_credentials(self) -> Optional[Credentials]:
+        if self._cached is not None:
+            return self._cached
         # boto3's credential lookup is sync; offload so we don't block
         # the event loop while it reads the SSO cache / refreshes a
         # token.
-        return await asyncio.to_thread(self._resolve)
+        self._cached = await asyncio.to_thread(self._resolve)
+        return self._cached
 
     def _resolve(self) -> Credentials:
         try:
