@@ -198,6 +198,43 @@ export default function StudentAssessment() {
     );
   }, [speech.error]);
 
+  // Auto-stop handling. When the WebSocket dies before the student
+  // pressed stop (server-enforced duration cap, abnormal close), the
+  // orchestrator runs the buffered-audio fallback and exposes
+  // autoStopReason + the transcript via speech.final. The mic flow
+  // never gets a chance to call setTypedAnswer because there's no
+  // awaited stop() to return the text — surface it here instead, plus
+  // an informational banner so the student knows what happened.
+  const autoStopHandledRef = useRef(false);
+  useEffect(() => {
+    if (!STREAMING_ENABLED) return;
+    if (!speech.autoStopReason) {
+      autoStopHandledRef.current = false;
+      return;
+    }
+    // Wait until the fallback has finished and the orchestrator has
+    // settled back to idle / error before reacting — speech.final is
+    // only populated once the batch transcribe round-trip completes.
+    if (speech.status !== "idle" && speech.status !== "error") return;
+    if (autoStopHandledRef.current) return;
+    autoStopHandledRef.current = true;
+
+    if (speech.final && speech.final.trim()) {
+      // Overwrite to match the user-initiated stop flow's behaviour.
+      setTypedAnswer(speech.final.trim());
+    }
+
+    setAudioError(
+      speech.autoStopReason === "session_timeout"
+        ? "Recording stopped automatically after the maximum duration. We saved what was captured — review it below and submit."
+        : "The recording connection dropped, so we stopped automatically and recovered what was captured. Review the text below and submit, or record again.",
+    );
+  }, [
+    speech.autoStopReason,
+    speech.final,
+    speech.status,
+  ]);
+
   // [STT #72] Elapsed-time counter for the "Transcribing…" indicator.
   // This is the cheapest fix for the "frozen UI" symptom in the
   // original issue: even if the underlying latency is still there, a
