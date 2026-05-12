@@ -523,6 +523,17 @@ class TranscribeStreamer:
                 audio_chunk=frame
             )
         except Exception as exc:  # noqa: BLE001
+            # Log the original SDK exception before wrapping it.
+            # Without this, the route only sees the wrapped
+            # TranscribeStreamError message and the actual AWS reason
+            # (e.g. BadRequestException, signature mismatch, IAM
+            # denial, partial-result stream timeout) is lost.
+            logger.exception(
+                "[TranscribeStream] send_pcm failed at offset=%d bytes (frame_bytes=%d)",
+                self._stats.get("partial_count", 0)
+                + self._stats.get("final_count", 0),
+                len(frame),
+            )
             raise TranscribeStreamError(f"send_pcm failed: {exc}") from exc
 
     async def end_input(self) -> None:
