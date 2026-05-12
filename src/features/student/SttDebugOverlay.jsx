@@ -25,6 +25,8 @@ function isEnabled() {
 export default function SttDebugOverlay() {
   const [enabled] = useState(isEnabled);
   const [timings, setTimings] = useState(null);
+  const [streamStats, setStreamStats] = useState(null);
+  const [audioStats, setAudioStats] = useState(null);
 
   useEffect(() => {
     if (!enabled) return undefined;
@@ -36,15 +38,27 @@ export default function SttDebugOverlay() {
       /* localStorage unavailable — overlay still renders, no logs */
     }
 
-    if (window.__sttLastTimings) {
-      setTimings(window.__sttLastTimings);
-    }
+    if (window.__sttLastTimings) setTimings(window.__sttLastTimings);
+    if (window.__sttStreamStats) setStreamStats(window.__sttStreamStats);
+    if (window.__sttAudioCtxStats) setAudioStats(window.__sttAudioCtxStats);
 
-    function handler(event) {
+    function batchHandler(event) {
       setTimings(event.detail);
     }
-    window.addEventListener("stt:timings", handler);
-    return () => window.removeEventListener("stt:timings", handler);
+    function streamHandler(event) {
+      setStreamStats(event.detail);
+    }
+    function audioHandler(event) {
+      setAudioStats(event.detail);
+    }
+    window.addEventListener("stt:timings", batchHandler);
+    window.addEventListener("stt:stream-stats", streamHandler);
+    window.addEventListener("stt:audio-stats", audioHandler);
+    return () => {
+      window.removeEventListener("stt:timings", batchHandler);
+      window.removeEventListener("stt:stream-stats", streamHandler);
+      window.removeEventListener("stt:audio-stats", audioHandler);
+    };
   }, [enabled]);
 
   if (!enabled) return null;
@@ -72,21 +86,55 @@ export default function SttDebugOverlay() {
       <div style={{ fontWeight: 600, marginBottom: 4 }}>
         STT debug (issue #72)
       </div>
+
+      <div style={{ fontWeight: 600, marginTop: 4 }}>audio worklet</div>
+      {audioStats ? (
+        <>
+          <div>posted: {audioStats.framesPosted} frames</div>
+          <div>bytes: {audioStats.bytesPosted}</div>
+          <div>ctx: {audioStats.ctxState}</div>
+          <div>
+            peak: {audioStats.peakAmpEver ?? 0}
+            {audioStats.peakAmpEver != null && audioStats.peakAmpEver < 500 && (
+              <span style={{ color: "#fca5a5" }}> (silent!)</span>
+            )}
+          </div>
+        </>
+      ) : (
+        <div style={{ opacity: 0.7 }}>not recording yet</div>
+      )}
+
+      <div style={{ fontWeight: 600, marginTop: 6 }}>ws → server</div>
+      {streamStats ? (
+        <>
+          <div>sent: {streamStats.framesSent} frames</div>
+          <div>bytes: {streamStats.bytesSent}</div>
+          <div>state: {streamStats.wsState}</div>
+          {streamStats.sendSkippedNotOpen > 0 && (
+            <div style={{ color: "#fca5a5" }}>
+              skipped: {streamStats.sendSkippedNotOpen}
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ opacity: 0.7 }}>not connected yet</div>
+      )}
+
+      <div style={{ fontWeight: 600, marginTop: 6 }}>last batch</div>
       {timings ? (
         <>
           <div>round-trip: {timings.requestRoundTripMs} ms</div>
           <div>blob: {timings.blobSizeKB} KB</div>
           <div>type: {timings.blobType}</div>
           <div>ext: {timings.ext}</div>
-          <div style={{ opacity: 0.7, marginTop: 4 }}>
-            check backend logs for [STT timings]
-          </div>
         </>
       ) : (
-        <div style={{ opacity: 0.8 }}>
-          waiting for first transcription…
-        </div>
+        <div style={{ opacity: 0.7 }}>no batch yet</div>
       )}
+
+      <div style={{ opacity: 0.7, marginTop: 6 }}>
+        check backend logs for [STT timings]
+      </div>
     </div>
   );
 }
