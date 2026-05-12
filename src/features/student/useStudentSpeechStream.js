@@ -248,6 +248,18 @@ export function useStudentSpeechStream() {
       const resolve = stopResolverRef.current;
       stopResolverRef.current = null;
       stopRejecterRef.current = null;
+      // Server delivered a clean close, so the recorder was held
+      // alive purely as a fallback safety net we no longer need.
+      // Dispose it here so the mic doesn't keep capturing past the
+      // user's stop click.
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.dispose();
+        } catch {
+          /* recorder may already be torn down */
+        }
+        recorderRef.current = null;
+      }
       setStatus((s) => (s === "stopping" ? "idle" : s));
       resolve(finalRef.current);
     }
@@ -329,18 +341,28 @@ export function useStudentSpeechStream() {
     setStatus("stopping");
     await stopAudio();
 
-    // Streaming completed without needing the fallback — drop the
-    // parallel recorder so we don't leak it past this session.
-    if (recorderRef.current) {
-      try {
-        recorderRef.current.dispose();
-      } catch {
-        /* recorder may already be torn down */
-      }
-      recorderRef.current = null;
-    }
+    // The parallel recorder is intentionally NOT disposed here.
+    // After we send the stop frame the server may still respond
+    // with {"type":"error"} (e.g. AWS Transcribe failing the
+    // finalisation pass), and branch 1 of the effect needs the
+    // recorder intact to run the batch fallback. Disposing it now
+    // would leave the recorder permanently gone by the time the
+    // error arrived and the UI would freeze in "Transcribing…".
+    // The clean-close and error branches below dispose it once we
+    // know the WS lifecycle has settled.
 
     if (!isStreaming) {
+      // WS already closed cleanly — no server response is coming,
+      // so the recorder won't be needed for a fallback. Dispose it
+      // now so we don't leak the mic stream past this session.
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.dispose();
+        } catch {
+          /* recorder may already be torn down */
+        }
+        recorderRef.current = null;
+      }
       setStatus((s) => (s === "stopping" ? "idle" : s));
       return finalRef.current;
     }
