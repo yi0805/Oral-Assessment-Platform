@@ -28,6 +28,8 @@ build/
 
 # Environment files
 .env
+production.env
+.env.production
 
 # Testing / coverage
 .pytest_cache/

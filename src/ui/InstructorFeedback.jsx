@@ -12,6 +12,19 @@ function InstructorFeedback({ assessmentResults }) {
             key={result.sessionId}
           >
             <div className="absolute right-0 top-0 -mr-16 -mt-16 h-32 w-32 rounded-full bg-primary/5"></div>
+
+            <div className="relative mb-4 flex items-baseline gap-2 border-b border-surface-container pb-3">
+              <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                {result.courseCode}
+              </span>
+
+              <span className="text-xs text-on-surface-variant">·</span>
+
+              <span className="truncate text-xs font-semibold text-on-surface">
+                {result.title}
+              </span>
+            </div>
+
             <div className="mb-4 flex items-center gap-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-surface-container text-outline">
                 {result.instructorImage ? (
