@@ -1320,7 +1320,15 @@ async def transcribe_response_stream(
         # ``streamer`` is bound before the ``async with`` so the
         # finally block can read its stats (ttfp / partials / finals)
         # after __aexit__ has run.
-        streamer = TranscribeStreamer(region=settings.aws_region)
+        streamer = TranscribeStreamer(
+            region=settings.aws_region,
+            # Use the same profile the batch S3 client does so SSO
+            # credentials work locally without `AWS_PROFILE` being set
+            # in the uvicorn shell. On a deployment with an attached
+            # IAM role this is a no-op (env vars / instance profile
+            # still take precedence via boto3's own chain).
+            profile_name=settings.aws_profile_name,
+        )
         try:
             async with streamer:
 

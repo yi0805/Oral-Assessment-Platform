@@ -22,11 +22,12 @@ instead, this module bridges those callbacks into an
 yields them out. The handler runs on its own task spawned in
 :meth:`__aenter__` and torn down in :meth:`__aexit__`.
 
-AWS credentials come from the standard botocore credential chain
-(env vars, ``~/.aws/credentials``, instance profile, etc.). For local
-SSO development with a named profile, set ``AWS_PROFILE`` in your
-shell before starting uvicorn — the streaming SDK does *not* read
-``settings.aws_profile_name`` directly the way the batch path does.
+AWS credentials default to the streaming SDK's CRT credential chain
+(env vars, IAM role, etc.). Local dev with SSO needs the named
+profile — pass ``profile_name=settings.aws_profile_name`` to
+:class:`TranscribeStreamer` and an internal resolver routes
+credential lookup through ``boto3.Session`` so SSO-cached tokens
+under ``~/.aws/sso/cache/`` are picked up automatically.
 
 Intended call shape::
 
@@ -58,11 +59,73 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, AsyncIterator, Optional, Type
 
+import boto3
+from amazon_transcribe.auth import CredentialResolver, Credentials
 from amazon_transcribe.client import TranscribeStreamingClient
 from amazon_transcribe.handlers import TranscriptResultStreamHandler
 from amazon_transcribe.model import TranscriptEvent
+from botocore.exceptions import ProfileNotFound
 
 logger = logging.getLogger(__name__)
+
+
+class _BotoProfileCredentialResolver(CredentialResolver):
+    """Bridge boto3's named-profile credential chain into the
+    amazon_transcribe SDK.
+
+    The streaming SDK's default resolver (``AwsCrtCredentialResolver``)
+    walks the CRT credential chain, which on a dev laptop has no
+    knowledge of SSO-cached credentials under
+    ``~/.aws/sso/cache/<hash>.json``. That mismatch is why the
+    streaming route was failing with
+    ``AWS_AUTH_CREDENTIALS_PROVIDER_IMDS_SOURCE_FAILURE`` while the
+    batch route — which already goes through ``boto3.Session(
+    profile_name=settings.aws_profile_name)`` via aws_clients.get_s3_client
+    — worked fine.
+
+    boto3 *does* understand SSO profiles, so we just delegate: ask the
+    boto3 session for a frozen credential snapshot and wrap it in the
+    ``Credentials`` shape the streaming SDK expects. Resolution runs
+    every time the streamer opens (cheap — boto3 caches the SSO token
+    on disk), so an SSO refresh while the server is up just works on
+    the next streaming session.
+    """
+
+    def __init__(self, profile_name: str, region: str) -> None:
+        self._profile_name = profile_name
+        self._region = region
+
+    async def get_credentials(self) -> Optional[Credentials]:
+        # boto3's credential lookup is sync; offload so we don't block
+        # the event loop while it reads the SSO cache / refreshes a
+        # token.
+        return await asyncio.to_thread(self._resolve)
+
+    def _resolve(self) -> Credentials:
+        try:
+            session = boto3.Session(
+                profile_name=self._profile_name,
+                region_name=self._region,
+            )
+        except ProfileNotFound as exc:
+            raise RuntimeError(
+                f"AWS profile '{self._profile_name}' was not found. "
+                "Run `aws configure sso` or set AWS_PROFILE_NAME in .env."
+            ) from exc
+
+        boto_creds = session.get_credentials()
+        if boto_creds is None:
+            raise RuntimeError(
+                f"AWS profile '{self._profile_name}' resolved no credentials. "
+                "If using SSO, run `aws sso login --profile {profile}`."
+            )
+
+        frozen = boto_creds.get_frozen_credentials()
+        return Credentials(
+            access_key_id=frozen.access_key,
+            secret_access_key=frozen.secret_key,
+            session_token=frozen.token,
+        )
 
 # Internal sentinel pushed onto the result queue by the handler task
 # when the AWS output stream closes. ``results()`` uses it to know when
@@ -217,6 +280,7 @@ class TranscribeStreamer:
         region: str,
         language_code: str = "en-US",
         sample_rate_hz: int = DEFAULT_SAMPLE_RATE_HZ,
+        profile_name: Optional[str] = None,
     ) -> None:
         """
         Capture configuration. No network calls happen here — the AWS
@@ -231,10 +295,18 @@ class TranscribeStreamer:
             sample_rate_hz: PCM sample rate of the frames you'll feed
                 via :meth:`send_pcm`. Must match the actual rate the
                 client encodes at; otherwise transcripts are garbled.
+            profile_name: Optional boto3 named profile to source
+                credentials from (matches what the batch S3 client
+                does in aws_clients.get_s3_client). When omitted, the
+                streaming SDK's default CRT credential chain is used —
+                which works on EC2 / Lambda but does NOT understand
+                SSO-cached credentials, so local dev requires either
+                this argument or AWS_PROFILE in the shell env.
         """
         self._region = region
         self._language_code = language_code
         self._sample_rate_hz = sample_rate_hz
+        self._profile_name = profile_name
         # AWS streaming state — populated in __aenter__.
         self._client: Optional[TranscribeStreamingClient] = None
         self._stream: Any = None
@@ -271,7 +343,15 @@ class TranscribeStreamer:
         be established (auth failure, network error, etc.).
         """
         try:
-            self._client = TranscribeStreamingClient(region=self._region)
+            client_kwargs: dict[str, Any] = {"region": self._region}
+            if self._profile_name:
+                client_kwargs["credential_resolver"] = (
+                    _BotoProfileCredentialResolver(
+                        profile_name=self._profile_name,
+                        region=self._region,
+                    )
+                )
+            self._client = TranscribeStreamingClient(**client_kwargs)
             self._stream = await self._client.start_stream_transcription(
                 language_code=self._language_code,
                 media_sample_rate_hz=self._sample_rate_hz,
