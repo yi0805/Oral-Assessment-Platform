@@ -91,6 +91,15 @@ export function useStudentSpeechStream() {
   const [fallbackFinal, setFallbackFinal] = useState("");
   const [fallbackPhase, setFallbackPhase] = useState("none");
   const [fallbackError, setFallbackError] = useState(null);
+  // Ref mirror of fallbackPhase so callbacks (stop / cancel) can read
+  // the current phase without going through state and without having
+  // to list it in their deps array — they need to fire on the same
+  // render that branch 1 set the deferred phase, and React batches
+  // state updates so a captured-via-closure value would be stale.
+  const fallbackPhaseRef = useRef("none");
+  useEffect(() => {
+    fallbackPhaseRef.current = fallbackPhase;
+  }, [fallbackPhase]);
 
   // Pending stop()/cancel() promise resolvers, plus the latest known
   // `final` value snapshotted into a ref so the resolver can read it
@@ -144,12 +153,13 @@ export function useStudentSpeechStream() {
       !fallbackTriggeredRef.current
     ) {
       fallbackTriggeredRef.current = true;
-      setFallbackPhase("pending");
-      setStatus("stopping");
-      // Capture whether the user was already awaiting stop(). If not,
-      // this is an auto-stop (server timeout / abnormal close while
-      // the student is still speaking) and the consumer needs to be
-      // told so it can show the transcript in the textarea.
+      // If the user has already clicked stop and is awaiting the
+      // promise, run the batch fallback immediately so we can resolve
+      // them with what audio we have. Otherwise (the student is still
+      // speaking when the WS dies), DEFER the batch transcribe and
+      // keep the MediaRecorder running so it keeps capturing — this
+      // way the student's remaining speech isn't lost. When they
+      // eventually click stop, stop() picks up the full buffer.
       const userInitiatedStop = stopResolverRef.current !== null;
       const reason =
         wsError && wsError.code === "session_timeout"
@@ -160,6 +170,23 @@ export function useStudentSpeechStream() {
       // next render — keeps the brief "error flashes then recovers"
       // UX from leaking out to the consumer.
       resetWs();
+
+      if (!userInitiatedStop) {
+        // ----- Deferred path: keep recorder alive, stop the streaming
+        // pipeline only. Status stays at "streaming" so the student
+        // keeps seeing "Listening…" and doesn't realise the back-end
+        // path silently changed under them.
+        setFallbackPhase("deferred");
+        // Stop the PCM/worklet pipeline — we have nowhere to send
+        // frames now, no point burning CPU on the downsampler.
+        stopAudio();
+        return;
+      }
+
+      // ----- Immediate path: student already clicked stop, so they
+      // are blocked waiting for a transcript. Run the batch now.
+      setFallbackPhase("pending");
+      setStatus("stopping");
 
       const recorder = recorderRef.current;
       recorderRef.current = null;
@@ -192,10 +219,6 @@ export function useStudentSpeechStream() {
           setFallbackPhase("ok");
           setStatus("idle");
 
-          if (!userInitiatedStop) {
-            setAutoStopReason(reason);
-          }
-
           if (stopResolverRef.current) {
             const resolve = stopResolverRef.current;
             stopResolverRef.current = null;
@@ -214,6 +237,11 @@ export function useStudentSpeechStream() {
             reject(fallbackErr);
           }
         }
+        // reason captured for parity with the deferred path's eventual
+        // banner — kept unused here so the immediate path stays a
+        // pure user-initiated stop with no extra "we auto-stopped"
+        // chrome.
+        void reason;
       })();
       return;
     }
@@ -335,9 +363,59 @@ export function useStudentSpeechStream() {
   );
 
   const stop = useCallback(async () => {
-    // If the fallback effect has already kicked in (WS errored
-    // before the user hit stop), install a resolver and let the
-    // fallback IIFE finish it — don't fire our own stop sequence.
+    // Deferred fallback: WS died mid-recording, the orchestrator
+    // suppressed the failure and kept the MediaRecorder running. Now
+    // that the student has clicked stop, run the batch transcribe on
+    // the *full* buffer (not just the audio captured before the WS
+    // error). This is the path that recovers the rest of the
+    // student's speech instead of cutting them off at the failure
+    // moment.
+    if (fallbackPhaseRef.current === "deferred") {
+      setStatus("stopping");
+      setFallbackPhase("pending");
+      // Update the ref synchronously so a double-click on stop()
+      // doesn't take the deferred path twice — React batches the
+      // state update through an effect, which would be too late.
+      fallbackPhaseRef.current = "pending";
+
+      const recorder = recorderRef.current;
+      recorderRef.current = null;
+      const sessionId = sessionIdRef.current;
+
+      try {
+        if (!recorder) {
+          throw new Error("Streaming fallback: recorder missing.");
+        }
+        const blob = await recorder.stop();
+        if (!blob || blob.size === 0) {
+          throw new Error("Streaming fallback: no audio captured.");
+        }
+        if (blob.size > FALLBACK_BYTES_LIMIT) {
+          throw new Error(
+            "Streaming fallback: recording is too long (>25 MB).",
+          );
+        }
+        const transcript = await transcribeAudio({
+          sessionId,
+          audioBlob: blob,
+        });
+        const text = typeof transcript === "string" ? transcript : "";
+        setFallbackFinal(text);
+        finalRef.current = text;
+        setFallbackPhase("ok");
+        setStatus("idle");
+        return text;
+      } catch (fallbackErr) {
+        setFallbackPhase("failed");
+        setFallbackError(fallbackErr);
+        setStatus("error");
+        throw fallbackErr;
+      }
+    }
+
+    // Immediate-fallback path is still in flight (WS errored AND the
+    // student had already clicked stop, so the effect's IIFE is
+    // running). Install a resolver and let the IIFE finish it.
     if (fallbackTriggeredRef.current) {
       return new Promise((resolve, reject) => {
         stopResolverRef.current = resolve;
@@ -380,12 +458,13 @@ export function useStudentSpeechStream() {
       stopResolverRef.current = resolve;
       stopRejecterRef.current = reject;
     });
-  }, [stopAudio, isStreaming, sendStop]);
+  }, [stopAudio, isStreaming, sendStop, transcribeAudio]);
 
   const cancel = useCallback(() => {
     // Hard abandon: stop the mic, drop the WS without flushing, drop
-    // the parallel recorder, and resolve any pending stop() with
-    // whatever final we already have.
+    // the parallel recorder (incl. the one kept alive by the deferred
+    // fallback path), and resolve any pending stop() with whatever
+    // final we already have.
     stopAudio();
     disconnectWs();
     if (recorderRef.current) {
@@ -397,6 +476,7 @@ export function useStudentSpeechStream() {
       recorderRef.current = null;
     }
     fallbackTriggeredRef.current = false;
+    setFallbackPhase("none");
     setStatus("idle");
 
     if (stopResolverRef.current) {
@@ -423,7 +503,8 @@ export function useStudentSpeechStream() {
   const exposedFinal = fallbackFinal || final;
 
   // Error priority:
-  //   1. While the fallback is pending or has succeeded, suppress —
+  //   1. While the fallback is deferred (silently waiting for the
+  //      student's stop click), pending, or has succeeded, suppress —
   //      the WS error that triggered it isn't actionable for the
   //      student, and a transient "WebSocket closed abnormally"
   //      arriving after a successful fallback would be misleading.
@@ -433,10 +514,13 @@ export function useStudentSpeechStream() {
   //      in right after — the fallback message is the specific one
   //      that tells the student what to do next.
   //   3. Otherwise surface the underlying WS / audio-context error.
-  const exposedError =
-    fallbackPhase === "pending" || fallbackPhase === "ok"
-      ? null
-      : fallbackError || wsError || audioError;
+  const fallbackSilent =
+    fallbackPhase === "deferred" ||
+    fallbackPhase === "pending" ||
+    fallbackPhase === "ok";
+  const exposedError = fallbackSilent
+    ? null
+    : fallbackError || wsError || audioError;
 
   return {
     status,
