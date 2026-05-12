@@ -83,9 +83,14 @@ export function useStudentSpeechStream() {
   // by the batch path; fallbackPhase tracks whether we're in the
   // middle of running it ("pending"), have finished it successfully
   // ("ok"), or finished it with an error ("failed"). "none" is the
-  // happy path where streaming worked end-to-end.
+  // happy path where streaming worked end-to-end. fallbackError
+  // captures the specific reason the fallback failed (e.g. "audio
+  // too short") so the consumer can show it instead of the generic
+  // "WebSocket closed abnormally" message that the close handler
+  // races in just after.
   const [fallbackFinal, setFallbackFinal] = useState("");
   const [fallbackPhase, setFallbackPhase] = useState("none");
+  const [fallbackError, setFallbackError] = useState(null);
 
   // Pending stop()/cancel() promise resolvers, plus the latest known
   // `final` value snapshotted into a ref so the resolver can read it
@@ -199,6 +204,7 @@ export function useStudentSpeechStream() {
           }
         } catch (fallbackErr) {
           setFallbackPhase("failed");
+          setFallbackError(fallbackErr);
           setStatus("error");
 
           if (stopRejecterRef.current) {
@@ -270,6 +276,7 @@ export function useStudentSpeechStream() {
       setStatus("connecting");
       setFallbackFinal("");
       setFallbackPhase("none");
+      setFallbackError(null);
       fallbackTriggeredRef.current = false;
       setAutoStopReason(null);
       sessionIdRef.current = sessionId;
@@ -404,6 +411,7 @@ export function useStudentSpeechStream() {
     resetWs();
     setFallbackFinal("");
     setFallbackPhase("none");
+    setFallbackError(null);
     fallbackTriggeredRef.current = false;
     setAutoStopReason(null);
     setStatus("idle");
@@ -414,14 +422,21 @@ export function useStudentSpeechStream() {
   // otherwise expose the WS final unchanged.
   const exposedFinal = fallbackFinal || final;
 
-  // Error suppression: while the fallback is pending or has succeeded
-  // we don't want to also bother the consumer with the WS error that
-  // triggered it. If the fallback itself failed, surface the original
-  // error (set on `error` state via the error-watcher branch).
+  // Error priority:
+  //   1. While the fallback is pending or has succeeded, suppress —
+  //      the WS error that triggered it isn't actionable for the
+  //      student, and a transient "WebSocket closed abnormally"
+  //      arriving after a successful fallback would be misleading.
+  //   2. If the fallback failed, prefer the fallback's own error
+  //      (e.g. "Transcription job failed: input media file length is
+  //      too small") over the generic close-handler error that races
+  //      in right after — the fallback message is the specific one
+  //      that tells the student what to do next.
+  //   3. Otherwise surface the underlying WS / audio-context error.
   const exposedError =
     fallbackPhase === "pending" || fallbackPhase === "ok"
       ? null
-      : wsError || audioError;
+      : fallbackError || wsError || audioError;
 
   return {
     status,
