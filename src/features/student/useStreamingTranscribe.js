@@ -155,6 +155,23 @@ export function useStreamingTranscribe() {
                   : "stream_error",
               ),
             );
+          } else if (msg.type === "timeout") {
+            // Server-enforced per-stream duration cap reached
+            // (stt_streaming_max_seconds, default 300s). The route
+            // sends this frame and then closes 1008 with reason
+            // "session_timeout". Surface as an error so the
+            // orchestrator's fallback path picks up the buffered
+            // audio and the mic gets released — without this branch
+            // the timeout frame was being dropped and the client
+            // left the mic open.
+            const maxSeconds = Number(msg.max_seconds);
+            const detail =
+              Number.isFinite(maxSeconds) && maxSeconds > 0
+                ? `Recording stopped automatically after ${maxSeconds} seconds.`
+                : "Recording stopped automatically after the maximum duration.";
+            const err = new Error(detail);
+            err.code = "session_timeout";
+            setError(err);
           }
         });
 
