@@ -93,6 +93,12 @@ def _release_one_result(db: Session, session_id: UUID, student_id: UUID, instruc
     feedback.status = "published"
     sess.status = "released"
 
+def join_detailed_feedback(summary):
+    summary_text = " | ".join([
+        f"{title}: {content['feedback']}" 
+        for title, content in summary.detailed_feedback.items()
+    ])
+    return summary_text
 
 # Release one result
 
@@ -356,6 +362,8 @@ def _approve_one_ai_grade(db: Session, session_id: UUID, instructor_id: UUID):
         .first()
     )
 
+    comments = join_detailed_feedback(ai_summary)
+
     if not ai_summary:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -384,7 +392,7 @@ def _approve_one_ai_grade(db: Session, session_id: UUID, instructor_id: UUID):
         session_id=session_id,
         user_i_id=instructor_id,
         final_grade=ai_summary.suggested_grade,
-        comments=ai_summary.detailed_feedback,
+        comments=comments,
         status="draft",
     )
     db.add(feedback)

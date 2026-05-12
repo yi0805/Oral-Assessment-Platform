@@ -164,4 +164,24 @@ class TranscriptDetailOut(BaseModel):
     assessment: AssessmentTitleOut
     ai_summary: AISummaryInfoOut | None = None
     session_feedback: SessionFeedbackOut | None = None
+    blur_count: int | None = None
     transcript: list[TranscriptMessageOut]
+
+class BlurNotificationRequest(BaseModel):
+    blur_count: int
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    session_id: UUID
+    user_id: UUID
+    blur_count: int
+
+class InstructorNotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    session_id: UUID
+    blur_count: int
+    course_code: str
+    course_name: str
+    assessment_title: str
+    student_name: str

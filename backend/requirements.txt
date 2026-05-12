@@ -19,8 +19,8 @@ python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 
 # AWS
-boto3==1.35.0
-# Issue #72: AWS Transcribe Streaming SDK. Used by the upcoming
+boto3==1.43.6
+# Issue #72: AWS Transcribe Streaming SDK. Used by the
 # /sessions/{id}/transcribe/stream WebSocket endpoint to forward PCM
 # frames to AWS in real time and receive partial transcripts. Pulls in
 # aws-crt and amazon-transcribe-events-* as transitive deps.
@@ -48,3 +48,6 @@ pytest-asyncio==0.24.0
 pytest-mock==3.14.0
 httpx==0.27.0
 moto[s3]==5.0.0
+
+# Production server
+gunicorn==23.0.0

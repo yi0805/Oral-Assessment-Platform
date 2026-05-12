@@ -15,21 +15,25 @@ _clients: dict[str, object] = {}
 
 def get_s3_client():
     if "s3" not in _clients:
-        logger.info("[AWS] Creating S3 client with profile '%s'", settings.aws_profile_name)
+        session_kwargs = {"region_name": settings.aws_region}
+        
+        if settings.aws_profile_name:
+            session_kwargs["profile_name"] = settings.aws_profile_name
+            logger.info("[AWS] Creating S3 client with profile '%s'", settings.aws_profile_name)
+
+        else:
+            logger.info("[AWS] Creating S3 client with default credential chain")
 
         try:
-            session = boto3.Session(
-                profile_name=settings.aws_profile_name,
-                region_name=settings.aws_region,
-            )
+            session = boto3.Session(**session_kwargs)
             _clients["s3"] = session.client("s3")
 
         except ProfileNotFound as exc:
             raise RuntimeError(
                 f"AWS profile '{settings.aws_profile_name}' was not found. "
-                "Run aws configure sso or set AWS_PROFILE_NAME in .env correctly."
+                "Run aws configure sso or unset AWS_PROFILE_NAME to use the default credential chain."
             ) from exc
-        
+
     return _clients["s3"]
 
 

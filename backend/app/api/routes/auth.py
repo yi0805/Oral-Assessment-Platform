@@ -5,6 +5,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.security import create_access_token, is_login_domain_allowed, resolve_role_for_new_user
@@ -122,7 +123,7 @@ def login_with_google(
         key="access_token",
         value=jwt_token,
         httponly=True,
-        secure=False,
+        secure=settings.cookie_secure,
         samesite="lax",
         max_age=60 * 60 * 3,
         path="/",
@@ -141,7 +142,7 @@ def logout(response: Response):
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        secure=False,
+        secure=settings.cookie_secure,
         samesite="lax",
         path="/",
     )

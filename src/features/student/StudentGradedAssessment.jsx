@@ -25,6 +25,7 @@ function StudentGradedAssessment() {
   if (selectedCourse && isLoading) return <Spinner />;
 
   const items = history?.items ?? [];
+  const currentCourse = courses.find((c) => c.id === selectedCourse);
 
   const assessmentResults = items.map((item) => ({
     sessionId: item.session_id,
@@ -41,6 +42,8 @@ function StudentGradedAssessment() {
     instructorName: item.instructor_name,
     instructorImage: item.instructor_image,
     department: "Computer Science",
+    courseCode: currentCourse?.course_code ?? "",
+    courseName: currentCourse?.course_name ?? "",
   }));
 
   const Grades = items.map((i) => i.final_grade);

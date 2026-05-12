@@ -39,14 +39,17 @@ from app.models import (
     User,
     AssessmentConfig, AssessmentSession,
     CourseEnrollment, Course, AISummary, Question,
-    SessionQuestionItem, TranscriptMessage, SessionFeedback,
+    SessionQuestionItem, TranscriptMessage, SessionFeedback, Notification
 )
 from app.schemas import (
     AssessmentHistoryItemOut, AssessmentHistoryOut,
     PendingReviewOut, TranscriptDetailOut, TranscriptMessageOut, AssessmentTitleOut,
     StudentCourseAssessmentOut, StudentNextQuestionOut,
-    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut, AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse,
+    StudentInfoOut, SessionFeedbackOut, CourseInfoOut,
+    AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
     AudioTranscriptionResponse,
+    BlurNotificationRequest, NotificationOut, InstructorNotificationOut,
 )
 from app.services.ai_gateway import smart_chat_complete
 
@@ -357,11 +360,18 @@ def get_transcript_detail(
         .all()
     )
 
+    notif = (
+        db.query(Notification)
+        .filter(Notification.session_id == session_id)
+        .first()
+    )
+
     return TranscriptDetailOut(
         student=StudentInfoOut.model_validate(user_obj),
         assessment=AssessmentTitleOut.model_validate(assessment_obj),
         ai_summary=AISummaryInfoOut.model_validate(ai_obj) if ai_obj else None,
         session_feedback=SessionFeedbackOut.model_validate(feedback_obj) if feedback_obj else None,
+        blur_count=notif.blur_count if notif else None,
         transcript=[TranscriptMessageOut.model_validate(t) for t in transcripts],
     )
 
@@ -1572,3 +1582,132 @@ def complete_session(
     background_tasks.add_task(_run_ai_summary_background, session_id)
 
     return {"session_id": str(session_id), "status": "under_review"}
+
+BLUR_NOTIFICATION_THRESHOLD = 3
+
+
+@router.post(
+    "/sessions/{session_id}/blur-notification",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Record blur/tab-switch notification for an assessment session",
+)
+def record_blur_notification(
+    session_id: UUID,
+    payload: BlurNotificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    session = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.id == session_id,
+            AssessmentSession.user_s_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Assessment session not found")
+
+    if payload.blur_count < BLUR_NOTIFICATION_THRESHOLD:
+        return
+
+    notification = Notification(
+        user_id=current_user.id,
+        session_id=session_id,
+        blur_count=payload.blur_count,
+    )
+
+    db.add(notification)
+    db.commit()
+
+
+@router.get(
+    "/notifications",
+    response_model=list[InstructorNotificationOut],
+    summary="List blur notifications for instructor's courses",
+)
+def list_notifications(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    rows = (
+        db.query(Notification, AssessmentConfig, Course, User)
+        .join(AssessmentSession, AssessmentSession.id == Notification.session_id)
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .join(Course, Course.id == AssessmentConfig.course_id)
+        .join(CourseEnrollment, CourseEnrollment.course_id == Course.id)
+        .join(User, User.id == Notification.user_id)
+        .filter(CourseEnrollment.user_id == current_user.id)
+        .filter(Notification.is_read == False)
+        .filter(Notification.blur_count >= BLUR_NOTIFICATION_THRESHOLD)
+        .order_by(AssessmentConfig.title.asc())
+        .all()
+    )
+
+    return [
+        InstructorNotificationOut(
+            id=notif.id,
+            session_id=notif.session_id,
+            blur_count=notif.blur_count,
+            course_code=course.course_code,
+            course_name=course.course_name,
+            assessment_title=config.title,
+            student_name=student.full_name,
+        )
+        for notif, config, course, student in rows
+    ]
+
+
+@router.patch(
+    "/notifications/read-all",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Mark all unread notifications for instructor's courses as read",
+)
+def mark_all_notifications_read(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    ids_rows = (
+        db.query(Notification.id)
+        .join(AssessmentSession, AssessmentSession.id == Notification.session_id)
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .join(CourseEnrollment, CourseEnrollment.course_id == AssessmentConfig.course_id)
+        .filter(CourseEnrollment.user_id == current_user.id)
+        .filter(Notification.is_read == False)
+        .all()
+    )
+    ids = [row[0] for row in ids_rows]
+
+    if ids:
+        db.query(Notification).filter(Notification.id.in_(ids)).update(
+            {Notification.is_read: True}, synchronize_session=False
+        )
+        db.commit()
+
+
+@router.patch(
+    "/notifications/{notification_id}/read",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Mark a single notification as read",
+)
+def mark_notification_read(
+    notification_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    notif = (
+        db.query(Notification)
+        .join(AssessmentSession, AssessmentSession.id == Notification.session_id)
+        .join(AssessmentConfig, AssessmentConfig.id == AssessmentSession.assessment_config_id)
+        .join(CourseEnrollment, CourseEnrollment.course_id == AssessmentConfig.course_id)
+        .filter(Notification.id == notification_id)
+        .filter(CourseEnrollment.user_id == current_user.id)
+        .first()
+    )
+
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+
+    notif.is_read = True
+    db.commit()

@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     DateTime,
     ForeignKey,
     Integer,
@@ -113,3 +114,31 @@ class AssessmentSession(Base):
 
     def __repr__(self) -> str:
         return f"<Session student={self.user_s_id} [{self.status}]>"
+    
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("assessment_sessions.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    blur_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="false",
+    )
+    def __repr__(self) -> str:
+        return f"<Session: {self.session_id}, student:{self.user_id}, exitCount:{self.blur_count}>"
+

@@ -10,6 +10,7 @@ import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 import SttDebugOverlay from "./SttDebugOverlay";
 import { useStudentSpeechStream } from "./useStudentSpeechStream";
+import { useRecordBlurNotification } from "./useRecordBlurNotification";
 
 // [STT #72] Streaming path is the default after the rollout in
 // commit 28 of feature/audio-to-text. Set VITE_STT_STREAMING=0 in
@@ -27,16 +28,25 @@ export default function StudentAssessment() {
 
   const { courseId, assessmentConfigId } = useParams();
 
-  const [sessionId, setSessionId] = useState(null);
-  const [assessmentTitle, setAssessmentTitle] = useState("");
+  const {
+    session,
+    isLoading: isSessionLoading,
+    isFetching: isSessionFetching,
+    error: sessionError,
+    refetch: refetchSession,
+  } = useStartSession(assessmentConfigId);
 
-  const [expiresAt, setExpiresAt] = useState(null);
+  const sessionId = session?.session_id ?? null;
+  const assessmentTitle = session?.assessment_title ?? "";
+  const expiresAtIso = session?.expires_at ?? null;
+  const maxMainQuestions = session?.main_question_num ?? 0;
+  const maxFollowupsPerMain = session?.follow_up_num ?? 0;
+
   const [timeLeft, setTimeLeft] = useState(null);
 
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [typedAnswer, setTypedAnswer] = useState("");
 
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [error, setError] = useState(null);
@@ -46,10 +56,9 @@ export default function StudentAssessment() {
 
   const [blurCount, setBlurCount] = useState(0);
 
-  const [maxMainQuestions, setMaxMainQuestions] = useState(0);
-  const [maxFollowupsPerMain, setMaxFollowupsPerMain] = useState(0);
-
   const hasAutoCompleted = useRef(false);
+  const autoRetryTimerRef = useRef(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   // [STT #72] Set to true when the student presses Esc during an
   // in-flight batch transcription. The fetch can't actually be
@@ -61,7 +70,6 @@ export default function StudentAssessment() {
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const course = courses.find((c) => c.id === courseId);
 
-  const { startSession } = useStartSession();
   const { submitAnswer } = useSubmitAnswer();
   const { transcribeAudio, isPending: batchIsTranscribing } =
     useTranscribeAudio();
@@ -73,6 +81,7 @@ export default function StudentAssessment() {
     reset: resetRecorder,
   } = useAudioRecorder();
   const { completeAssessment } = useCompleteAssessment();
+  const { recordBlurNotification } = useRecordBlurNotification();
 
   // [STT #72] Streaming hook is always instantiated so React's
   // rules-of-hooks stay happy; the rest of the component branches on
@@ -94,41 +103,20 @@ export default function StudentAssessment() {
   const audioBusy = isRecording || isTranscribing;
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function init() {
-      try {
-        const Response = await startSession({ assessmentConfigId });
-        if (cancelled) return;
-
-        setSessionId(Response.session_id);
-        setAssessmentTitle(Response.assessment_title);
-        setExpiresAt(new Date(Response.expires_at));
-        setCurrentQuestion(Response.current_question);
-        setCanComplete(Response.can_complete ?? false);
-        setMaxMainQuestions(Response.main_question_num ?? 0);
-        setMaxFollowupsPerMain(Response.follow_up_num ?? 0);
-      } catch (err) {
-        if (cancelled) return;
-        setError(getErrorMessage(err, "Failed to start the assessment."));
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    }
-
-    init();
-    return () => {
-      cancelled = true;
-    };
-  }, [assessmentConfigId, startSession]);
+    if (!session) return;
+    setCurrentQuestion(session.current_question);
+    setCanComplete(session.can_complete ?? false);
+  }, [session]);
 
   useEffect(() => {
-    if (!expiresAt) return;
+    if (!expiresAtIso) return;
+
+    const expiresAtMs = new Date(expiresAtIso).getTime();
 
     function tick() {
       const remaining = Math.max(
         0,
-        Math.floor((expiresAt.getTime() - Date.now()) / 1000),
+        Math.floor((expiresAtMs - Date.now()) / 1000),
       );
       setTimeLeft(remaining);
     }
@@ -136,7 +124,7 @@ export default function StudentAssessment() {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [expiresAt]);
+  }, [expiresAtIso]);
 
   useEffect(() => {
     function handleVisibilityChange() {
@@ -165,12 +153,39 @@ export default function StudentAssessment() {
 
     async function autoComplete() {
       try {
+        if (typedAnswer.trim() && !isRecording && !isTranscribing) {
+          try {
+            await submitAnswer({ sessionId, answer: typedAnswer });
+          } catch {
+            //do not block completion
+          }
+        }
+
+        if (blurCount > 0) {
+          try {
+            await recordBlurNotification({ sessionId, blurCount });
+          } catch (blurError) {
+            setError(
+              getErrorMessage(
+                blurError,
+                "Failed to record tab-switch notification.",
+              ),
+            );
+          }
+        }
+
         await completeAssessment({ sessionId, courseId });
         navigate(`/student/${courseId}`);
       } catch (error) {
-        hasAutoCompleted.current = false;
         setError(getErrorMessage(error, "Failed to submit assessment."));
         setIsSubmitting(false);
+        if (retryNonce < 2) {
+          const delay = retryNonce === 0 ? 5000 : 15000;
+          autoRetryTimerRef.current = setTimeout(() => {
+            hasAutoCompleted.current = false;
+            setRetryNonce((n) => n + 1);
+          }, delay);
+        }
       }
     }
 
@@ -180,9 +195,15 @@ export default function StudentAssessment() {
     sessionId,
     isSubmitting,
     isTranscribing,
+    isRecording,
     completeAssessment,
+    recordBlurNotification,
+    submitAnswer,
+    blurCount,
+    typedAnswer,
     navigate,
     courseId,
+    retryNonce,
   ]);
 
   // [STT #72] Surface streaming errors (e.g. AWS dropped the
@@ -236,12 +257,10 @@ export default function StudentAssessment() {
   ]);
 
   // [STT #72] Elapsed-time counter for the "Transcribing…" indicator.
-  // This is the cheapest fix for the "frozen UI" symptom in the
-  // original issue: even if the underlying latency is still there, a
-  // ticking timer signals the system is working, not stuck. Driven by
-  // the derived isTranscribing, so it covers both the batch path
-  // (waiting for AWS Transcribe job to complete) and the streaming
-  // path (waiting for the final flush after the user hits stop).
+  // Driven by the derived isTranscribing, so it covers both the
+  // batch path (waiting for AWS Transcribe job to complete) and the
+  // streaming path (waiting for the final flush after the user hits
+  // stop).
   const [transcribingElapsedSec, setTranscribingElapsedSec] = useState(0);
   useEffect(() => {
     if (!isTranscribing) {
@@ -261,16 +280,6 @@ export default function StudentAssessment() {
   }, [isTranscribing]);
 
   // [STT #72] Esc-to-cancel for the in-flight recording / transcription.
-  // Cancellation semantics differ per path:
-  //   - streaming: speech.cancel() drops the mic and the WS without
-  //     flushing, then reset() clears any partial/final.
-  //   - batch / recording: resetRecorder() releases the mic and
-  //     discards the audio blob before it ever goes to the server.
-  //   - batch / transcribing: the HTTP request can't be aborted
-  //     client-side, but transcribeCancelledRef tells handleAudioSubmit
-  //     to discard the result when it eventually arrives.
-  // No-ops if nothing is in flight, so Esc on the page is otherwise
-  // free for the browser / other components to handle.
   useEffect(() => {
     function onKeyDown(event) {
       if (event.key !== "Escape") return;
@@ -283,9 +292,6 @@ export default function StudentAssessment() {
         speech.cancel();
         speech.reset();
       } else if (isRecording) {
-        // Drop the recorder + mic stream. The blob produced by stop()
-        // (if any) was never going to be sent — handleAudioSubmit
-        // wasn't called yet, so there's nothing else to undo.
         resetRecorder();
       }
 
@@ -296,7 +302,23 @@ export default function StudentAssessment() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isRecording, isTranscribing, resetRecorder, speech]);
 
-  if (isLoading || isCoursesLoading) return <Loading />;
+  // Integration: clear the auto-submit retry timer on unmount so a
+  // user navigating away while a retry is queued doesn't fire it
+  // against a stale session.
+  useEffect(
+    () => () => {
+      if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
+    },
+    [],
+  );
+
+  if (isSessionLoading || isCoursesLoading) return <Loading />;
+
+  const displayedError =
+    error ||
+    (sessionError
+      ? getErrorMessage(sessionError, "Failed to start the assessment.")
+      : null);
 
   function formatTime(seconds) {
     if (seconds == null) return "--:--";
@@ -350,10 +372,25 @@ export default function StudentAssessment() {
     setIsSubmitting(true);
 
     try {
+      if (blurCount > 0 && sessionId) {
+        try {
+          await recordBlurNotification({ sessionId, blurCount });
+        } catch (blurError) {
+          setError(
+            getErrorMessage(
+              blurError,
+              "Failed to record tab-switch notification.",
+            ),
+          );
+        }
+      }
+
       await completeAssessment({ sessionId, courseId });
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -533,6 +570,7 @@ export default function StudentAssessment() {
   const mainGroupNo = currentQuestion?.main_group_no ?? 0;
   const followupNo = currentQuestion?.followup_no ?? 0;
   const isFollowupQuestion = currentQuestion?.question_kind === "followup";
+  const timerExpired = timeLeft != null && timeLeft <= 0;
 
   const questionKindLabel = isFollowupQuestion
     ? `Follow-up Question ${toRoman(followupNo) || ""}`.trim()
@@ -593,6 +631,10 @@ export default function StudentAssessment() {
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-primary">
             {assessmentTitle || "Assessment Title Not Available"}
           </h1>
+
+          <p className="mt-2 text-xs text-on-surface-variant">
+            The exam clock continues running while you are away from this page.
+          </p>
         </div>
 
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
@@ -605,7 +647,7 @@ export default function StudentAssessment() {
               </div>
             )}
 
-            {error && (
+            {displayedError && (
               <div className="relative overflow-hidden rounded-xl border border-error/15 bg-error-container/40 p-8 shadow-sm">
                 <div className="absolute left-0 top-0 h-full w-2 bg-error"></div>
 
@@ -623,8 +665,22 @@ export default function StudentAssessment() {
                     </h2>
 
                     <p className="text-sm leading-relaxed text-on-surface-variant">
-                      {error}
+                      {displayedError}
                     </p>
+
+                    {sessionError && !session && (
+                      <button
+                        type="button"
+                        onClick={() => refetchSession()}
+                        disabled={isSessionFetching}
+                        className="mt-2 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary shadow-sm transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-sm">
+                          refresh
+                        </span>
+                        {isSessionFetching ? "Retrying..." : "Try again"}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1005,7 +1061,7 @@ export default function StudentAssessment() {
                 </button>
               )}
 
-              {canComplete && !currentQuestion && (
+              {((canComplete && !currentQuestion) || timerExpired) && (
                 <button
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-secondary py-4 font-bold text-on-secondary shadow-sm transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
                   onClick={handleCompleteSession}

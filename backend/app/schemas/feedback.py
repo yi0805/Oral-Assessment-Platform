@@ -4,20 +4,6 @@ from pydantic import BaseModel, RootModel, ConfigDict, Field, field_validator
 from typing import Dict
 
 
-#  AI summary
-
-class AISummaryInfoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    suggested_grade: int | None = None
-    # detailed_feedback is stored as JSONB and contains a structured
-    # per-criterion dict (e.g. {"Accuracy": {"feedback": "...",
-    # "suggested_points": 0}, ...}). The legacy text format is kept in
-    # the union for backward compatibility with any older rows that
-    # haven't been re-summarized since the JSONB migration.
-    detailed_feedback: dict | str | None = None
-
-
 # Grade / review updates
 
 class GradeUpdate(BaseModel):
@@ -66,3 +52,11 @@ class CriterionFeedback(BaseModel):
 
 class _SummaryLLMOutput(RootModel):
     root: Dict[str, CriterionFeedback]
+
+#  AI summary
+
+class AISummaryInfoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    suggested_grade: int | None = None
+    detailed_feedback: Dict[str, CriterionFeedback] | None = None

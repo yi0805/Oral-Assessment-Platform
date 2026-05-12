@@ -43,9 +43,7 @@ export async function updateReviewGrade(sessionId, grade) {
 }
 
 export async function approveAiSummary(sessionId) {
-  const response = await api.post(
-    `/sessions/${sessionId}/ai-summary/approve`,
-  );
+  const response = await api.post(`/sessions/${sessionId}/ai-summary/approve`);
   return response.data;
 }
 
@@ -152,10 +150,31 @@ export async function completeSession(sessionId) {
   return response.data;
 }
 
-
-export async function unpublishGrade(sessionId, studentId){
+export async function unpublishGrade(sessionId, studentId) {
   const response = await api.put(
     `/sessions/${sessionId}/${studentId}/unpublish/session`,
   );
+  return response.data;
+}
+
+export async function recordBlurNotification(sessionId, blurCount) {
+  const response = await api.post(`/sessions/${sessionId}/blur-notification`, {
+    blur_count: blurCount,
+  });
+  return response.data;
+}
+
+export async function getNotifications() {
+  const response = await api.get("/notifications");
+  return response.data;
+}
+
+export async function markNotificationRead(notificationId) {
+  const response = await api.patch(`/notifications/${notificationId}/read`);
+  return response.data;
+}
+
+export async function markAllNotificationsRead() {
+  const response = await api.patch("/notifications/read-all");
   return response.data;
 }
