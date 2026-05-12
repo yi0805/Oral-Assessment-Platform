@@ -201,6 +201,31 @@ export function useStreamingTranscribe() {
             );
             setError(err);
             reject(err);
+            return;
+          }
+
+          // Already-open WS closed with a non-clean code. Without
+          // surfacing this the orchestrator can't tell the difference
+          // between a clean server-side shutdown (after the final has
+          // been flushed) and an abnormal close that should trigger
+          // the batch fallback + release the mic. 1000 (normal) and
+          // 1005 (no status — what the browser reports when the close
+          // frame omits a code) are treated as clean; anything else
+          // becomes an error.
+          if (event.code !== 1000 && event.code !== 1005) {
+            const reason = event.reason || "no reason";
+            const err = new Error(
+              `WebSocket closed abnormally (code ${event.code}): ${reason}`,
+            );
+            // Tag session_timeout closes specifically so the consumer
+            // can show a friendlier message than the generic close
+            // string — the "timeout" JSON frame may also have arrived
+            // and set this already, in which case setError is a no-op
+            // on re-render.
+            if (event.reason === "session_timeout") {
+              err.code = "session_timeout";
+            }
+            setError(err);
           }
         });
       });
