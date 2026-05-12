@@ -1410,6 +1410,18 @@ async def transcribe_response_stream(
                 )
                 if any(isinstance(r, WebSocketDisconnect) for r in results):
                     _disconnected = True
+                # gather() with return_exceptions=True collects task
+                # failures as values instead of raising them. Without
+                # explicitly re-raising the streamer errors, a
+                # TranscribeStreamError from inside feed() (e.g.
+                # `send_pcm failed: ...` when AWS rejects a chunk) gets
+                # silently swallowed and the route reports
+                # outcome=ok / partials=0 / finals=0 to a confused user.
+                # Surface it here so the outer except can mark the
+                # outcome correctly and notify the client.
+                for r in results:
+                    if isinstance(r, TranscribeStreamError):
+                        raise r
 
                 if timed_out:
                     _stream_outcome = "timeout"
