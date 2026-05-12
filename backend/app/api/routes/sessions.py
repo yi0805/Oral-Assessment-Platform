@@ -1329,11 +1329,18 @@ async def transcribe_response_stream(
             # still take precedence via boto3's own chain).
             profile_name=settings.aws_profile_name,
         )
+        # Per-session frame counters. Surfaced in the phase=stream log
+        # line below so we can disambiguate "client sent no audio" from
+        # "AWS received audio but produced no transcripts" — both
+        # produce the same finals=0 outcome on the user side.
+        _bytes_forwarded = 0
+        _frame_count = 0
         try:
             async with streamer:
 
                 async def feed() -> None:
                     """Pull frames off the WebSocket, push them into AWS."""
+                    nonlocal _bytes_forwarded, _frame_count
                     try:
                         while True:
                             msg = await websocket.receive()
@@ -1341,6 +1348,8 @@ async def transcribe_response_stream(
                                 return
                             chunk = msg.get("bytes")
                             if chunk:
+                                _bytes_forwarded += len(chunk)
+                                _frame_count += 1
                                 await streamer.send_pcm(chunk)
                                 continue
                             text = msg.get("text")
@@ -1489,7 +1498,7 @@ async def transcribe_response_stream(
             logger.info(
                 "[STT timings] phase=stream session=%s outcome=%s "
                 "disconnected=%s ttfp=%s ttfr=%s partials=%d finals=%d "
-                "duration=%.3fs",
+                "frames=%d bytes=%d duration=%.3fs",
                 session_id,
                 _stream_outcome,
                 "true" if _disconnected else "false",
@@ -1497,6 +1506,8 @@ async def transcribe_response_stream(
                 ttfr,
                 streamer.partial_count,
                 streamer.final_count,
+                _frame_count,
+                _bytes_forwarded,
                 time.monotonic() - _t_stream_start,
             )
 
