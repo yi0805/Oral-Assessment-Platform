@@ -157,7 +157,7 @@ _END_OF_RESULTS: Any = object()
 # 16 kHz mono is the recommended rate for English speech models and
 # matches what the client-side AudioWorklet (added in the frontend
 # commits of issue #72) downsamples to before sending.
-DEFAULT_SAMPLE_RATE_HZ = 16000
+_DEFAULT_SAMPLE_RATE_HZ = 16000
 
 
 def fmt_optional_seconds(t: Optional[float]) -> str:
@@ -300,7 +300,7 @@ class TranscribeStreamer:
         *,
         region: str,
         language_code: str = "en-US",
-        sample_rate_hz: int = DEFAULT_SAMPLE_RATE_HZ,
+        sample_rate_hz: int = _DEFAULT_SAMPLE_RATE_HZ,
         profile_name: Optional[str] = None,
     ) -> None:
         """

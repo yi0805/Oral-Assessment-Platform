@@ -13,7 +13,7 @@
 // This module is pure JS, no React. It is a true refactor — the public
 // behaviour of useAudioRecorder must not change.
 
-export const PREFERRED_MIME_TYPES = [
+const PREFERRED_MIME_TYPES = [
   "audio/webm;codecs=opus",
   "audio/webm",
   "audio/ogg;codecs=opus",
@@ -26,7 +26,7 @@ export const PREFERRED_MIME_TYPES = [
  * actually supports, or "" to mean "let the browser pick", or null if
  * MediaRecorder doesn't exist at all (SSR / very old browser).
  */
-export function pickSupportedMimeType() {
+function pickSupportedMimeType() {
   if (typeof window === "undefined") return null;
   if (typeof window.MediaRecorder === "undefined") return null;
 
