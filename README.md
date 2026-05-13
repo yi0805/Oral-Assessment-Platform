@@ -1,4 +1,4 @@
-# COMPSCI 399 Team 8 Capstone Project
+# COMPSCI 399 Team 8 Capstone Project: WhereRU
 
 ## Project Overview
 
@@ -6,15 +6,19 @@ This project is an AI-powered assessment system designed to support instructors 
 
 
 ### Key Features
-- Upload course materials and generate a small pool of questions (editable by instructor)
-- Rubric table for instructors to define and edit marking criteria
+- Upload course materials and generate a pool of questions which is editable by instructor
+- Rubric table for instructors to define precise evaluation dimensions, ensuring grading consistency
 - Short text-based chat assessment with adaptive follow-up questions
 - Secure recording and storage of full conversation transcripts
 - Instructor dashboard to review sessions and add manual judgement and feedback comments
 - Automatic summary of each student’s demonstrated understanding (advisory only)
-- Integrated with AWS Transcribe for accurate transcription of student answers
+- Integrated with AWS Transcribe for Speech-to-Text feature with a user-confirmation loop to ensure transcript accuracy before evaluation
 
 ---
+
+## Live Demo
+
+http://where-areyou.com
 
 ## Deployment
 
@@ -22,7 +26,7 @@ The application is deployed on an AWS EC2 instance and is accessible via a publi
 
 ### Domain Configuration
 The application is accessible via a custom domain:
-
+- **Current Version**: v1.0.0
 - **Domain**: where-areyou.com  
 - **DNS**: A record pointing to EC2 public IP  
 - **Hosting**: AWS EC2 instance  
@@ -61,6 +65,18 @@ The application is accessible via a custom domain:
     - Primary model fails
     - API limits are reached
     - Network or service issues occur
+
+---
+
+## System Architecture
+
+Frontend (React)
+    ↓
+FastAPI Backend
+    ↓
+AWS RDS PostgreSQL
+    ↓
+AWS Bedrock / OpenRouter
 
 ---
 
@@ -111,54 +127,113 @@ The application is accessible via a custom domain:
 
 ---
 
-## Local Run
-1. `git clone https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git`
-2. Configure environment variables
+## Local Development Setup
 
-#### macOS
+### Prerequisites
+
+- Python 3.11+
+- PostgreSQL 15+ with pgvector, or Docker
+- `psql`
+
+1. Clone Repository
+
+```bash
+git clone https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git`
+```
+
+2. Configure environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-#### Windows PowerShell
+3. Start PostgreSQL 
 
-```powershell
-Copy-Item .env.example .env
+```bash
+docker run --name project20-db \
+  -e POSTGRES_DB=project20_dev \
+  -e POSTGRES_USER=project20 \
+  -e POSTGRES_PASSWORD=localdev123 \
+  -p 5432:5432 \
+  -d pgvector/pgvector:pg16
 ```
 
-Edit `.env` and fill in the required keys from the [Environment Variables](#environment-variables) section.
-
-3. Run `docker-compose up --build`
-
-4. Backend Setup:
-
-#### macOS
+4. Start Backend
 
 ```bash
 cd backend
-python3 -m venv venv
+
+python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-```
-#### Windows PowerShell
 
-```powershell
-cd backend
-py -3 -m venv venv
-.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
-5. Run backend:
-```bash
-uvicorn app.main:app --reload --port 8000
+
+uvicorn app.main:app --reload
 ```
 
-6. Frontend Setup
+5. Frontend Setup:
+
 ```bash
+cd src
+
 npm install
 npm run dev
 ```
+
+---
+
+## Assessment Workflow
+
+```text
+Instructor uploads materials and fill out rubric form
+        ↓
+AI generates question pool
+        ↓
+Instructor reviews and edits questions
+        ↓
+Assessment published
+        ↓
+Student completes timed session
+        ↓
+AI evaluates responses
+        ↓
+Instructor reviews and releases feedback
+        ↓
+Student reviews the results
+```
+
+---
+
+## Design Decisions
+
+### Structured Output
+AI responses are enforced in structured JSON format to:
+- simplify frontend rendering
+- improve response consistency
+- reduce parsing errors
+
+### LLM Fallback Strategy
+- reliability under failure
+
+### Layered Architecture
+The backend follows a layered architecture:
+- API layer
+- service layer
+- database layer
+
+
+---
+
+## Future Improvements
+
+- Adaptive question difficulty
+- Better anti-cheating mechanisms
+- Improved prompt optimization
+- Course management
+- Timer for each question
+- Real-time monitoring dashboard
+- Role-Based Access Control for instructors
+- Concurrency
 
 ---
 
