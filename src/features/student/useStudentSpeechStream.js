@@ -177,6 +177,9 @@ export function useStudentSpeechStream() {
         // keeps seeing "Listening…" and doesn't realise the back-end
         // path silently changed under them.
         setFallbackPhase("deferred");
+
+        // Surface the auto-stop reason so the UI can show the banner.
+        setAutoStopReason(reason);
         // Stop the PCM/worklet pipeline — we have nowhere to send
         // frames now, no point burning CPU on the downsampler.
         stopAudio();
@@ -278,7 +281,11 @@ export function useStudentSpeechStream() {
     }
 
     // ---------- 3. Clean close → resolve any pending stop() ----------
-    if (!isStreaming && stopResolverRef.current && !fallbackTriggeredRef.current) {
+    if (
+      !isStreaming &&
+      stopResolverRef.current &&
+      !fallbackTriggeredRef.current
+    ) {
       const resolve = stopResolverRef.current;
       stopResolverRef.current = null;
       stopRejecterRef.current = null;

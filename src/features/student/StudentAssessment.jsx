@@ -8,7 +8,6 @@ import { useTranscribeAudio } from "./useTranscribeAudio";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
-import SttDebugOverlay from "./SttDebugOverlay";
 import { useStudentSpeechStream } from "./useStudentSpeechStream";
 import { useRecordBlurNotification } from "./useRecordBlurNotification";
 
@@ -250,11 +249,7 @@ export default function StudentAssessment() {
         ? "Recording stopped automatically after the maximum duration. We saved what was captured — review it below and submit."
         : "The recording connection dropped, so we stopped automatically and recovered what was captured. Review the text below and submit, or record again.",
     );
-  }, [
-    speech.autoStopReason,
-    speech.final,
-    speech.status,
-  ]);
+  }, [speech.autoStopReason, speech.final, speech.status]);
 
   // [STT #72] Elapsed-time counter for the "Transcribing…" indicator.
   // Driven by the derived isTranscribing, so it covers both the
@@ -447,10 +442,7 @@ export default function StudentAssessment() {
   // batch flow below; we keep them as siblings so the feature flag
   // can flip back to batch with a single env-var change.
   async function handleMicClickStreaming() {
-    if (
-      speech.status === "connecting" ||
-      speech.status === "stopping"
-    ) {
+    if (speech.status === "connecting" || speech.status === "stopping") {
       return;
     }
 
@@ -459,6 +451,10 @@ export default function StudentAssessment() {
     if (speech.status === "streaming") {
       try {
         const finalText = await speech.stop();
+
+        // Esc pressed during await: discard the transcript instead of
+        // overwriting typedAnswer. Mirrors the batch path in handleAudioSubmit.
+        if (transcribeCancelledRef.current) return;
         if (finalText && finalText.trim()) {
           // Overwrite typedAnswer to match the batch flow's behaviour
           // (handleAudioSubmit), so each new recording fully replaces
@@ -470,9 +466,8 @@ export default function StudentAssessment() {
           );
         }
       } catch (err) {
-        setAudioError(
-          getErrorMessage(err, "Streaming transcription failed."),
-        );
+        if (transcribeCancelledRef.current) return;
+        setAudioError(getErrorMessage(err, "Streaming transcription failed."));
       } finally {
         speech.reset();
       }
@@ -487,6 +482,10 @@ export default function StudentAssessment() {
     }
 
     try {
+      // Reset for the new recording so a stale Esc flag from a previous
+      // stop doesn't suppress this recording's transcript when the
+      // student eventually stops it.
+      transcribeCancelledRef.current = false;
       speech.reset();
       await speech.start(sessionId);
     } catch (err) {
@@ -744,10 +743,7 @@ export default function StudentAssessment() {
                           data-testid="stt-transcribing-elapsed"
                         >
                           {Math.floor(transcribingElapsedSec / 60)}:
-                          {String(transcribingElapsedSec % 60).padStart(
-                            2,
-                            "0",
-                          )}
+                          {String(transcribingElapsedSec % 60).padStart(2, "0")}
                         </span>
                       </>
                     ) : isRecording ? (
@@ -1092,9 +1088,6 @@ export default function StudentAssessment() {
           </div>
         </div>
       </main>
-
-      {/* [STT Instrumentation - issue #72] Renders only when ?debugStt=1 */}
-      <SttDebugOverlay />
     </div>
   );
 }

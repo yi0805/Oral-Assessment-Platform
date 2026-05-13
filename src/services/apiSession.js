@@ -103,40 +103,10 @@ export async function transcribeSessionAudio(sessionId, audioBlob) {
   const formData = new FormData();
   formData.append("audio", audioBlob, `answer.${ext}`);
 
-  // [STT Instrumentation - issue #72]
-  // Capture client-side timing and blob metadata. Gated behind a
-  // localStorage flag so production users never see the logs.
-  // Enable via DevTools console: localStorage.setItem('stt_debug', '1')
-  const sttDebug =
-    typeof window !== "undefined" &&
-    typeof window.localStorage !== "undefined" &&
-    window.localStorage.getItem("stt_debug") === "1";
-  const t0 = sttDebug ? performance.now() : 0;
-
   const response = await api.post(
     `/sessions/${sessionId}/transcribe/audio`,
     formData,
   );
-
-  if (sttDebug) {
-    const elapsedMs = performance.now() - t0;
-    const sizeKB = (audioBlob.size / 1024).toFixed(1);
-    const timings = {
-      sessionId,
-      blobType: audioBlob.type || "(unknown)",
-      blobSizeKB: Number(sizeKB),
-      ext,
-      requestRoundTripMs: Math.round(elapsedMs),
-      timestamp: new Date().toISOString(),
-    };
-    console.info("[STT timings]", timings);
-    // Stash the most recent reading so the debug overlay can render it
-    // without prop-drilling.
-    if (typeof window !== "undefined") {
-      window.__sttLastTimings = timings;
-      window.dispatchEvent(new CustomEvent("stt:timings", { detail: timings }));
-    }
-  }
 
   // Backend always returns { transcript: string }. Coerce to a safe
   // string so downstream code can rely on .length / .trim() etc.
