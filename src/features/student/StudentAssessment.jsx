@@ -51,6 +51,8 @@ export default function StudentAssessment() {
   const [error, setError] = useState(null);
   const [audioError, setAudioError] = useState(null);
 
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
   const [canComplete, setCanComplete] = useState(false);
 
   const [blurCount, setBlurCount] = useState(0);
@@ -100,6 +102,9 @@ export default function StudentAssessment() {
     ? speech.status === "stopping"
     : batchIsTranscribing;
   const audioBusy = isRecording || isTranscribing;
+
+  const ttsSupported =
+    typeof window !== "undefined" && "speechSynthesis" in window;
 
   useEffect(() => {
     if (!session) return;
@@ -251,6 +256,20 @@ export default function StudentAssessment() {
     );
   }, [speech.autoStopReason, speech.final, speech.status]);
 
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis?.cancel();
+      setIsSpeaking(false);
+    };
+  }, [currentQuestion?.question_text]);
+
+  useEffect(() => {
+    if (isRecording) {
+      window.speechSynthesis?.cancel();
+      setIsSpeaking(false);
+    }
+  }, [isRecording]);
+
   // [STT #72] Elapsed-time counter for the "Transcribing…" indicator.
   // Driven by the derived isTranscribing, so it covers both the
   // batch path (waiting for AWS Transcribe job to complete) and the
@@ -387,6 +406,24 @@ export default function StudentAssessment() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleSpeakQuestion() {
+    if (!currentQuestion?.question_text) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(
+      currentQuestion.question_text,
+    );
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
   }
 
   // Issue #71 — transcribe-then-edit flow.
@@ -715,10 +752,39 @@ export default function StudentAssessment() {
               <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-8 shadow-sm">
                 <div className="absolute left-0 top-0 h-full w-2 bg-primary"></div>
 
-                <div className="mb-6 flex items-center gap-3">
+                <div className="mb-6 flex items-center justify-between gap-3">
                   <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
                     {questionKindLabel}
                   </span>
+
+                  {ttsSupported && (
+                    <button
+                      type="button"
+                      onClick={handleSpeakQuestion}
+                      disabled={audioBusy}
+                      aria-label={
+                        isSpeaking
+                          ? "Stop reading question"
+                          : "Read question aloud"
+                      }
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isSpeaking
+                          ? "bg-secondary-container text-on-secondary-container"
+                          : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
+                      }`}
+                    >
+                      <span
+                        className="material-symbols-outlined text-xl"
+                        style={
+                          isSpeaking
+                            ? { fontVariationSettings: '"FILL" 1' }
+                            : undefined
+                        }
+                      >
+                        {isSpeaking ? "stop_circle" : "volume_up"}
+                      </span>
+                    </button>
+                  )}
                 </div>
 
                 <h2 className="mb-4 select-none font-headline text-2xl font-semibold leading-snug text-on-background">
