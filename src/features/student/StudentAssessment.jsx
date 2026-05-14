@@ -804,9 +804,6 @@ export default function StudentAssessment() {
                 <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low p-10">
                   <p className="mb-8 font-medium text-on-surface-variant">
                     {isTranscribing ? (
-                      // [STT #72] Inline elapsed-time counter so the
-                      // student can see the system is making progress
-                      // even when transcription takes several seconds.
                       <>
                         Transcribing your answer…{" "}
                         <span
@@ -817,6 +814,13 @@ export default function StudentAssessment() {
                           {Math.floor(transcribingElapsedSec / 60)}:
                           {String(transcribingElapsedSec % 60).padStart(2, "0")}
                         </span>
+                        <span className="mt-2 block text-sm font-normal text-on-surface-variant/70">
+                          {transcribingElapsedSec >= 60
+                            ? "Almost there… your transcript will appear shortly."
+                            : transcribingElapsedSec >= 30
+                              ? "Still transcribing… AWS is taking longer than usual."
+                              : "This usually takes 15-20 seconds."}
+                        </span>
                       </>
                     ) : isRecording ? (
                       "Recording… tap the button again to stop and submit"
@@ -824,6 +828,16 @@ export default function StudentAssessment() {
                       "Tap the microphone to speak your answer"
                     )}
                   </p>
+
+                  {isTranscribing && (
+                    <div
+                      className="mb-8 h-1 w-48 overflow-hidden rounded-full bg-surface-container-high"
+                      role="progressbar"
+                      aria-label="Transcribing your answer"
+                    >
+                      <div className="animate-indeterminate-bar h-full w-1/3 rounded-full bg-primary" />
+                    </div>
+                  )}
 
                   <div className="relative">
                     <div
