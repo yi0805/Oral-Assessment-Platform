@@ -130,6 +130,30 @@ export function useStudentSpeechStream() {
     finalRef.current = final;
   }, [final]);
 
+  // Shared core of the batch-transcribe fallback
+  const runBatchFallback = useCallback(async () => {
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    const sessionId = sessionIdRef.current;
+
+    if (!recorder) {
+      throw new Error("Streaming fallback: recorder missing.");
+    }
+
+    const blob = await recorder.stop();
+    if (!blob || blob.size === 0) {
+      throw new Error("Streaming fallback: no audio captured.");
+    }
+
+    if (blob.size > FALLBACK_BYTES_LIMIT) {
+      throw new Error("Streaming fallback: recording is too long (>25 MB).");
+    }
+
+    const transcript = await transcribeAudio({ sessionId, audioBlob: blob });
+
+    return typeof transcript === "string" ? transcript : "";
+  }, [transcribeAudio]);
+
   // Unified "WS state change" effect. Runs whenever wsError /
   // audioError / isStreaming flips. Priority order:
   //   1. WS error AND a parallel recorder is available → run the
@@ -191,31 +215,13 @@ export function useStudentSpeechStream() {
       setFallbackPhase("pending");
       setStatus("stopping");
 
-      const recorder = recorderRef.current;
-      recorderRef.current = null;
-      const sessionId = sessionIdRef.current;
-
       (async () => {
         try {
           // Stop the mic / WebSocket pipeline; we won't be sending
           // any more PCM frames.
           await stopAudio();
 
-          const blob = await recorder.stop();
-          if (!blob || blob.size === 0) {
-            throw new Error("Streaming fallback: no audio captured.");
-          }
-          if (blob.size > FALLBACK_BYTES_LIMIT) {
-            throw new Error(
-              "Streaming fallback: recording is too long (>25 MB).",
-            );
-          }
-
-          const transcript = await transcribeAudio({
-            sessionId,
-            audioBlob: blob,
-          });
-          const text = typeof transcript === "string" ? transcript : "";
+          const text = await runBatchFallback();
 
           setFallbackFinal(text);
           finalRef.current = text;
@@ -286,13 +292,46 @@ export function useStudentSpeechStream() {
       stopResolverRef.current &&
       !fallbackTriggeredRef.current
     ) {
+      if (!finalRef.current.trim() && recorderRef.current) {
+        fallbackTriggeredRef.current = true;
+        setFallbackPhase("pending");
+        setStatus("stopping");
+
+        (async () => {
+          try {
+            const text = await runBatchFallback();
+
+            setFallbackFinal(text);
+            finalRef.current = text;
+            setFallbackPhase("ok");
+            setStatus("idle");
+
+            if (stopResolverRef.current) {
+              const resolve = stopResolverRef.current;
+              stopResolverRef.current = null;
+              stopRejecterRef.current = null;
+              resolve(text);
+            }
+          } catch (fallbackErr) {
+            setFallbackPhase("failed");
+            setFallbackError(fallbackErr);
+            setStatus("idle");
+            finalRef.current = "";
+
+            if (stopResolverRef.current) {
+              const resolve = stopResolverRef.current;
+              stopResolverRef.current = null;
+              stopRejecterRef.current = null;
+              resolve("");
+            }
+          }
+        })();
+        return;
+      }
+
       const resolve = stopResolverRef.current;
       stopResolverRef.current = null;
       stopRejecterRef.current = null;
-      // Server delivered a clean close, so the recorder was held
-      // alive purely as a fallback safety net we no longer need.
-      // Dispose it here so the mic doesn't keep capturing past the
-      // user's stop click.
       if (recorderRef.current) {
         try {
           recorderRef.current.dispose();
@@ -304,7 +343,7 @@ export function useStudentSpeechStream() {
       setStatus((s) => (s === "stopping" ? "idle" : s));
       resolve(finalRef.current);
     }
-  }, [wsError, audioError, isStreaming, resetWs, stopAudio, transcribeAudio]);
+  }, [wsError, audioError, isStreaming, resetWs, stopAudio, runBatchFallback]);
 
   const start = useCallback(
     async (sessionId) => {
@@ -385,28 +424,8 @@ export function useStudentSpeechStream() {
       // state update through an effect, which would be too late.
       fallbackPhaseRef.current = "pending";
 
-      const recorder = recorderRef.current;
-      recorderRef.current = null;
-      const sessionId = sessionIdRef.current;
-
       try {
-        if (!recorder) {
-          throw new Error("Streaming fallback: recorder missing.");
-        }
-        const blob = await recorder.stop();
-        if (!blob || blob.size === 0) {
-          throw new Error("Streaming fallback: no audio captured.");
-        }
-        if (blob.size > FALLBACK_BYTES_LIMIT) {
-          throw new Error(
-            "Streaming fallback: recording is too long (>25 MB).",
-          );
-        }
-        const transcript = await transcribeAudio({
-          sessionId,
-          audioBlob: blob,
-        });
-        const text = typeof transcript === "string" ? transcript : "";
+        const text = await runBatchFallback();
         setFallbackFinal(text);
         finalRef.current = text;
         setFallbackPhase("ok");
@@ -465,7 +484,7 @@ export function useStudentSpeechStream() {
       stopResolverRef.current = resolve;
       stopRejecterRef.current = reject;
     });
-  }, [stopAudio, isStreaming, sendStop, transcribeAudio]);
+  }, [stopAudio, isStreaming, sendStop, runBatchFallback]);
 
   const cancel = useCallback(() => {
     // Hard abandon: stop the mic, drop the WS without flushing, drop
