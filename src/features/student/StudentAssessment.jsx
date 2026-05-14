@@ -497,9 +497,15 @@ export default function StudentAssessment() {
           // (handleAudioSubmit), so each new recording fully replaces
           // the previous draft and the student can edit from there.
           setTypedAnswer(finalText.trim());
+        } else if (speech.partial && speech.partial.trim()) {
+          // No final transcript, but AWS sent some partial guesses along
+          // the way. Use the last guess — it might be wrong, but letting
+          // the student fix it beats losing their answer entirely.
+          setTypedAnswer(speech.partial.trim());
         } else {
+          // No final, no partial, no fallback transcript.
           setAudioError(
-            "We didn't catch any speech. Please try recording again.",
+            "Transcription returned no text. Try speaking a bit longer or check your microphone.",
           );
         }
       } catch (err) {
