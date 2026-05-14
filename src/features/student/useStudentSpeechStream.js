@@ -52,6 +52,8 @@ import { useTranscribeAudio } from "./useTranscribeAudio";
 // belt-and-braces guard against a stuck recording.
 const FALLBACK_BYTES_LIMIT = 25 * 1024 * 1024;
 
+const MIN_PARTIAL_FALLBACK_LENGTH = 5;
+
 export function useStudentSpeechStream() {
   // Destructure up-front so callback deps can reference only the
   // stable functions instead of the parent objects (which re-create
@@ -109,6 +111,8 @@ export function useStudentSpeechStream() {
   const stopRejecterRef = useRef(null);
   const finalRef = useRef("");
 
+  const partialRef = useRef("");
+
   // Fallback bookkeeping. recorderRef holds the handle returned by
   // startAudioRecorder (the framework-agnostic factory we extracted
   // in commit 12). sessionIdRef captures the id at start() time so
@@ -129,6 +133,10 @@ export function useStudentSpeechStream() {
   useEffect(() => {
     finalRef.current = final;
   }, [final]);
+
+  useEffect(() => {
+    partialRef.current = partial;
+  }, [partial]);
 
   // Shared core of the batch-transcribe fallback
   const runBatchFallback = useCallback(async () => {
@@ -293,6 +301,25 @@ export function useStudentSpeechStream() {
       !fallbackTriggeredRef.current
     ) {
       if (!finalRef.current.trim() && recorderRef.current) {
+        // Prefer a usable partial over the slow batch fallback
+        const partialText = partialRef.current.trim();
+        if (partialText.length >= MIN_PARTIAL_FALLBACK_LENGTH) {
+          const resolve = stopResolverRef.current;
+          stopResolverRef.current = null;
+          stopRejecterRef.current = null;
+          if (recorderRef.current) {
+            try {
+              recorderRef.current.dispose();
+            } catch {
+              // recorder may already be torn down
+            }
+            recorderRef.current = null;
+          }
+          setStatus((s) => (s === "stopping" ? "idle" : s));
+          resolve(partialText);
+          return;
+        }
+
         fallbackTriggeredRef.current = true;
         setFallbackPhase("pending");
         setStatus("stopping");
