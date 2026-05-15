@@ -54,6 +54,7 @@ export default function EditAssessment() {
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [confirmingPublish, setConfirmingPublish] = useState(false);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
   const [rubricRows, setRubricRows] = useState([]);
   const [initialSnapshot, setInitialSnapshot] = useState(null);
@@ -167,6 +168,7 @@ export default function EditAssessment() {
 
   async function handlePublish() {
     if (isPublishing) return;
+    setConfirmingPublish(false);
     try {
       await updateAssessment({
         courseId,
@@ -238,6 +240,17 @@ export default function EditAssessment() {
           isLoading={isDeleting}
           onConfirm={handleDelete}
           onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
+
+      {confirmingPublish && (
+        <ConfirmModal
+          title="Publish Assessment"
+          message={`Are you sure you want to publish the assessment "${assessment?.title}"? Once published, the students gain access to it and only the name and due date can be changed. This action cannot be undone.`}
+          confirmLabel="Yes, Publish"
+          isLoading={isPublishing}
+          onConfirm={handlePublish}
+          onCancel={() => setConfirmingPublish(false)}
         />
       )}
 
@@ -426,7 +439,7 @@ export default function EditAssessment() {
                         <button
                           className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                           disabled={isPublishing || isSaving}
-                          onClick={handlePublish}
+                          onClick={() => setConfirmingPublish(true)}
                         >
                           {isPublishing ? "Publishing…" : "Publish"}
                         </button>
