@@ -26,6 +26,7 @@ const isValidGithubUrl = (u) => GITHUB_URL_RE.test((u || "").trim());
 function GeneratePanel() {
   const { courseId } = useParams();
   const { courses } = useCourses();
+  const course = courses.find((c) => String(c.id) === String(courseId));
   const [materialFile, setMaterialFile] = useState(null);
 
   const [source, setSource] = useState("pdf");
@@ -203,6 +204,9 @@ function GeneratePanel() {
       </div>
 
       <div className="mb-8">
+        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+          {course?.course_code} • {course?.course_name}
+        </span>
         <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
           Generate Assessment
         </h1>

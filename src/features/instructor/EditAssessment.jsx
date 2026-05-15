@@ -47,6 +47,7 @@ export default function EditAssessment() {
   const { courseId, assessmentId } = useParams();
 
   const { courses } = useCourses();
+  const course = courses.find((c) => String(c.id) === String(courseId));
 
   const [assessmentName, setAssessmentName] = useState("");
   const [numQuestions, setNumQuestions] = useState("");
@@ -282,6 +283,9 @@ export default function EditAssessment() {
           </div>
 
           <div className="mb-8">
+            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+              {course?.course_code} • {course?.course_name}
+            </span>
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
               {isDetailLoading ? "Loading…" : (assessment?.title ?? "Edit Assessment")}
             </h1>

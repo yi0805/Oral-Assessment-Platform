@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 
+import { useCourses } from "../../hooks/useCourses";
 import { useCourseAssessments } from "./useCourseAssessments";
 
 export default function AssessmentManagement() {
@@ -8,6 +9,8 @@ export default function AssessmentManagement() {
   const { courseId } = useParams();
   const [searchQuery, setSearchQuery] = useState("");
 
+  const { courses } = useCourses();
+  const course = courses.find((c) => String(c.id) === String(courseId));
   const { assessments, isLoading } = useCourseAssessments(courseId);
 
   const filtered = assessments.filter((a) =>
@@ -32,6 +35,9 @@ export default function AssessmentManagement() {
         </div>
 
         <div className="mb-8">
+          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+            {course?.course_code} • {course?.course_name}
+          </span>
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
             Assessments
           </h1>
