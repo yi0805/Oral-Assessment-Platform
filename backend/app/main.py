@@ -1,4 +1,5 @@
 import json
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,13 @@ from slowapi.errors import RateLimitExceeded
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.limiter import limiter
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+logging.getLogger("app").setLevel(logging.INFO)
 
 
 # application entry point, FastAPI app instance, and global middleware setup.

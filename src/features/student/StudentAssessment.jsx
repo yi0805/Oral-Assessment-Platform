@@ -4,11 +4,19 @@ import { useEffect, useRef, useState } from "react";
 import { useStartSession } from "./useStartSession";
 import { useCourses } from "../../hooks/useCourses";
 import { useSubmitAnswer } from "./useSubmitAnswer";
-import { useSubmitAudioAnswer } from "./useSubmitAudioAnswer";
+import { useTranscribeAudio } from "./useTranscribeAudio";
 import { useAudioRecorder } from "./useAudioRecorder";
 import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
+import { useStudentSpeechStream } from "./useStudentSpeechStream";
 import { useRecordBlurNotification } from "./useRecordBlurNotification";
+
+// [STT #72] Streaming path is the default after the rollout in
+// commit 28 of feature/audio-to-text. Set VITE_STT_STREAMING=0 in
+// .env.local to force the legacy batch-only behaviour for debugging
+// (the batch path is intact and used as the automatic fallback when
+// the WebSocket errors — see useStudentSpeechStream.js).
+const STREAMING_ENABLED = import.meta.env.VITE_STT_STREAMING !== "0";
 
 import Loading from "../../ui/Loading";
 import { toRoman } from "../../utils/toRomanNumber";
@@ -43,6 +51,8 @@ export default function StudentAssessment() {
   const [error, setError] = useState(null);
   const [audioError, setAudioError] = useState(null);
 
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
   const [canComplete, setCanComplete] = useState(false);
 
   const [blurCount, setBlurCount] = useState(0);
@@ -51,12 +61,19 @@ export default function StudentAssessment() {
   const autoRetryTimerRef = useRef(null);
   const [retryNonce, setRetryNonce] = useState(0);
 
+  // [STT #72] Set to true when the student presses Esc during an
+  // in-flight batch transcription. The fetch can't actually be
+  // aborted client-side, but checking this ref after the await lets
+  // us discard the eventual transcript instead of clobbering the
+  // textarea with stale text.
+  const transcribeCancelledRef = useRef(false);
+
   const { courses, isLoading: isCoursesLoading } = useCourses();
   const course = courses.find((c) => c.id === courseId);
 
   const { submitAnswer } = useSubmitAnswer();
-  const { submitAudioAnswer, isPending: isTranscribing } =
-    useSubmitAudioAnswer();
+  const { transcribeAudio, isPending: batchIsTranscribing } =
+    useTranscribeAudio();
   const {
     status: recordingStatus,
     isSupported: isAudioSupported,
@@ -67,10 +84,27 @@ export default function StudentAssessment() {
   const { completeAssessment } = useCompleteAssessment();
   const { recordBlurNotification } = useRecordBlurNotification();
 
+  // [STT #72] Streaming hook is always instantiated so React's
+  // rules-of-hooks stay happy; the rest of the component branches on
+  // STREAMING_ENABLED to decide whether to use it.
+  const speech = useStudentSpeechStream();
+
   const { logout } = useLogout();
 
-  const isRecording = recordingStatus === "recording";
+  // [STT #72] Unified "isRecording" / "isTranscribing" derived from
+  // whichever flow is active. Downstream UI (mic-button styling,
+  // textarea disabled state, audioBusy guards) reads these names
+  // exactly as before, so the JSX below doesn't have to branch.
+  const isRecording = STREAMING_ENABLED
+    ? speech.status === "connecting" || speech.status === "streaming"
+    : recordingStatus === "recording";
+  const isTranscribing = STREAMING_ENABLED
+    ? speech.status === "stopping"
+    : batchIsTranscribing;
   const audioBusy = isRecording || isTranscribing;
+
+  const ttsSupported =
+    typeof window !== "undefined" && "speechSynthesis" in window;
 
   useEffect(() => {
     if (!session) return;
@@ -176,6 +210,115 @@ export default function StudentAssessment() {
     retryNonce,
   ]);
 
+  // [STT #72] Surface streaming errors (e.g. AWS dropped the
+  // connection mid-stream) into the existing audioError banner so the
+  // student isn't left wondering why partials stopped appearing.
+  // handleMicClick also catches errors at start/stop boundaries; this
+  // effect covers the in-between case.
+  useEffect(() => {
+    if (!STREAMING_ENABLED) return;
+    if (!speech.error) return;
+    setAudioError(
+      getErrorMessage(speech.error, "Streaming transcription error."),
+    );
+  }, [speech.error]);
+
+  // Auto-stop handling. When the WebSocket dies before the student
+  // pressed stop (server-enforced duration cap, abnormal close), the
+  // orchestrator runs the buffered-audio fallback and exposes
+  // autoStopReason + the transcript via speech.final. The mic flow
+  // never gets a chance to call setTypedAnswer because there's no
+  // awaited stop() to return the text — surface it here instead, plus
+  // an informational banner so the student knows what happened.
+  const autoStopHandledRef = useRef(false);
+  useEffect(() => {
+    if (!STREAMING_ENABLED) return;
+    if (!speech.autoStopReason) {
+      autoStopHandledRef.current = false;
+      return;
+    }
+    // Wait until the fallback has finished and the orchestrator has
+    // settled back to idle / error before reacting — speech.final is
+    // only populated once the batch transcribe round-trip completes.
+    if (speech.status !== "idle" && speech.status !== "error") return;
+    if (autoStopHandledRef.current) return;
+    autoStopHandledRef.current = true;
+
+    if (speech.final && speech.final.trim()) {
+      // Overwrite to match the user-initiated stop flow's behaviour.
+      setTypedAnswer(speech.final.trim());
+    }
+
+    setAudioError(
+      speech.autoStopReason === "session_timeout"
+        ? "Recording stopped automatically after the maximum duration. We saved what was captured — review it below and submit."
+        : "The recording connection dropped, so we stopped automatically and recovered what was captured. Review the text below and submit, or record again.",
+    );
+  }, [speech.autoStopReason, speech.final, speech.status]);
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis?.cancel();
+      setIsSpeaking(false);
+    };
+  }, [currentQuestion?.question_text]);
+
+  useEffect(() => {
+    if (isRecording) {
+      window.speechSynthesis?.cancel();
+      setIsSpeaking(false);
+    }
+  }, [isRecording]);
+
+  // [STT #72] Elapsed-time counter for the "Transcribing…" indicator.
+  // Driven by the derived isTranscribing, so it covers both the
+  // batch path (waiting for AWS Transcribe job to complete) and the
+  // streaming path (waiting for the final flush after the user hits
+  // stop).
+  const [transcribingElapsedSec, setTranscribingElapsedSec] = useState(0);
+  useEffect(() => {
+    if (!isTranscribing) {
+      setTranscribingElapsedSec(0);
+      return undefined;
+    }
+    // performance.now() rather than Date.now() so the counter is
+    // unaffected by the user's system clock drifting / changing.
+    const startMs = performance.now();
+    setTranscribingElapsedSec(0);
+    const id = setInterval(() => {
+      setTranscribingElapsedSec(
+        Math.floor((performance.now() - startMs) / 1000),
+      );
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isTranscribing]);
+
+  // [STT #72] Esc-to-cancel for the in-flight recording / transcription.
+  useEffect(() => {
+    function onKeyDown(event) {
+      if (event.key !== "Escape") return;
+      if (!isRecording && !isTranscribing) return;
+
+      event.preventDefault();
+      transcribeCancelledRef.current = true;
+
+      if (STREAMING_ENABLED) {
+        speech.cancel();
+        speech.reset();
+      } else if (isRecording) {
+        resetRecorder();
+      }
+
+      setAudioError(null);
+    }
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isRecording, isTranscribing, resetRecorder, speech]);
+
+  // Integration: clear the auto-submit retry timer on unmount so a
+  // user navigating away while a retry is queued doesn't fire it
+  // against a stale session.
   useEffect(
     () => () => {
       if (autoRetryTimerRef.current) clearTimeout(autoRetryTimerRef.current);
@@ -203,14 +346,27 @@ export default function StudentAssessment() {
   }
 
   async function handleSubmitAnswer() {
-    if (!typedAnswer.trim() || isSubmitting) return;
+    // Trim once at the boundary so what the server stores matches what
+    // the student saw. Re-checks isSubmitting for the (rare) case where
+    // a click slips through before the disabled prop renders.
+    const trimmedAnswer = typedAnswer.trim();
+    if (!trimmedAnswer || isSubmitting) return;
 
+    // Clear any lingering transcription error so it doesn't sit on the
+    // page after a successful submit (#71).
+    setAudioError(null);
     setIsSubmitting(true);
 
     try {
-      const response = await submitAnswer({ sessionId, answer: typedAnswer });
+      const response = await submitAnswer({
+        sessionId,
+        answer: trimmedAnswer,
+      });
 
       setTypedAnswer("");
+      // [STT #72] Clear any stale partial/final from the previous
+      // question so the next one starts fresh.
+      if (STREAMING_ENABLED) speech.reset();
 
       if (response.next_question) {
         setCurrentQuestion(response.next_question);
@@ -252,45 +408,176 @@ export default function StudentAssessment() {
     }
   }
 
+  function handleSpeakQuestion() {
+    if (!currentQuestion?.question_text) return;
+
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(
+      currentQuestion.question_text,
+    );
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  }
+
+  // Issue #71 — transcribe-then-edit flow.
+  //
+  // Takes a finalized recording Blob, runs it through the transcribe-only
+  // backend endpoint, and drops the result into the answer textarea. The
+  // DB write happens later when the student clicks "Submit Answer" via
+  // handleSubmitAnswer. This function never persists or advances the
+  // session by itself.
+  async function handleAudioSubmit(blob) {
+    // [STT #72] Reset the cancel flag for this attempt. Pressing Esc
+    // during the await below will flip it back to true and we'll
+    // discard the result when it finally arrives.
+    transcribeCancelledRef.current = false;
+    try {
+      const transcript = await transcribeAudio({
+        sessionId,
+        audioBlob: blob,
+      });
+
+      if (transcribeCancelledRef.current) {
+        // The student cancelled mid-flight. Drop the transcript on
+        // the floor — the cancel handler already cleared error state
+        // and the UI has returned to "Tap the microphone to speak".
+        return;
+      }
+
+      if (!transcript || !transcript.trim()) {
+        // Don't clobber any existing typed text the student already
+        // wrote — just surface a hint and leave the textarea alone.
+        setAudioError(
+          "We didn't catch any speech. Please try recording again.",
+        );
+        return;
+      }
+
+      // Overwrite (not append) so each new recording fully replaces the
+      // previous draft. The student can then edit.
+      setTypedAnswer(transcript);
+    } catch (err) {
+      // If the cancel happened to race with a network failure, prefer
+      // the cancel — silent is the right UX when the student asked
+      // us to stop.
+      if (transcribeCancelledRef.current) return;
+      setAudioError(getErrorMessage(err, "Failed to transcribe your audio."));
+    }
+  }
+
+  // [STT #72] Streaming variant of the mic-button flow. Connects the
+  // WebSocket, opens the mic, and (on second click) flushes the
+  // server's remaining results before dropping the final transcript
+  // into typedAnswer. Behaviourally a drop-in replacement for the
+  // batch flow below; we keep them as siblings so the feature flag
+  // can flip back to batch with a single env-var change.
+  async function handleMicClickStreaming() {
+    if (speech.status === "connecting" || speech.status === "stopping") {
+      return;
+    }
+
+    setAudioError(null);
+
+    if (speech.status === "streaming") {
+      try {
+        const finalText = await speech.stop();
+
+        // Esc pressed during await: discard the transcript instead of
+        // overwriting typedAnswer. Mirrors the batch path in handleAudioSubmit.
+        if (transcribeCancelledRef.current) return;
+        if (finalText && finalText.trim()) {
+          // Overwrite typedAnswer to match the batch flow's behaviour
+          // (handleAudioSubmit), so each new recording fully replaces
+          // the previous draft and the student can edit from there.
+          setTypedAnswer(finalText.trim());
+        } else if (speech.partial && speech.partial.trim()) {
+          // No final transcript, but AWS sent some partial guesses along
+          // the way. Use the last guess — it might be wrong, but letting
+          // the student fix it beats losing their answer entirely.
+          setTypedAnswer(speech.partial.trim());
+        } else {
+          // No final, no partial, no fallback transcript.
+          setAudioError(
+            "Transcription returned no text. Try speaking a bit longer or check your microphone.",
+          );
+        }
+      } catch (err) {
+        if (transcribeCancelledRef.current) return;
+        setAudioError(getErrorMessage(err, "Streaming transcription failed."));
+      } finally {
+        speech.reset();
+      }
+      return;
+    }
+
+    if (!speech.isSupported) {
+      setAudioError(
+        "Real-time transcription isn't supported in this browser. Please type your answer instead.",
+      );
+      return;
+    }
+
+    try {
+      // Reset for the new recording so a stale Esc flag from a previous
+      // stop doesn't suppress this recording's transcript when the
+      // student eventually stops it.
+      transcribeCancelledRef.current = false;
+      speech.reset();
+      await speech.start(sessionId);
+    } catch (err) {
+      const name = err && err.name;
+
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setAudioError(
+          "Microphone access was blocked. Please allow microphone access in your browser and try again.",
+        );
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setAudioError(
+          "No microphone was detected. Please connect one and try again.",
+        );
+      } else {
+        setAudioError(
+          getErrorMessage(err, "Failed to start streaming transcription."),
+        );
+      }
+    }
+  }
+
+  // Mic-button lifecycle only. Responsible for starting/stopping the
+  // recorder and producing a Blob; persistence is delegated to
+  // handleAudioSubmit so the two halves can evolve independently.
   async function handleMicClick() {
     if (!currentQuestion) return;
-    if (isSubmitting || isTranscribing) return;
+    if (isSubmitting) return;
+
+    // [STT #72] When streaming is enabled, the whole mic flow is
+    // delegated to handleMicClickStreaming and the batch path below
+    // is unreachable.
+    if (STREAMING_ENABLED) {
+      await handleMicClickStreaming();
+      return;
+    }
+
+    if (isTranscribing) return;
 
     setAudioError(null);
 
     if (isRecording) {
-      let didStartSubmitting = false;
-      try {
-        const blob = await stopRecording();
+      const blob = await stopRecording();
 
-        if (!blob || blob.size === 0) {
-          setAudioError("No audio was captured. Please try again.");
-          return;
-        }
-
-        setIsSubmitting(true);
-        didStartSubmitting = true;
-
-        const response = await submitAudioAnswer({
-          sessionId,
-          audioBlob: blob,
-        });
-
-        if (response.next_question) {
-          setCurrentQuestion(response.next_question);
-        } else {
-          setCurrentQuestion(null);
-          setCanComplete(true);
-        }
-
-        setTypedAnswer("");
-      } catch (err) {
-        setAudioError(
-          getErrorMessage(err, "Failed to submit your audio answer."),
-        );
-      } finally {
-        if (didStartSubmitting) setIsSubmitting(false);
+      if (!blob || blob.size === 0) {
+        setAudioError("No audio was captured. Please try again.");
+        return;
       }
+
+      await handleAudioSubmit(blob);
       return;
     }
 
@@ -471,10 +758,39 @@ export default function StudentAssessment() {
               <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-8 shadow-sm">
                 <div className="absolute left-0 top-0 h-full w-2 bg-primary"></div>
 
-                <div className="mb-6 flex items-center gap-3">
+                <div className="mb-6 flex items-center justify-between gap-3">
                   <span className="rounded-full bg-primary-container px-3 py-1 text-xs font-bold text-on-primary-container">
                     {questionKindLabel}
                   </span>
+
+                  {ttsSupported && (
+                    <button
+                      type="button"
+                      onClick={handleSpeakQuestion}
+                      disabled={audioBusy}
+                      aria-label={
+                        isSpeaking
+                          ? "Stop reading question"
+                          : "Read question aloud"
+                      }
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isSpeaking
+                          ? "bg-secondary-container text-on-secondary-container"
+                          : "text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface"
+                      }`}
+                    >
+                      <span
+                        className="material-symbols-outlined text-xl"
+                        style={
+                          isSpeaking
+                            ? { fontVariationSettings: '"FILL" 1' }
+                            : undefined
+                        }
+                      >
+                        {isSpeaking ? "stop_circle" : "volume_up"}
+                      </span>
+                    </button>
+                  )}
                 </div>
 
                 <h2 className="mb-4 select-none font-headline text-2xl font-semibold leading-snug text-on-background">
@@ -487,12 +803,41 @@ export default function StudentAssessment() {
               <div className="space-y-6">
                 <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low p-10">
                   <p className="mb-8 font-medium text-on-surface-variant">
-                    {isTranscribing
-                      ? "Transcribing your answer…"
-                      : isRecording
-                        ? "Recording… tap the button again to stop and submit"
-                        : "Tap the microphone to speak your answer"}
+                    {isTranscribing ? (
+                      <>
+                        Transcribing your answer…{" "}
+                        <span
+                          className="font-mono tabular-nums"
+                          aria-live="polite"
+                          data-testid="stt-transcribing-elapsed"
+                        >
+                          {Math.floor(transcribingElapsedSec / 60)}:
+                          {String(transcribingElapsedSec % 60).padStart(2, "0")}
+                        </span>
+                        <span className="mt-2 block text-sm font-normal text-on-surface-variant/70">
+                          {transcribingElapsedSec >= 60
+                            ? "Almost there… your transcript will appear shortly."
+                            : transcribingElapsedSec >= 30
+                              ? "Still transcribing… AWS is taking longer than usual."
+                              : "This usually takes 15-20 seconds."}
+                        </span>
+                      </>
+                    ) : isRecording ? (
+                      "Recording… tap the button again to stop and submit"
+                    ) : (
+                      "Tap the microphone to speak your answer"
+                    )}
                   </p>
+
+                  {isTranscribing && (
+                    <div
+                      className="mb-8 h-1 w-48 overflow-hidden rounded-full bg-surface-container-high"
+                      role="progressbar"
+                      aria-label="Transcribing your answer"
+                    >
+                      <div className="animate-indeterminate-bar h-full w-1/3 rounded-full bg-primary" />
+                    </div>
+                  )}
 
                   <div className="relative">
                     <div
@@ -566,6 +911,57 @@ export default function StudentAssessment() {
                   )}
                 </div>
 
+                {/*
+                  Issue #71 — anti-cheat surface for the answer textarea.
+
+                  Programmatic insertions (the transcript populated by
+                  setTypedAnswer) bypass all of these handlers because
+                  they aren't user input events, so the new flow keeps
+                  working. The handlers only block USER paths:
+
+                    - onCopy / onCut / onPaste:  clipboard via menus + keys
+                    - onKeyDown:                 Ctrl/Cmd+C/V/X, Shift+Insert,
+                                                 Ctrl+Insert, Shift+Delete
+                    - onContextMenu:             right-click "Paste" menu
+                    - onDrop / onDragOver:       drag-and-drop text/files
+                    - onBeforeInput:             cross-browser InputEvent
+                                                 belt-and-suspenders for
+                                                 paths that bypass onPaste
+                                                 (async Clipboard API,
+                                                 some mobile keyboards,
+                                                 undo-restore-of-paste)
+                    - onChange rate limit:       blocks bulk insertion if
+                                                 anything above slips through
+                    - data-gramm* attrs:         disable Grammarly extension
+                    - data-lt-active="false":    disable LanguageTool
+                    - autoComplete + name="":    disable browser autofill
+                    - autoCorrect / spellCheck:  disable native suggestions
+                */}
+                {/* [STT #72] Live streaming preview. Renders only when
+                    the feature flag is on AND we either have a partial
+                    in flight or we're actively streaming. The italic-
+                    grey treatment signals "this text may still change"
+                    so the student knows the textarea is the source of
+                    truth. */}
+                {STREAMING_ENABLED &&
+                  (speech.status === "connecting" ||
+                    speech.status === "streaming" ||
+                    speech.status === "stopping" ||
+                    speech.partial) && (
+                    <div
+                      className="mb-2 min-h-[2.5rem] rounded-xl border border-outline-variant/20 bg-surface-container px-3 py-2 font-body text-sm italic text-outline"
+                      aria-live="polite"
+                      data-testid="stt-partial-preview"
+                    >
+                      {speech.partial ||
+                        (speech.status === "connecting"
+                          ? "Connecting…"
+                          : speech.status === "stopping"
+                            ? "Finalising…"
+                            : "Listening…")}
+                    </div>
+                  )}
+
                 <div className="relative">
                   <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
                     <span className="material-symbols-outlined text-outline">
@@ -587,6 +983,21 @@ export default function StudentAssessment() {
                     onCopy={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
+                    onBeforeInput={(e) => {
+                      // Block insertions whose origin is paste or drop —
+                      // catches paths that don't fire onPaste/onDrop on
+                      // some browsers (Safari async Clipboard API, mobile
+                      // long-press paste, undo of a prior paste).
+                      const inputType = e.nativeEvent?.inputType || "";
+                      if (
+                        inputType === "insertFromPaste" ||
+                        inputType === "insertFromPasteAsQuotation" ||
+                        inputType === "insertFromDrop" ||
+                        inputType === "insertFromYank"
+                      ) {
+                        e.preventDefault();
+                      }
+                    }}
                     onKeyDown={(e) => {
                       const key = e.key?.toLowerCase();
                       if (
@@ -607,9 +1018,15 @@ export default function StudentAssessment() {
                     onDrop={(e) => e.preventDefault()}
                     onDragOver={(e) => e.preventDefault()}
                     onContextMenu={(e) => e.preventDefault()}
+                    name=""
                     autoComplete="off"
                     autoCorrect="off"
+                    autoCapitalize="off"
                     spellCheck={false}
+                    data-gramm="false"
+                    data-gramm_editor="false"
+                    data-enable-grammarly="false"
+                    data-lt-active="false"
                   ></textarea>
                 </div>
               </div>

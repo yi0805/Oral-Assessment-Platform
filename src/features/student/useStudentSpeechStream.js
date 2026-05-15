@@ -1,0 +1,595 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { startAudioRecorder } from "./audioRecorder";
+import { useAudioContext } from "./useAudioContext";
+import { useStreamingTranscribe } from "./useStreamingTranscribe";
+import { useTranscribeAudio } from "./useTranscribeAudio";
+
+// Orchestration hook for the student streaming-transcription flow.
+// Combines the two single-responsibility hooks added earlier in
+// issue #72:
+//
+//   * useAudioContext        — produces 16 kHz Int16 LE PCM frames
+//                              from the mic via the AudioWorklet.
+//   * useStreamingTranscribe — owns the WebSocket to the streaming
+//                              backend route and surfaces partial /
+//                              final transcripts as React state.
+//
+// Plus, since commit 20 of issue #72, a parallel MediaRecorder that
+// buffers a webm/opus copy of the same audio. If the WebSocket dies
+// mid-stream (AWS hiccup, network blip, server flag flip), the
+// buffered blob is replayed through the existing useTranscribeAudio
+// mutation as a graceful fallback. The student gets a transcript
+// either way; they never have to re-record.
+//
+// Public contract:
+//
+//   const {
+//     status, partial, final, error, isSupported,
+//     start, stop, cancel, reset,
+//   } = useStudentSpeechStream();
+//
+//   await start(sessionId);           // opens WS + parallel recorder, then mic
+//   // ...PCM frames stream automatically while status === "streaming"
+//   const transcript = await stop();  // flushes server, returns final
+//
+// Status transitions:
+//
+//   idle ──start()──▶ connecting ──ws open──▶ streaming
+//   streaming ──stop()──▶ stopping ──ws close──▶ idle
+//   streaming ──ws error──▶ stopping ──batch transcribe──▶ idle  (fallback)
+//   (no fallback available) ──error──▶ error
+//   error / streaming / stopping ──cancel()──▶ idle  (no flush)
+//
+// stop() returns a Promise that resolves with the accumulated final
+// transcript once the server has flushed and closed (or once the
+// fallback has produced a batch transcript). cancel() is the abandon
+// path — used when the student navigates away or hits Esc.
+
+// Cap the buffered audio at 25 MB to mirror the upload limit enforced
+// by the batch route's transcribe_response_audio handler. In practice
+// Opus encoding keeps a 5-minute clip under 1 MB, so this is mostly a
+// belt-and-braces guard against a stuck recording.
+const FALLBACK_BYTES_LIMIT = 25 * 1024 * 1024;
+
+const MIN_PARTIAL_FALLBACK_LENGTH = 5;
+
+export function useStudentSpeechStream() {
+  // Destructure up-front so callback deps can reference only the
+  // stable functions instead of the parent objects (which re-create
+  // each render).
+  const {
+    partial,
+    final,
+    isStreaming,
+    error: wsError,
+    connect: connectWs,
+    sendPcm,
+    sendStop,
+    disconnect: disconnectWs,
+    reset: resetWs,
+  } = useStreamingTranscribe();
+
+  const {
+    error: audioError,
+    isSupported,
+    start: startAudio,
+    stop: stopAudio,
+  } = useAudioContext({ onPcmFrame: sendPcm });
+
+  const { transcribeAudio } = useTranscribeAudio();
+
+  const [status, setStatus] = useState("idle");
+
+  // Fallback-only state. fallbackFinal holds the transcript produced
+  // by the batch path; fallbackPhase tracks whether we're in the
+  // middle of running it ("pending"), have finished it successfully
+  // ("ok"), or finished it with an error ("failed"). "none" is the
+  // happy path where streaming worked end-to-end. fallbackError
+  // captures the specific reason the fallback failed (e.g. "audio
+  // too short") so the consumer can show it instead of the generic
+  // "WebSocket closed abnormally" message that the close handler
+  // races in just after.
+  const [fallbackFinal, setFallbackFinal] = useState("");
+  const [fallbackPhase, setFallbackPhase] = useState("none");
+  const [fallbackError, setFallbackError] = useState(null);
+  // Ref mirror of fallbackPhase so callbacks (stop / cancel) can read
+  // the current phase without going through state and without having
+  // to list it in their deps array — they need to fire on the same
+  // render that branch 1 set the deferred phase, and React batches
+  // state updates so a captured-via-closure value would be stale.
+  const fallbackPhaseRef = useRef("none");
+  useEffect(() => {
+    fallbackPhaseRef.current = fallbackPhase;
+  }, [fallbackPhase]);
+
+  // Pending stop()/cancel() promise resolvers, plus the latest known
+  // `final` value snapshotted into a ref so the resolver can read it
+  // without going through state (which may be stale by the time the
+  // close event lands).
+  const stopResolverRef = useRef(null);
+  const stopRejecterRef = useRef(null);
+  const finalRef = useRef("");
+
+  const partialRef = useRef("");
+
+  // Fallback bookkeeping. recorderRef holds the handle returned by
+  // startAudioRecorder (the framework-agnostic factory we extracted
+  // in commit 12). sessionIdRef captures the id at start() time so
+  // the fallback transcribe call can be made from inside the WS-error
+  // effect without re-plumbing it. fallbackTriggeredRef prevents
+  // re-entry if the effect fires more than once on the same error.
+  const recorderRef = useRef(null);
+  const sessionIdRef = useRef(null);
+  const fallbackTriggeredRef = useRef(false);
+
+  // Auto-stop bookkeeping. Set when the WS dies before the user has
+  // pressed stop (server timeout, abnormal close, etc.). The consumer
+  // reads this to detect "the recording ended on its own" and
+  // populate the answer textarea + surface a banner, since there's
+  // no awaited stop() promise to resolve.
+  const [autoStopReason, setAutoStopReason] = useState(null);
+
+  useEffect(() => {
+    finalRef.current = final;
+  }, [final]);
+
+  useEffect(() => {
+    partialRef.current = partial;
+  }, [partial]);
+
+  // Shared core of the batch-transcribe fallback
+  const runBatchFallback = useCallback(async () => {
+    const recorder = recorderRef.current;
+    recorderRef.current = null;
+    const sessionId = sessionIdRef.current;
+
+    if (!recorder) {
+      throw new Error("Streaming fallback: recorder missing.");
+    }
+
+    const blob = await recorder.stop();
+    if (!blob || blob.size === 0) {
+      throw new Error("Streaming fallback: no audio captured.");
+    }
+
+    if (blob.size > FALLBACK_BYTES_LIMIT) {
+      throw new Error("Streaming fallback: recording is too long (>25 MB).");
+    }
+
+    const transcript = await transcribeAudio({ sessionId, audioBlob: blob });
+
+    return typeof transcript === "string" ? transcript : "";
+  }, [transcribeAudio]);
+
+  // Unified "WS state change" effect. Runs whenever wsError /
+  // audioError / isStreaming flips. Priority order:
+  //   1. WS error AND a parallel recorder is available → run the
+  //      batch fallback. This is the whole point of this commit.
+  //   2. Some error AND no fallback available → surface it the same
+  //      way the pre-fallback orchestrator did.
+  //   3. WS closed cleanly (no error) AND someone is awaiting stop()
+  //      → resolve their Promise with the WS final.
+  //
+  // The single-effect design is deliberate: declaring two effects on
+  // the same set of deps invites order-of-execution bugs (the
+  // resolver effect would race the error effect and could resolve
+  // stop() with an empty string before the fallback got a chance to
+  // produce a transcript).
+  useEffect(() => {
+    // ---------- 1. WS error → fallback ----------
+    if (
+      wsError &&
+      recorderRef.current &&
+      sessionIdRef.current &&
+      !fallbackTriggeredRef.current
+    ) {
+      fallbackTriggeredRef.current = true;
+      // If the user has already clicked stop and is awaiting the
+      // promise, run the batch fallback immediately so we can resolve
+      // them with what audio we have. Otherwise (the student is still
+      // speaking when the WS dies), DEFER the batch transcribe and
+      // keep the MediaRecorder running so it keeps capturing — this
+      // way the student's remaining speech isn't lost. When they
+      // eventually click stop, stop() picks up the full buffer.
+      const userInitiatedStop = stopResolverRef.current !== null;
+      const reason =
+        wsError && wsError.code === "session_timeout"
+          ? "session_timeout"
+          : "stream_error";
+      // Clear the underlying WS-hook error synchronously so the
+      // orchestrator's `error` field stops surfacing it on the very
+      // next render — keeps the brief "error flashes then recovers"
+      // UX from leaking out to the consumer.
+      resetWs();
+
+      if (!userInitiatedStop) {
+        // ----- Deferred path: keep recorder alive, stop the streaming
+        // pipeline only. Status stays at "streaming" so the student
+        // keeps seeing "Listening…" and doesn't realise the back-end
+        // path silently changed under them.
+        setFallbackPhase("deferred");
+
+        // Surface the auto-stop reason so the UI can show the banner.
+        setAutoStopReason(reason);
+        // Stop the PCM/worklet pipeline — we have nowhere to send
+        // frames now, no point burning CPU on the downsampler.
+        stopAudio();
+        return;
+      }
+
+      // ----- Immediate path: student already clicked stop, so they
+      // are blocked waiting for a transcript. Run the batch now.
+      setFallbackPhase("pending");
+      setStatus("stopping");
+
+      (async () => {
+        try {
+          // Stop the mic / WebSocket pipeline; we won't be sending
+          // any more PCM frames.
+          await stopAudio();
+
+          const text = await runBatchFallback();
+
+          setFallbackFinal(text);
+          finalRef.current = text;
+          setFallbackPhase("ok");
+          setStatus("idle");
+
+          if (stopResolverRef.current) {
+            const resolve = stopResolverRef.current;
+            stopResolverRef.current = null;
+            stopRejecterRef.current = null;
+            resolve(text);
+          }
+        } catch (fallbackErr) {
+          setFallbackPhase("failed");
+          setFallbackError(fallbackErr);
+          setStatus("error");
+
+          if (stopRejecterRef.current) {
+            const reject = stopRejecterRef.current;
+            stopResolverRef.current = null;
+            stopRejecterRef.current = null;
+            reject(fallbackErr);
+          }
+        }
+        // reason captured for parity with the deferred path's eventual
+        // banner — kept unused here so the immediate path stays a
+        // pure user-initiated stop with no extra "we auto-stopped"
+        // chrome.
+        void reason;
+      })();
+      return;
+    }
+
+    // ---------- 2. Error with no fallback → surface it ----------
+    const err = wsError || audioError;
+    if (err && !fallbackTriggeredRef.current) {
+      // Release the mic stream so the recorder doesn't keep
+      // capturing past the failure. Best-effort — stopAudio() is
+      // idempotent and the inner try/catches guard against
+      // partially-built pipelines, so calling it here is safe even
+      // if the audio pipeline never fully opened.
+      stopAudio();
+      // Drop the parallel recorder handle too. Without a recorder we
+      // have nothing to fall back to, but we still need to release
+      // the underlying tracks rather than leaving them hot.
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.dispose();
+        } catch {
+          /* recorder may already be torn down */
+        }
+        recorderRef.current = null;
+      }
+      setStatus("error");
+
+      if (stopRejecterRef.current) {
+        const reject = stopRejecterRef.current;
+        stopResolverRef.current = null;
+        stopRejecterRef.current = null;
+        reject(err);
+      }
+      return;
+    }
+
+    // ---------- 3. Clean close → resolve any pending stop() ----------
+    if (
+      !isStreaming &&
+      stopResolverRef.current &&
+      !fallbackTriggeredRef.current
+    ) {
+      if (!finalRef.current.trim() && recorderRef.current) {
+        // Prefer a usable partial over the slow batch fallback
+        const partialText = partialRef.current.trim();
+        if (partialText.length >= MIN_PARTIAL_FALLBACK_LENGTH) {
+          const resolve = stopResolverRef.current;
+          stopResolverRef.current = null;
+          stopRejecterRef.current = null;
+          if (recorderRef.current) {
+            try {
+              recorderRef.current.dispose();
+            } catch {
+              // recorder may already be torn down
+            }
+            recorderRef.current = null;
+          }
+          setStatus((s) => (s === "stopping" ? "idle" : s));
+          resolve(partialText);
+          return;
+        }
+
+        fallbackTriggeredRef.current = true;
+        setFallbackPhase("pending");
+        setStatus("stopping");
+
+        (async () => {
+          try {
+            const text = await runBatchFallback();
+
+            setFallbackFinal(text);
+            finalRef.current = text;
+            setFallbackPhase("ok");
+            setStatus("idle");
+
+            if (stopResolverRef.current) {
+              const resolve = stopResolverRef.current;
+              stopResolverRef.current = null;
+              stopRejecterRef.current = null;
+              resolve(text);
+            }
+          } catch (fallbackErr) {
+            setFallbackPhase("failed");
+            setFallbackError(fallbackErr);
+            setStatus("idle");
+            finalRef.current = "";
+
+            if (stopResolverRef.current) {
+              const resolve = stopResolverRef.current;
+              stopResolverRef.current = null;
+              stopRejecterRef.current = null;
+              resolve("");
+            }
+          }
+        })();
+        return;
+      }
+
+      const resolve = stopResolverRef.current;
+      stopResolverRef.current = null;
+      stopRejecterRef.current = null;
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.dispose();
+        } catch {
+          /* recorder may already be torn down */
+        }
+        recorderRef.current = null;
+      }
+      setStatus((s) => (s === "stopping" ? "idle" : s));
+      resolve(finalRef.current);
+    }
+  }, [wsError, audioError, isStreaming, resetWs, stopAudio, runBatchFallback]);
+
+  const start = useCallback(
+    async (sessionId) => {
+      setStatus("connecting");
+      setFallbackFinal("");
+      setFallbackPhase("none");
+      setFallbackError(null);
+      fallbackTriggeredRef.current = false;
+      setAutoStopReason(null);
+      sessionIdRef.current = sessionId;
+
+      // 1. Open the parallel batch recorder first. Best effort — if
+      // it fails (mic blocked, codec unsupported) we proceed without
+      // the fallback safety net but streaming may still work.
+      try {
+        recorderRef.current = await startAudioRecorder();
+      } catch {
+        recorderRef.current = null;
+      }
+
+      // 2. Open the WebSocket.
+      try {
+        await connectWs(sessionId);
+      } catch (err) {
+        // WS won't open at all. No frames captured yet, so the
+        // parallel recorder's blob would be near-empty — dispose it
+        // and surface the connect error.
+        if (recorderRef.current) {
+          try {
+            recorderRef.current.dispose();
+          } catch {
+            /* recorder may already be torn down */
+          }
+          recorderRef.current = null;
+        }
+        setStatus("error");
+        throw err;
+      }
+
+      // 3. Open the AudioContext / worklet pipeline.
+      try {
+        await startAudio();
+      } catch (err) {
+        // WS opened but mic permission / AudioContext init failed.
+        // Roll the socket back and dispose the parallel recorder so
+        // we don't leave half-built sessions hanging around.
+        disconnectWs();
+        if (recorderRef.current) {
+          try {
+            recorderRef.current.dispose();
+          } catch {
+            /* recorder may already be torn down */
+          }
+          recorderRef.current = null;
+        }
+        setStatus("error");
+        throw err;
+      }
+
+      setStatus("streaming");
+    },
+    [connectWs, startAudio, disconnectWs],
+  );
+
+  const stop = useCallback(async () => {
+    // Deferred fallback: WS died mid-recording, the orchestrator
+    // suppressed the failure and kept the MediaRecorder running. Now
+    // that the student has clicked stop, run the batch transcribe on
+    // the *full* buffer (not just the audio captured before the WS
+    // error). This is the path that recovers the rest of the
+    // student's speech instead of cutting them off at the failure
+    // moment.
+    if (fallbackPhaseRef.current === "deferred") {
+      setStatus("stopping");
+      setFallbackPhase("pending");
+      // Update the ref synchronously so a double-click on stop()
+      // doesn't take the deferred path twice — React batches the
+      // state update through an effect, which would be too late.
+      fallbackPhaseRef.current = "pending";
+
+      try {
+        const text = await runBatchFallback();
+        setFallbackFinal(text);
+        finalRef.current = text;
+        setFallbackPhase("ok");
+        setStatus("idle");
+        return text;
+      } catch (fallbackErr) {
+        setFallbackPhase("failed");
+        setFallbackError(fallbackErr);
+        setStatus("error");
+        throw fallbackErr;
+      }
+    }
+
+    // Immediate-fallback path is still in flight (WS errored AND the
+    // student had already clicked stop, so the effect's IIFE is
+    // running). Install a resolver and let the IIFE finish it.
+    if (fallbackTriggeredRef.current) {
+      return new Promise((resolve, reject) => {
+        stopResolverRef.current = resolve;
+        stopRejecterRef.current = reject;
+      });
+    }
+
+    setStatus("stopping");
+    await stopAudio();
+
+    // The parallel recorder is intentionally NOT disposed here.
+    // After we send the stop frame the server may still respond
+    // with {"type":"error"} (e.g. AWS Transcribe failing the
+    // finalisation pass), and branch 1 of the effect needs the
+    // recorder intact to run the batch fallback. Disposing it now
+    // would leave the recorder permanently gone by the time the
+    // error arrived and the UI would freeze in "Transcribing…".
+    // The clean-close and error branches below dispose it once we
+    // know the WS lifecycle has settled.
+
+    if (!isStreaming) {
+      // WS already closed cleanly — no server response is coming,
+      // so the recorder won't be needed for a fallback. Dispose it
+      // now so we don't leak the mic stream past this session.
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.dispose();
+        } catch {
+          /* recorder may already be torn down */
+        }
+        recorderRef.current = null;
+      }
+      setStatus((s) => (s === "stopping" ? "idle" : s));
+      return finalRef.current;
+    }
+
+    sendStop();
+
+    return new Promise((resolve, reject) => {
+      stopResolverRef.current = resolve;
+      stopRejecterRef.current = reject;
+    });
+  }, [stopAudio, isStreaming, sendStop, runBatchFallback]);
+
+  const cancel = useCallback(() => {
+    // Hard abandon: stop the mic, drop the WS without flushing, drop
+    // the parallel recorder (incl. the one kept alive by the deferred
+    // fallback path), and resolve any pending stop() with whatever
+    // final we already have.
+    stopAudio();
+    disconnectWs();
+    if (recorderRef.current) {
+      try {
+        recorderRef.current.dispose();
+      } catch {
+        /* recorder may already be torn down */
+      }
+      recorderRef.current = null;
+    }
+    fallbackTriggeredRef.current = false;
+    setFallbackPhase("none");
+    setStatus("idle");
+
+    if (stopResolverRef.current) {
+      const resolve = stopResolverRef.current;
+      stopResolverRef.current = null;
+      stopRejecterRef.current = null;
+      resolve(finalRef.current);
+    }
+  }, [stopAudio, disconnectWs]);
+
+  const reset = useCallback(() => {
+    resetWs();
+    setFallbackFinal("");
+    setFallbackPhase("none");
+    setFallbackError(null);
+    fallbackTriggeredRef.current = false;
+    setAutoStopReason(null);
+    setStatus("idle");
+  }, [resetWs]);
+
+  // Final-transcript merge: prefer fallbackFinal if we have one (the
+  // batch path overwrites the partial WS state in that branch),
+  // otherwise expose the WS final unchanged.
+  const exposedFinal = fallbackFinal || final;
+
+  // Error priority:
+  //   1. While the fallback is deferred (silently waiting for the
+  //      student's stop click), pending, or has succeeded, suppress —
+  //      the WS error that triggered it isn't actionable for the
+  //      student, and a transient "WebSocket closed abnormally"
+  //      arriving after a successful fallback would be misleading.
+  //   2. If the fallback failed, prefer the fallback's own error
+  //      (e.g. "Transcription job failed: input media file length is
+  //      too small") over the generic close-handler error that races
+  //      in right after — the fallback message is the specific one
+  //      that tells the student what to do next.
+  //   3. Otherwise surface the underlying WS / audio-context error.
+  const fallbackSilent =
+    fallbackPhase === "deferred" ||
+    fallbackPhase === "pending" ||
+    fallbackPhase === "ok";
+  const exposedError = fallbackSilent
+    ? null
+    : fallbackError || wsError || audioError;
+
+  return {
+    status,
+    partial,
+    final: exposedFinal,
+    error: exposedError,
+    isSupported,
+    start,
+    stop,
+    cancel,
+    reset,
+    // Truthy ("session_timeout" | "stream_error") when the stream
+    // ended without a user-initiated stop. Cleared on reset() /
+    // start(). Consumers read this to differentiate "the student
+    // pressed stop and got a transcript" from "the server stopped
+    // them and we recovered a transcript".
+    autoStopReason,
+  };
+}

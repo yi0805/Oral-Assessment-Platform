@@ -32,4 +32,15 @@ export default defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
+  {
+    // [STT #72] Playwright config + E2E specs run under Node, not the
+    // browser. Without this override ESLint flags `process`, `setTimeout`,
+    // etc. as undefined. Specs also use Playwright's `test`/`expect`
+    // as ambient names but those are imported, so just adding node
+    // globals is sufficient.
+    files: ["playwright.config.js", "tests/e2e/**/*.js"],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
 ]);

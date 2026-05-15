@@ -1,19 +1,38 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
+)
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import require_instructor, require_student
+from app.core.ws_auth import authenticate_ws_student
 from app.services import s3_client
 from app.services._prompt_safety import sanitize_untrusted
+from app.utils.audio_streamer import (
+    TranscribeStreamer,
+    TranscribeStreamError,
+    fmt_optional_seconds,
+)
 from app.utils.audio_transcriber import is_audio_extension, transcribe_audio_from_s3
 
 from app.models import (
@@ -26,9 +45,11 @@ from app.schemas import (
     AssessmentHistoryItemOut, AssessmentHistoryOut,
     PendingReviewOut, TranscriptDetailOut, TranscriptMessageOut, AssessmentTitleOut,
     StudentCourseAssessmentOut, StudentNextQuestionOut,
-    StudentResponseRequest, StudentResponseResponse, SessionStartResponse, StudentInfoOut, SessionFeedbackOut, CourseInfoOut,
+    StudentResponseRequest, StudentResponseResponse, SessionStartResponse,
+    StudentInfoOut, SessionFeedbackOut, CourseInfoOut,
     AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
-    BlurNotificationRequest, NotificationOut, InstructorNotificationOut
+    AudioTranscriptionResponse,
+    BlurNotificationRequest, NotificationOut, InstructorNotificationOut,
 )
 from app.services.ai_gateway import smart_chat_complete
 
@@ -72,6 +93,69 @@ def _get_main_question_by_order(
 
     idx = order - 1
     return questions[idx] if 0 <= idx < len(questions) else None
+
+
+def _validate_session_for_transcribe(
+    session_id: UUID,
+    current_user: User,
+    db: Session,
+) -> AssessmentSession:
+    """
+    Shared session-level validation for the transcribe routes.
+
+    Looks up the assessment session, verifies that ``current_user`` owns
+    it, that the session is currently in progress, and that the
+    assessment time limit (if any) has not expired. Raises
+    ``HTTPException`` with the appropriate status codes on any failure.
+
+    Returns the validated ``AssessmentSession`` so callers that need
+    properties of the session (e.g. ``session.id``) can use it without
+    re-querying.
+
+    Extracted from ``transcribe_response_audio`` so the upcoming
+    streaming route (``/sessions/{id}/transcribe/stream``, issue #72)
+    can reuse the exact same checks.
+    """
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Session not found",
+        )
+
+    if session.user_s_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have access to this session.",
+        )
+
+    if session.status != "in_progress":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Session is not in progress.",
+        )
+
+    config = (
+        db.query(AssessmentConfig)
+        .filter(AssessmentConfig.id == session.assessment_config_id)
+        .first()
+    )
+
+    if session.started_at and config and config.total_time_minute:
+        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+
+        if datetime.now(timezone.utc) > expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The time limit for this assessment has expired.",
+            )
+
+    return session
 
 
 async def _generate_ai_followup(
@@ -636,6 +720,24 @@ async def submit_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    # The frontend disables the
+    # Submit Answer button on whitespace-only input, but we revalidate here
+    answer_text = (payload.answer_text or "").strip()
+
+    if not answer_text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Answer cannot be empty.",
+        )
+
+    _MAX_ANSWER_CHARS = 10000
+
+    if len(answer_text) > _MAX_ANSWER_CHARS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Answer is too long (max {_MAX_ANSWER_CHARS} characters).",
+        )
+
     # Validate session
     session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
 
@@ -714,7 +816,7 @@ async def submit_response(
         session_question_item_id=last_question_item.id,
         message_type="student_answer",
         sequence_no=next_seq,
-        content=payload.answer_text,
+        content=answer_text,
     )
 
     db.add(answer_msg)
@@ -830,7 +932,7 @@ async def submit_response(
     )
 
 
-# Submit voice response
+# MIME types used when uploading student audio to S3 before an AWS Transcribe job
 
 _AUDIO_MIME_MAP = {
     "mp3": "audio/mpeg",
@@ -844,18 +946,24 @@ _AUDIO_MIME_MAP = {
 }
 
 
+
+# Edit-before-submit transcribe-only endpoint: validates,
+# uploads, transcribes, and cleans up, returning just the transcript
+# for the client to display, edit, and submit via /respond — without
+# writing to the Transcript table or advancing the session.
 @router.post(
-    "/sessions/{session_id}/respond/audio",
-    response_model=StudentResponseResponse,
-    summary="Submit student's voice answer (transcribed via AWS Transcribe) and get next question",
+    "/sessions/{session_id}/transcribe/audio",
+    response_model=AudioTranscriptionResponse,
+    summary="Transcribe a student's voice answer without persisting it",
 )
-async def submit_response_audio(
+async def transcribe_response_audio(
     session_id: UUID,
     audio: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    # Validate audio extension up-front (cheap fail)
+    # Validate audio extension up-front (cheap fail; route-specific so
+    # not part of _validate_session_for_transcribe).
     filename = audio.filename or ""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
@@ -865,39 +973,9 @@ async def submit_response_audio(
             detail=f"Unsupported audio format: {ext!r}. Supported: mp3, mp4, m4a, wav, flac, ogg, webm, amr.",
         )
 
-    # Validate session (mirrors submit_response so we fail fast before uploading)
-    session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
-
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
-    if session.user_s_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this session.",
-        )
-
-    if session.status != "in_progress":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Session is not in progress.",
-        )
-
-    config = (
-        db.query(AssessmentConfig)
-        .filter(AssessmentConfig.id == session.assessment_config_id)
-        .first()
-    )
-
-    # Time check
-    if session.started_at and config and config.total_time_minute:
-        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
-
-        if datetime.now(timezone.utc) > expires_at:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="The time limit for this assessment has expired.",
-            )
+    # Session-level validation (ownership, status, time limit). Shared
+    # with the upcoming streaming route — see _validate_session_for_transcribe.
+    _validate_session_for_transcribe(session_id, current_user, db)
 
     # Enforce upload size limit (25 MB)
     max_audio_bytes = 25 * 1024 * 1024
@@ -906,7 +984,7 @@ async def submit_response_audio(
     if content_length is not None:
         try:
             declared_size = int(content_length)
-            
+
         except ValueError:
             declared_size = None
 
@@ -916,8 +994,13 @@ async def submit_response_audio(
                 detail="Audio file exceeds the 25 MB upload limit.",
             )
 
+    # [STT Instrumentation - issue #72]
+    # Per-stage timings so we can attribute the perceived latency.
+    _t_handler_start = time.monotonic()
+
     # Read audio bytes
     audio_bytes = await audio.read()
+    _t_after_read = time.monotonic()
 
     if not audio_bytes:
         raise HTTPException(
@@ -944,6 +1027,8 @@ async def submit_response_audio(
             detail=f"Audio upload failed: {exc}",
         ) from exc
 
+    _t_after_s3 = time.monotonic()
+
     # Transcribe (blocking call — run off the event loop)
     try:
         result = await asyncio.to_thread(transcribe_audio_from_s3, storage_key, ext)
@@ -962,6 +1047,8 @@ async def submit_response_audio(
             detail=f"Transcription failed: {exc}",
         ) from exc
 
+    _t_after_transcribe = time.monotonic()
+
     # Delete the audio now that we have the text (best-effort)
     try:
         s3_client.delete_file(storage_key)
@@ -969,14 +1056,352 @@ async def submit_response_audio(
     except Exception:
         logger.warning("Session %s: failed to delete session audio %s", session_id, storage_key)
 
-    # Hand the transcript off to the existing text-answer flow
-    payload = StudentResponseRequest(answer_text=result.text)
-    return await submit_response(
-        session_id=session_id,
-        payload=payload,
-        db=db,
-        current_user=current_user,
+    # [STT Instrumentation - issue #72]
+    # Single grep-able line. Pair this with the [STT timings] line emitted
+    # by audio_transcriber.py to get the full picture (submit/poll/fetch).
+    logger.info(
+        "[STT timings] phase=route session=%s bytes=%d ext=%s "
+        "read=%.3fs s3=%.3fs transcribe=%.3fs total=%.3fs",
+        session_id,
+        len(audio_bytes),
+        ext,
+        _t_after_read - _t_handler_start,
+        _t_after_s3 - _t_after_read,
+        _t_after_transcribe - _t_after_s3,
+        _t_after_transcribe - _t_handler_start,
     )
+
+    return AudioTranscriptionResponse(transcript=result.text or "")
+
+
+# Issue #72 — streaming-transcription WebSocket endpoint.
+# Companion to /sessions/{id}/transcribe/audio. Receives raw 16 kHz mono
+# LE16 PCM frames from the browser, forwards them to AWS Transcribe
+# Streaming via TranscribeStreamer, and sends back partial + final
+# transcripts as JSON messages. Does not touch S3 and does not write to
+# the Transcript table — the client edits the final text and submits it
+# through the existing /respond endpoint, same as the batch path.
+#
+# Client protocol:
+#   Client -> server:
+#     - binary PCM frames (audio_chunk; ~3200 bytes / 100 ms recommended)
+#     - text frame {"type": "stop"} to flush remaining results without
+#       closing the socket
+#     - WebSocket disconnect is treated as an implicit stop
+#   Server -> client (JSON):
+#     - {"type": "partial", "text": "...", "timestamp": float}
+#     - {"type": "final",   "text": "...", "timestamp": float}
+#     - {"type": "error",   "message": "transcription_failed"}
+#
+# Close codes:
+#   1000 normal completion
+#   1008 auth / validation / feature-flag rejection (uniform with ws_auth);
+#        also used for session-timeout (reason="session_timeout") and the
+#        per-user concurrency cap (reason="stream_already_active") so the
+#        client can disambiguate via the reason field
+#   1011 server error during streaming (e.g. AWS dropped the connection)
+
+# [STT #72] In-process set of user IDs (stringified) that currently
+# have an active streaming-transcribe WebSocket. Used to enforce a
+# one-concurrent-stream-per-user cap so a runaway tab can't open
+# dozens of parallel AWS Transcribe Streaming connections.
+#
+# In-memory rather than Redis-backed because (a) a single uvicorn
+# worker can comfortably handle the project's load, and (b) crash
+# recovery is automatic — the set is gone when the process dies, so
+# there are no stale entries blocking future connections after a
+# restart. A multi-worker deployment would need a shared store; this
+# is documented as a known limitation rather than papered over.
+_active_stream_users: set[str] = set()
+
+@router.websocket("/sessions/{session_id}/transcribe/stream")
+async def transcribe_response_stream(
+    websocket: WebSocket,
+    session_id: UUID,
+    db: Session = Depends(get_db),
+):
+    # 1. Feature flag. Reject before doing any work so an accidentally
+    # exposed endpoint doesn't burn AWS quotas in unfinished deployments.
+    if not settings.stt_streaming_enabled:
+        await websocket.close(
+            code=1008, reason="streaming transcription not enabled"
+        )
+        return
+
+    # 2. Auth. authenticate_ws_student closes and raises on failure.
+    try:
+        current_user = await authenticate_ws_student(websocket, db)
+    except WebSocketDisconnect:
+        return
+
+    # 3. Session-level validation, shared with the batch route. The
+    # helper raises HTTPException — we catch and translate to a WS close.
+    try:
+        _validate_session_for_transcribe(session_id, current_user, db)
+    except HTTPException as exc:
+        await websocket.close(code=1008, reason=str(exc.detail))
+        return
+
+    # 4. Per-user concurrency cap. Reject if this user already has an
+    # open streaming session — one tab speaking at a time is plenty,
+    # and this stops a runaway client from holding multiple AWS
+    # connections open in parallel. Safe without a lock because the
+    # check and the add are both synchronous and asyncio doesn't
+    # context-switch between them.
+    user_key = str(current_user.id)
+    if user_key in _active_stream_users:
+        logger.info(
+            "[StreamRoute] rejected — already streaming session=%s user=%s",
+            session_id,
+            current_user.id,
+        )
+        await websocket.close(
+            code=1008, reason="stream_already_active"
+        )
+        return
+    _active_stream_users.add(user_key)
+
+    try:
+        # 5. Accept the connection only after all checks have passed,
+        # so a rejected handshake never appears as "connected then
+        # immediately closed" to the client.
+        await websocket.accept()
+        logger.info(
+            "[StreamRoute] accepted session=%s user=%s",
+            session_id,
+            current_user.id,
+        )
+
+        # [STT Instrumentation - issue #72] Stream session bookkeeping.
+        # The inner finally block emits a single grep-able timing line
+        # regardless of which exit path ran. AWS-side cleanup happens
+        # via the TranscribeStreamer's async-context-manager __aexit__
+        # no matter how we leave the inner try, so a browser tab
+        # closing mid-stream cannot leak an AWS streaming connection.
+        _t_stream_start = time.monotonic()
+        _stream_outcome = "ok"  # "ok" | "stream_error" | "timeout"
+        _disconnected = False
+
+        # 6. Run the streaming session. The TranscribeStreamer context
+        # manager handles AWS open/close; we just bridge frames and
+        # results between the WebSocket and the streamer.
+        #
+        # ``streamer`` is bound before the ``async with`` so the
+        # finally block can read its stats (ttfp / partials / finals)
+        # after __aexit__ has run.
+        streamer = TranscribeStreamer(
+            region=settings.aws_region,
+            # Use the same profile the batch S3 client does so SSO
+            # credentials work locally without `AWS_PROFILE` being set
+            # in the uvicorn shell. On a deployment with an attached
+            # IAM role this is a no-op (env vars / instance profile
+            # still take precedence via boto3's own chain).
+            profile_name=settings.aws_profile_name,
+        )
+        # Per-session frame counters. Surfaced in the phase=stream log
+        # line below so we can disambiguate "client sent no audio" from
+        # "AWS received audio but produced no transcripts" — both
+        # produce the same finals=0 outcome on the user side.
+        _bytes_forwarded = 0
+        _frame_count = 0
+        try:
+            async with streamer:
+
+                async def feed() -> None:
+                    """Pull frames off the WebSocket, push them into AWS."""
+                    nonlocal _bytes_forwarded, _frame_count
+                    try:
+                        while True:
+                            msg = await websocket.receive()
+                            if msg.get("type") == "websocket.disconnect":
+                                return
+                            chunk = msg.get("bytes")
+                            if chunk:
+                                _bytes_forwarded += len(chunk)
+                                _frame_count += 1
+                                await streamer.send_pcm(chunk)
+                                continue
+                            text = msg.get("text")
+                            if not text:
+                                continue
+                            # Optional control message — currently only
+                            # {"type": "stop"} is supported.
+                            try:
+                                payload = json.loads(text)
+                            except json.JSONDecodeError:
+                                continue
+                            if payload.get("type") == "stop":
+                                return
+                    finally:
+                        # Always signal AWS we're done so it flushes the
+                        # last partial-or-final result, even if the loop
+                        # exits via cancellation.
+                        await streamer.end_input()
+
+                async def drain() -> None:
+                    """Forward AWS results back to the WebSocket."""
+                    async for result in streamer.results():
+                        try:
+                            await websocket.send_json(
+                                {
+                                    "type": "partial" if result.is_partial else "final",
+                                    "text": result.text,
+                                    "timestamp": result.timestamp,
+                                }
+                            )
+                        except Exception:  # noqa: BLE001
+                            # WebSocket closed under us mid-send. Stop
+                            # draining; the streamer context manager
+                            # will clean up the AWS side.
+                            return
+
+                feed_task = asyncio.create_task(feed())
+                drain_task = asyncio.create_task(drain())
+
+                # FIRST_COMPLETED rather than gather() so we don't hang
+                # on the feed loop if drain finishes first (e.g. AWS
+                # closes the output stream abruptly).
+                #
+                # The ``timeout=`` cap is the per-stream duration limit
+                # (settings.stt_streaming_max_seconds, default 300 s).
+                # If neither task finishes within that window,
+                # asyncio.wait returns with an empty ``done`` set —
+                # we treat that as a server-side timeout, mirroring
+                # the batch route's 25 MB upload cap.
+                _done, pending = await asyncio.wait(
+                    {feed_task, drain_task},
+                    return_when=asyncio.FIRST_COMPLETED,
+                    timeout=settings.stt_streaming_max_seconds,
+                )
+                timed_out = len(_done) == 0
+                for task in pending:
+                    task.cancel()
+                # Surface any unexpected exceptions from either task
+                # without letting them mask each other. Capture the
+                # results so we can spot a WebSocketDisconnect that
+                # bubbled out of feed() — return_exceptions swallows
+                # the exception (so the outer ``except
+                # WebSocketDisconnect`` would never fire for that path)
+                # and we want it reflected in the timing log below.
+                results = await asyncio.gather(
+                    feed_task, drain_task, return_exceptions=True
+                )
+                if any(isinstance(r, WebSocketDisconnect) for r in results):
+                    _disconnected = True
+                # gather() with return_exceptions=True collects task
+                # failures as values instead of raising them. Without
+                # explicitly re-raising the streamer errors, a
+                # TranscribeStreamError from inside feed() (e.g.
+                # `send_pcm failed: ...` when AWS rejects a chunk) gets
+                # silently swallowed and the route reports
+                # outcome=ok / partials=0 / finals=0 to a confused user.
+                # Surface it here so the outer except can mark the
+                # outcome correctly and notify the client.
+                for r in results:
+                    if isinstance(r, TranscribeStreamError):
+                        raise r
+
+                if timed_out:
+                    _stream_outcome = "timeout"
+                    logger.warning(
+                        "[StreamRoute] session=%s exceeded "
+                        "stt_streaming_max_seconds=%ds — tearing down",
+                        session_id,
+                        settings.stt_streaming_max_seconds,
+                    )
+                    # Best-effort notify the client so the UI can
+                    # recover to "Tap the microphone" rather than
+                    # spinning forever.
+                    try:
+                        await websocket.send_json(
+                            {
+                                "type": "timeout",
+                                "message": "session_timeout",
+                                "max_seconds": settings.stt_streaming_max_seconds,
+                            }
+                        )
+                    except Exception:  # noqa: BLE001
+                        # Peer may already have gone away — fine.
+                        pass
+                    try:
+                        await websocket.close(
+                            code=1008, reason="session_timeout"
+                        )
+                    except Exception:  # noqa: BLE001
+                        pass
+
+        except TranscribeStreamError:
+            _stream_outcome = "stream_error"
+            logger.exception(
+                "[StreamRoute] streaming failed session=%s", session_id
+            )
+            try:
+                await websocket.send_json(
+                    {"type": "error", "message": "transcription_failed"}
+                )
+            except Exception:  # noqa: BLE001
+                pass
+            try:
+                await websocket.close(code=1011, reason="transcription error")
+            except Exception:  # noqa: BLE001
+                pass
+
+        except WebSocketDisconnect:
+            # Reached when the disconnect propagates straight out of
+            # the ``async with`` (rather than being caught inside
+            # feed()'s gather). Either way the streamer's __aexit__
+            # has already run.
+            _disconnected = True
+
+        finally:
+            # [STT Instrumentation - issue #72] One grep-able line per
+            # stream session. ``disconnected=true`` distinguishes a
+            # browser-tab close from a clean stop; ``outcome`` tracks
+            # whether AWS bailed mid-stream. ``ttfp`` / ``ttfr`` /
+            # ``partials`` / ``finals`` come from the streamer's stats
+            # (mutated by the result pump as events arrive). They're
+            # "-" when no result of that kind ever arrived for the
+            # session.
+            ttfp = fmt_optional_seconds(streamer.time_to_first_partial)
+            ttfr = fmt_optional_seconds(streamer.time_to_first_final)
+            logger.info(
+                "[STT timings] phase=stream session=%s outcome=%s "
+                "disconnected=%s ttfp=%s ttfr=%s partials=%d finals=%d "
+                "frames=%d bytes=%d duration=%.3fs",
+                session_id,
+                _stream_outcome,
+                "true" if _disconnected else "false",
+                ttfp,
+                ttfr,
+                streamer.partial_count,
+                streamer.final_count,
+                _frame_count,
+                _bytes_forwarded,
+                time.monotonic() - _t_stream_start,
+            )
+
+        if _stream_outcome != "ok":
+            # stream_error and timeout branches already sent their
+            # error frames and closed the socket — nothing more to do
+            # here.
+            return
+
+        if _disconnected:
+            # Peer is already gone; close() would just raise.
+            return
+
+        # 7. Best-effort clean close on the happy path.
+        try:
+            await websocket.close(code=1000)
+        except Exception:  # noqa: BLE001
+            pass
+
+    finally:
+        # Concurrency-cap cleanup. Runs no matter how we exit the
+        # route body — exception, early return, or normal completion
+        # — so a half-built session never leaves a stale entry that
+        # would lock the user out of opening a new stream.
+        _active_stream_users.discard(user_key)
 
 
 # Complete session

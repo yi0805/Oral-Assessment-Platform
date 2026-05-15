@@ -92,18 +92,27 @@ function inferAudioExtension(blob) {
   return AUDIO_MIME_TO_EXT[baseType] || "webm";
 }
 
-export async function respondSessionAudio(sessionId, audioBlob) {
+// Issue #71 — transcribe-only endpoint for the edit-before-submit flow.
+// Sends the recording to the backend, receives back just the transcript
+// string, and does NOT advance the session or write to the Transcript
+// table. The caller is responsible for showing the text to the student
+// and triggering the standard /respond endpoint when they hit Submit.
+export async function transcribeSessionAudio(sessionId, audioBlob) {
   const ext = inferAudioExtension(audioBlob);
 
   const formData = new FormData();
   formData.append("audio", audioBlob, `answer.${ext}`);
 
   const response = await api.post(
-    `/sessions/${sessionId}/respond/audio`,
+    `/sessions/${sessionId}/transcribe/audio`,
     formData,
   );
 
-  return response.data;
+  // Backend always returns { transcript: string }. Coerce to a safe
+  // string so downstream code can rely on .length / .trim() etc.
+  return typeof response.data?.transcript === "string"
+    ? response.data.transcript
+    : "";
 }
 
 export async function completeSession(sessionId) {

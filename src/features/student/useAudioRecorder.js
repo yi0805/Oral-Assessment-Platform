@@ -1,53 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const PREFERRED_MIME_TYPES = [
-  "audio/webm;codecs=opus",
-  "audio/webm",
-  "audio/ogg;codecs=opus",
-  "audio/ogg",
-  "audio/mp4",
-];
+import {
+  isRecordingSupported,
+  startAudioRecorder,
+} from "./audioRecorder";
 
-function pickSupportedMimeType() {
-  if (typeof window === "undefined") return null;
-  if (typeof window.MediaRecorder === "undefined") return null;
-
-  for (const type of PREFERRED_MIME_TYPES) {
-    if (window.MediaRecorder.isTypeSupported(type)) return type;
-  }
-
-  return "";
-}
+// Thin React wrapper around the framework-agnostic recorder in
+// audioRecorder.js. Owns only the React state (status, error) and the
+// useRef-based handle; all MediaRecorder lifecycle, mime-type
+// negotiation, and stop-promise plumbing live in audioRecorder.js so
+// the streaming flow (added later in #72) can reuse them.
+//
+// This split is a pure refactor — the public contract { status, error,
+// isSupported, start, stop, reset } is unchanged. stop() still resolves
+// with the recorded Blob (or null if the recorder errored).
 
 export function useAudioRecorder() {
-  const [status, setStatus] = useState("idle"); 
+  const [status, setStatus] = useState("idle");
   const [error, setError] = useState(null);
 
-  const mediaRecorderRef = useRef(null);
-  const streamRef = useRef(null);
-  const chunksRef = useRef([]);
-  const stopResolverRef = useRef(null);
+  // Holds the handle returned by startAudioRecorder while a recording
+  // is in flight. Cleared on stop / dispose / unmount.
+  const handleRef = useRef(null);
 
-  const isSupported =
-    typeof navigator !== "undefined" &&
-    !!navigator.mediaDevices &&
-    typeof navigator.mediaDevices.getUserMedia === "function" &&
-    typeof window !== "undefined" &&
-    typeof window.MediaRecorder !== "undefined";
-
-  const releaseStream = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-  }, []);
+  const isSupported = isRecordingSupported();
 
   const cleanup = useCallback(() => {
-    releaseStream();
-    mediaRecorderRef.current = null;
-    chunksRef.current = [];
-    stopResolverRef.current = null;
-  }, [releaseStream]);
+    if (handleRef.current) {
+      handleRef.current.dispose();
+      handleRef.current = null;
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -67,52 +50,17 @@ export function useAudioRecorder() {
 
     try {
       setError(null);
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: true,
+      handleRef.current = await startAudioRecorder({
+        onError: (recorderErr) => {
+          // Mirror the original useAudioRecorder behaviour: a recorder
+          // error mid-stream surfaces as { status: "error", error }
+          // and the handle is dropped so subsequent stop() resolves
+          // null.
+          setError(recorderErr);
+          setStatus("error");
+          handleRef.current = null;
+        },
       });
-      streamRef.current = stream;
-
-      const mimeType = pickSupportedMimeType();
-      const recorder =
-        mimeType && mimeType.length > 0
-          ? new window.MediaRecorder(stream, { mimeType })
-          : new window.MediaRecorder(stream);
-
-      mediaRecorderRef.current = recorder;
-      chunksRef.current = [];
-
-      recorder.addEventListener("dataavailable", (event) => {
-        if (event.data && event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      });
-
-      recorder.addEventListener("stop", () => {
-        const blobType = recorder.mimeType || mimeType || "audio/webm";
-        const blob = new Blob(chunksRef.current, { type: blobType });
-
-        const resolver = stopResolverRef.current;
-        cleanup();
-        setStatus("idle");
-
-        if (resolver) resolver(blob);
-      });
-
-      recorder.addEventListener("error", (event) => {
-        const recorderErr =
-          event && event.error
-            ? event.error
-            : new Error("MediaRecorder failed.");
-        setError(recorderErr);
-        setStatus("error");
-
-        const resolver = stopResolverRef.current;
-        cleanup();
-        if (resolver) resolver(null);
-      });
-
-      recorder.start();
       setStatus("recording");
     } catch (err) {
       cleanup();
@@ -122,18 +70,17 @@ export function useAudioRecorder() {
     }
   }, [cleanup, isSupported]);
 
-  const stop = useCallback(() => {
-    return new Promise((resolve) => {
-      const recorder = mediaRecorderRef.current;
+  const stop = useCallback(async () => {
+    const handle = handleRef.current;
+    if (!handle) return null;
 
-      if (!recorder || recorder.state === "inactive") {
-        resolve(null);
-        return;
-      }
-
-      stopResolverRef.current = resolve;
-      recorder.stop();
-    });
+    const blob = await handle.stop();
+    handleRef.current = null;
+    // Only return to "idle" if the recorder didn't error mid-stop —
+    // the onError callback above may have already moved us to "error",
+    // and that takes precedence.
+    setStatus((s) => (s === "error" ? s : "idle"));
+    return blob;
   }, []);
 
   const reset = useCallback(() => {

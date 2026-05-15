@@ -1,11 +1,15 @@
 """
-Integration test for the voice-answer endpoint:
-    POST /api/sessions/{session_id}/respond/audio
+Integration tests for the transcribe-only endpoint:
+    POST /api/sessions/{session_id}/transcribe/audio
 
-Strategy: the DB, S3, and AWS Transcribe are all mocked. This test verifies
-only the new endpoint's behavior (validation, wiring, S3 cleanup on failure,
-and the delegation to submit_response). The existing submit_response
-function and models are not exercised.
+Issue #71. Strategy mirrors test_audio_answer.py — DB, S3, and AWS
+Transcribe are mocked. The critical invariant exercised here that
+distinguishes this endpoint from /respond/audio is:
+
+    submit_response() must NEVER be called.
+
+That guarantee is what lets the frontend show the transcript to the
+student for editing before persisting via the standard text endpoint.
 """
 from __future__ import annotations
 
@@ -56,8 +60,6 @@ def fake_session(session_id, student_id):
 
 @pytest.fixture
 def mock_db(fake_session):
-    """A MagicMock SQLAlchemy session whose .query().filter().first() returns
-    the fake AssessmentSession."""
     db = MagicMock()
     chain = db.query.return_value.filter.return_value
     chain.first.return_value = fake_session
@@ -66,7 +68,6 @@ def mock_db(fake_session):
 
 @pytest.fixture
 def client(fake_student, mock_db, monkeypatch):
-    """A TestClient with the dependencies and AWS calls overridden."""
     from app.main import app
     from app.core.database import get_db
     from app.core.dependencies import require_student
@@ -74,7 +75,6 @@ def client(fake_student, mock_db, monkeypatch):
     app.dependency_overrides[get_db] = lambda: mock_db
     app.dependency_overrides[require_student] = lambda: fake_student
 
-    # Stub S3
     monkeypatch.setattr(
         "app.api.routes.sessions.s3_client.upload_file",
         MagicMock(return_value="stub-key"),
@@ -84,7 +84,6 @@ def client(fake_student, mock_db, monkeypatch):
         MagicMock(return_value=None),
     )
 
-    # Stub the transcribe helper
     from app.utils.audio_transcriber import TranscribeResult
 
     monkeypatch.setattr(
@@ -98,14 +97,12 @@ def client(fake_student, mock_db, monkeypatch):
         ),
     )
 
-    # Stub the downstream text-answer handler (we only want to assert we
-    # delegate to it with the right payload; its behavior is tested elsewhere)
-    async def fake_submit_response(*, session_id, payload, db, current_user):
-        return {"next_question": None, "_received_text": payload.answer_text}
-
+    # Spy on submit_response so we can assert it is NEVER called by the
+    # transcribe endpoint. (If it ever gets called, the new flow has
+    # regressed into the legacy auto-save path.)
     monkeypatch.setattr(
         "app.api.routes.sessions.submit_response",
-        AsyncMock(side_effect=fake_submit_response),
+        AsyncMock(return_value={"next_question": None}),
     )
 
     yield TestClient(app)
@@ -118,50 +115,81 @@ def client(fake_student, mock_db, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_happy_path_mp3(client, session_id):
+def test_happy_path_returns_transcript_only(client, session_id):
     response = client.post(
-        f"/api/sessions/{session_id}/respond/audio",
-        files={"audio": ("answer.mp3", b"fake-audio-bytes", "audio/mpeg")},
+        f"/api/sessions/{session_id}/transcribe/audio",
+        files={"audio": ("answer.webm", b"fake-audio-bytes", "audio/webm")},
     )
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body.get("next_question") is None
+    assert body == {"transcript": "my spoken answer to the question"}
 
     from app.api.routes import sessions as sessions_module
 
-    # S3 upload called exactly once with an MP3 key under the session
+    # Audio uploaded under a session-scoped key with the correct extension
     sessions_module.s3_client.upload_file.assert_called_once()
     (passed_bytes, passed_key), kwargs = sessions_module.s3_client.upload_file.call_args
     assert passed_bytes == b"fake-audio-bytes"
     assert passed_key.startswith(f"sessions/{session_id}/audio/")
-    assert passed_key.endswith(".mp3")
-    assert kwargs["content_type"] == "audio/mpeg"
+    assert passed_key.endswith(".webm")
+    assert kwargs["content_type"] == "audio/webm"
 
-    # Transcribe called with the same S3 key and extension 'mp3'
+    # Transcribe called with the same key
     sessions_module.transcribe_audio_from_s3.assert_called_once()
     t_args = sessions_module.transcribe_audio_from_s3.call_args.args
     assert t_args[0] == passed_key
-    assert t_args[1] == "mp3"
+    assert t_args[1] == "webm"
 
-    # Audio cleaned up from S3 after transcription
+    # Audio cleaned up after success
     sessions_module.s3_client.delete_file.assert_called_once_with(passed_key)
 
-    # Downstream handler received the transcript as answer_text
-    sessions_module.submit_response.assert_awaited_once()
-    call_kwargs = sessions_module.submit_response.await_args.kwargs
-    assert call_kwargs["session_id"] == session_id
-    assert call_kwargs["payload"].answer_text == "my spoken answer to the question"
+    # CRITICAL: transcribe-only must not persist.
+    sessions_module.submit_response.assert_not_called()
+
+
+def test_happy_path_supports_mp3(client, session_id):
+    response = client.post(
+        f"/api/sessions/{session_id}/transcribe/audio",
+        files={"audio": ("answer.mp3", b"bytes", "audio/mpeg")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"transcript": "my spoken answer to the question"}
+
+
+def test_empty_aws_transcript_returns_empty_string(client, session_id, monkeypatch):
+    """If AWS returns empty text (silent audio), we still respond 200 with
+    an empty transcript and let the frontend decide how to surface it."""
+    from app.utils.audio_transcriber import TranscribeResult
+
+    monkeypatch.setattr(
+        "app.api.routes.sessions.transcribe_audio_from_s3",
+        MagicMock(
+            return_value=TranscribeResult(text="", job_name="j", language_code="en-US")
+        ),
+    )
+
+    response = client.post(
+        f"/api/sessions/{session_id}/transcribe/audio",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"transcript": ""}
+
+    from app.api.routes import sessions as sessions_module
+    sessions_module.submit_response.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
-# Validation failures (should never reach S3/Transcribe)
+# Validation failures (must never reach S3/Transcribe/submit_response)
 # ---------------------------------------------------------------------------
 
 
 def test_unsupported_extension_rejected(client, session_id):
     response = client.post(
-        f"/api/sessions/{session_id}/respond/audio",
+        f"/api/sessions/{session_id}/transcribe/audio",
         files={"audio": ("notes.txt", b"hello", "text/plain")},
     )
 
@@ -171,11 +199,12 @@ def test_unsupported_extension_rejected(client, session_id):
     from app.api.routes import sessions as sessions_module
     sessions_module.s3_client.upload_file.assert_not_called()
     sessions_module.transcribe_audio_from_s3.assert_not_called()
+    sessions_module.submit_response.assert_not_called()
 
 
 def test_empty_audio_rejected(client, session_id):
     response = client.post(
-        f"/api/sessions/{session_id}/respond/audio",
+        f"/api/sessions/{session_id}/transcribe/audio",
         files={"audio": ("answer.wav", b"", "audio/wav")},
     )
 
@@ -184,6 +213,7 @@ def test_empty_audio_rejected(client, session_id):
 
     from app.api.routes import sessions as sessions_module
     sessions_module.s3_client.upload_file.assert_not_called()
+    sessions_module.submit_response.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
@@ -195,8 +225,8 @@ def test_session_not_found(client, session_id, mock_db):
     mock_db.query.return_value.filter.return_value.first.return_value = None
 
     response = client.post(
-        f"/api/sessions/{session_id}/respond/audio",
-        files={"audio": ("answer.wav", b"x", "audio/wav")},
+        f"/api/sessions/{session_id}/transcribe/audio",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
     )
 
     assert response.status_code == 404
@@ -205,13 +235,14 @@ def test_session_not_found(client, session_id, mock_db):
     sessions_module.s3_client.upload_file.assert_not_called()
 
 
-def test_session_not_owned_by_caller(client, session_id, fake_session, other_student_id):
-    # Session exists but belongs to a different student
+def test_session_not_owned_by_caller(
+    client, session_id, fake_session, other_student_id
+):
     fake_session.user_s_id = other_student_id
 
     response = client.post(
-        f"/api/sessions/{session_id}/respond/audio",
-        files={"audio": ("answer.wav", b"x", "audio/wav")},
+        f"/api/sessions/{session_id}/transcribe/audio",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
     )
 
     assert response.status_code == 403
@@ -224,8 +255,8 @@ def test_session_already_completed(client, session_id, fake_session):
     fake_session.status = "completed"
 
     response = client.post(
-        f"/api/sessions/{session_id}/respond/audio",
-        files={"audio": ("answer.wav", b"x", "audio/wav")},
+        f"/api/sessions/{session_id}/transcribe/audio",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
     )
 
     assert response.status_code == 409
@@ -239,16 +270,17 @@ def test_session_already_completed(client, session_id, fake_session):
 # ---------------------------------------------------------------------------
 
 
-def test_transcription_failure_deletes_uploaded_audio(client, session_id, monkeypatch):
-    # Make transcription blow up
+def test_transcription_failure_deletes_uploaded_audio_and_does_not_persist(
+    client, session_id, monkeypatch
+):
     monkeypatch.setattr(
         "app.api.routes.sessions.transcribe_audio_from_s3",
         MagicMock(side_effect=RuntimeError("boom")),
     )
 
     response = client.post(
-        f"/api/sessions/{session_id}/respond/audio",
-        files={"audio": ("answer.wav", b"bytes", "audio/wav")},
+        f"/api/sessions/{session_id}/transcribe/audio",
+        files={"audio": ("a.wav", b"bytes", "audio/wav")},
     )
 
     assert response.status_code == 502
@@ -256,9 +288,9 @@ def test_transcription_failure_deletes_uploaded_audio(client, session_id, monkey
 
     from app.api.routes import sessions as sessions_module
 
-    # The audio was uploaded, then cleaned up even though the job failed
+    # Uploaded but cleaned up afterward
     sessions_module.s3_client.upload_file.assert_called_once()
     sessions_module.s3_client.delete_file.assert_called_once()
 
-    # And we did NOT write an answer to the DB
+    # CRITICAL: failure path also must not persist anything.
     sessions_module.submit_response.assert_not_called()

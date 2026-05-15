@@ -8,7 +8,23 @@ class Settings(BaseSettings):
     storage_backend: str
     s3_bucket_name: str
     aws_region: str
+    # Integration made this optional for prod deployments using an
+    # instance role instead of a named profile. The streaming
+    # resolver (audio_streamer._BotoProfileCredentialResolver) is
+    # guarded behind `if profile_name`, so None falls through to the
+    # SDK's default CRT credential chain — works in both cases.
     aws_profile_name: str | None = None
+
+    # Issue #72: poll interval (seconds) for batch AWS Transcribe jobs.
+    transcribe_poll_interval_seconds: int = 1
+
+    # Issue #72: feature flag for the WebSocket streaming-transcription
+    # route (/sessions/{id}/transcribe/stream).
+    stt_streaming_enabled: bool = True
+
+    # Issue #72: hard cap (seconds) on a single streaming-transcribe
+    # WebSocket session.
+    stt_streaming_max_seconds: int = 300
 
     gemini_api_key: str
     openrouter_api_key: str

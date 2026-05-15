@@ -18,7 +18,8 @@ from app.schemas.assessment import (
     SessionFeedbackOut, SessionInfoOut, PendingReviewOut, StudentInfoOut,
     TranscriptMessageOut, TranscriptDetailOut, StudentCourseAssessmentOut, StudentNextQuestionOut,
     StudentResponseRequest, StudentResponseResponse, SessionStartResponse, AssessmentCopyRequest,
-    BlurNotificationRequest, NotificationOut, InstructorNotificationOut
+    AudioTranscriptionResponse,
+    BlurNotificationRequest, NotificationOut, InstructorNotificationOut,
 )
 
 from app.schemas.question import (
