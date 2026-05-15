@@ -60,7 +60,7 @@ function App() {
               <Route path="instructor" element={<InstructorCourseLayout />}>
                 <Route
                   path=":courseId"
-                  element={<Navigate replace to="dashboard" />}
+                  element={<Navigate replace to="assessments" />}
                 />
                 <Route
                   path=":courseId/dashboard"
