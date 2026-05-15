@@ -41,8 +41,6 @@ function Sidebar() {
         </div>
       </div>
 
-      {user.role === "instructor" && <CourseSwitcher />}
-
       <nav className="flex flex-col gap-y-1">
         <NavLink
           className={({ isActive }) =>
