@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { NavLink } from "react-router";
+import { NavLink, useParams } from "react-router";
 import toast from "react-hot-toast";
 
+import { useCourses } from "../../hooks/useCourses";
 import { useUploadMaterial } from "./useUploadMaterial";
 import { useUploadGithubRepo } from "./useUploadGithubRepo";
 import { useCreateRubric } from "./useCreateRubric";
@@ -22,7 +23,9 @@ import {
 const GITHUB_URL_RE = /^https?:\/\/github\.com\/[^/\s]+\/[^/\s#?]+/i;
 const isValidGithubUrl = (u) => GITHUB_URL_RE.test((u || "").trim());
 
-function GeneratePanel({ courseId, courses }) {
+function GeneratePanel() {
+  const { courseId } = useParams();
+  const { courses } = useCourses();
   const [materialFile, setMaterialFile] = useState(null);
 
   const [source, setSource] = useState("pdf");
@@ -183,7 +186,31 @@ function GeneratePanel({ courseId, courses }) {
   }
 
   return (
-    <div>
+    <div className="min-h-screen">
+      <main className="ml-64 px-10 pb-12 pt-24">
+      <div className="mb-4">
+        <NavLink
+          className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
+          to={`/instructor/${courseId}/assessments`}
+        >
+          <span className="material-symbols-outlined text-sm transition-transform group-hover:-translate-x-1">
+            arrow_back
+          </span>
+          <span className="font-body uppercase tracking-widest">
+            Back to Assessments
+          </span>
+        </NavLink>
+      </div>
+
+      <div className="mb-8">
+        <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
+          Generate Assessment
+        </h1>
+        <p className="mt-2 text-sm text-on-surface-variant">
+          Upload material and let AI generate questions for a new assessment.
+        </p>
+      </div>
+
       {statusMessage && (
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary">
           <span className="material-symbols-outlined animate-spin text-lg">
@@ -505,7 +532,7 @@ function GeneratePanel({ courseId, courses }) {
             <div className="flex-row-reverse">
               <NavLink
                 className="rounded-xl bg-primary px-8 py-3 text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:opacity-50"
-                to="/home"
+                to={`/instructor/${courseId}/assessments`}
                 onClick={() => {
                   toast.success("Assessment saved successfully.");
                 }}
@@ -626,6 +653,7 @@ function GeneratePanel({ courseId, courses }) {
           )}
         </div>
       )}
+      </main>
     </div>
   );
 }

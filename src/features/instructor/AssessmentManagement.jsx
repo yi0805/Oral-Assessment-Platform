@@ -1,16 +1,18 @@
 import { useState } from "react";
 import { NavLink, useNavigate, useParams } from "react-router";
 
-import { useCourses } from "../../hooks/useCourses";
-import GeneratePanel from "./UploadMaterial";
-import EditPanel from "./EditAssessment";
+import { useCourseAssessments } from "./useCourseAssessments";
 
 export default function AssessmentManagement() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("edit");
   const { courseId } = useParams();
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const { courses } = useCourses();
+  const { assessments, isLoading } = useCourseAssessments(courseId);
+
+  const filtered = assessments.filter((a) =>
+    a.title.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
 
   return (
     <div className="min-h-screen">
@@ -34,46 +36,85 @@ export default function AssessmentManagement() {
             Assessments
           </h1>
           <p className="mt-2 text-sm text-on-surface-variant">
-            Generate a new assessment or edit an existing one.
+            Select an assessment to edit, or generate a new one.
           </p>
         </div>
 
-        {/* Tabs */}
-        <div className="mb-8 flex w-fit gap-1 rounded-xl bg-surface-container-low p-1">
-          {[
-            { id: "edit", label: "Edit Existing" },
-            { id: "generate", label: "Generate New" },
-          ].map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              className={`rounded-lg px-5 py-2 text-sm font-bold transition-all ${
-                tab === id
-                  ? "bg-surface text-on-surface shadow-sm"
-                  : "text-on-surface-variant hover:text-on-surface"
-              }`}
+        {isLoading ? (
+          <p className="text-sm text-outline">Loading assessments…</p>
+        ) : assessments.length === 0 ? (
+          <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-12 text-center">
+            <span
+              className="material-symbols-outlined mb-3 text-4xl text-outline"
+              style={{ verticalAlign: "middle" }}
             >
-              {label}
-            </button>
-          ))}
-        </div>
+              assignment
+            </span>
+            <p className="text-sm font-bold text-on-surface">
+              No assessments yet
+            </p>
+            <p className="mt-1 text-xs text-on-surface-variant">
+              Use the button below to generate your first assessment.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <input
+              className="w-full max-w-md rounded-xl border-none bg-surface-container-low px-4 py-2.5 text-sm text-on-surface placeholder:text-outline focus:ring-2 focus:ring-primary/20"
+              placeholder="Search assessments…"
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
 
-        {/* Panel content */}
-        {tab === "edit" && (
-          <EditPanel
-            key={courseId}
-            courseId={courseId}
-            courses={courses}
-            onSwitchCourse={(nextId) =>
-              navigate(`/instructor/${nextId}/assessments`)
-            }
-          />
-        )}
-        {tab === "generate" && (
-          <GeneratePanel key={courseId} courseId={courseId} courses={courses} />
+            {filtered.length === 0 ? (
+              <p className="py-3 text-sm text-outline">
+                No assessments match &ldquo;{searchQuery}&rdquo;
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {filtered.map((a) => (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() =>
+                      navigate(`/instructor/${courseId}/assessments/${a.id}`)
+                    }
+                    className="flex items-center justify-between rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-4 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                  >
+                    <p className="text-sm font-semibold text-on-surface">
+                      {a.title}
+                    </p>
+                    <span
+                      className={`ml-3 shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        a.status === "published"
+                          ? "bg-primary/10 text-primary"
+                          : "bg-surface-container text-on-surface-variant"
+                      }`}
+                    >
+                      {a.status === "published" ? "Published" : "Draft"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </main>
+
+      <div className="fixed bottom-8 right-8 z-50">
+        <button
+          className="group flex h-16 w-16 items-center justify-center rounded-2xl bg-primary text-on-primary shadow-2xl transition-all hover:bg-primary-dim active:scale-90"
+          title="Generate new assessment"
+          onClick={() =>
+            navigate(`/instructor/${courseId}/assessments/generate`)
+          }
+        >
+          <span className="material-symbols-outlined text-3xl transition-transform duration-300 group-hover:rotate-90">
+            add
+          </span>
+        </button>
+      </div>
     </div>
   );
 }
