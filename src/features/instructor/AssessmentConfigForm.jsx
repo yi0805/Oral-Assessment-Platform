@@ -136,7 +136,7 @@ export default function AssessmentConfigForm({
 
           <div className="space-y-2">
             <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-              Total Timer (mins)
+              Time Limit (mins)
             </label>
 
             <input
