@@ -3,6 +3,27 @@ import { NavLink, useNavigate, useParams } from "react-router";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useCourseAssessments } from "./useCourseAssessments";
+import Spinner from "../../ui/Spinner";
+
+function formatDueDate(iso) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function sortByDueThenTitle(items) {
+  return [...items].sort((a, b) => {
+    if (a.due_time && !b.due_time) return -1;
+    if (!a.due_time && b.due_time) return 1;
+    if (a.due_time && b.due_time) {
+      const diff = new Date(a.due_time) - new Date(b.due_time);
+      if (diff !== 0) return diff;
+    }
+    return a.title.localeCompare(b.title);
+  });
+}
 
 export default function AssessmentManagement() {
   const navigate = useNavigate();
@@ -13,9 +34,22 @@ export default function AssessmentManagement() {
   const course = courses.find((c) => String(c.id) === String(courseId));
   const { assessments, isLoading } = useCourseAssessments(courseId);
 
+  if (isLoading) return <Spinner />;
+
   const filtered = assessments.filter((a) =>
     a.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+  const drafts = sortByDueThenTitle(
+    filtered.filter((a) => a.status !== "published"),
+  );
+  const published = sortByDueThenTitle(
+    filtered.filter((a) => a.status === "published"),
+  );
+
+  const sections = [
+    { label: "Published", items: published },
+    { label: "Drafts", items: drafts },
+  ];
 
   return (
     <div className="min-h-screen">
@@ -46,9 +80,7 @@ export default function AssessmentManagement() {
           </p>
         </div>
 
-        {isLoading ? (
-          <p className="text-sm text-outline">Loading assessments…</p>
-        ) : assessments.length === 0 ? (
+        {assessments.length === 0 ? (
           <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-12 text-center">
             <span
               className="material-symbols-outlined mb-3 text-4xl text-outline"
@@ -78,30 +110,108 @@ export default function AssessmentManagement() {
                 No assessments match &ldquo;{searchQuery}&rdquo;
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {filtered.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() =>
-                      navigate(`/instructor/${courseId}/assessments/${a.id}`)
-                    }
-                    className="flex items-center justify-between rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-4 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
-                  >
-                    <p className="text-sm font-semibold text-on-surface">
-                      {a.title}
-                    </p>
-                    <span
-                      className={`ml-3 shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        a.status === "published"
-                          ? "bg-primary/10 text-primary"
-                          : "bg-surface-container text-on-surface-variant"
-                      }`}
-                    >
-                      {a.status === "published" ? "Published" : "Draft"}
-                    </span>
-                  </button>
-                ))}
+              <div className="space-y-6">
+                {sections.map(({ label, items }) =>
+                  items.length === 0 ? null : (
+                    <section key={label}>
+                      <div className="mb-2 flex items-baseline gap-2 px-1">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-outline">
+                          {label}
+                        </span>
+
+                        <span className="text-[11px] font-semibold text-outline-variant">
+                          · {items.length}
+                        </span>
+                      </div>
+
+                      <ul className="space-y-2">
+                        {items.map((a) => {
+                          const isPublished = a.status === "published";
+                          const dueLabel = formatDueDate(a.due_time);
+                          return (
+                            <li key={a.id}>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  navigate(
+                                    `/instructor/${courseId}/assessments/${a.id}`,
+                                  )
+                                }
+                                className="group flex w-full items-center gap-4 rounded-xl border border-outline-variant/15 bg-surface-container-lowest px-5 py-3.5 text-left shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                              >
+                                <span
+                                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                                    isPublished
+                                      ? "bg-primary/10 text-primary"
+                                      : "bg-surface-container text-on-surface-variant"
+                                  }`}
+                                >
+                                  <span
+                                    className="material-symbols-outlined text-lg"
+                                    style={{ verticalAlign: "middle" }}
+                                  >
+                                    {isPublished
+                                      ? "assignment_turned_in"
+                                      : "edit_note"}
+                                  </span>
+                                </span>
+
+                                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-on-surface">
+                                  {a.title}
+                                </p>
+
+                                <div className="hidden items-center gap-5 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant md:flex">
+                                  {a.main_question_num != null && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span
+                                        className="material-symbols-outlined text-[15px]"
+                                        style={{ verticalAlign: "middle" }}
+                                      >
+                                        quiz
+                                      </span>
+                                      {a.main_question_num} questions
+                                    </span>
+                                  )}
+
+                                  {a.total_time_minute != null && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span
+                                        className="material-symbols-outlined text-[15px]"
+                                        style={{ verticalAlign: "middle" }}
+                                      >
+                                        schedule
+                                      </span>
+                                      {a.total_time_minute} min
+                                    </span>
+                                  )}
+
+                                  {dueLabel && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <span
+                                        className="material-symbols-outlined text-[15px]"
+                                        style={{ verticalAlign: "middle" }}
+                                      >
+                                        event
+                                      </span>
+                                      Due {dueLabel}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <span
+                                  className="material-symbols-outlined shrink-0 text-on-surface-variant transition-transform group-hover:translate-x-1"
+                                  style={{ verticalAlign: "middle" }}
+                                >
+                                  chevron_right
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  ),
+                )}
               </div>
             )}
           </div>

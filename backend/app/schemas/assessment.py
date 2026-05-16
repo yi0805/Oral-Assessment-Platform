@@ -61,6 +61,8 @@ class AssessmentConfigSummary(BaseModel):
     id: UUID
     title: str
     status: str
+    total_time_minute: int
+    main_question_num: int
     release_time: datetime | None = None
     due_time: datetime | None = None
 
