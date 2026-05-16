@@ -2,6 +2,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.schemas.enums import UserRole
+
 
 # Course
 
@@ -47,3 +49,11 @@ class InstructorDashboardAssessmentOut(BaseModel):
     submitted_count: int
     total_students: int
     students: list[InstructorDashboardStudentRow]
+    
+
+class EnrolledUser(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    full_name: str
+    upi: str
+    role: UserRole

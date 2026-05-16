@@ -97,3 +97,10 @@ export async function copyAssessmentConfig(courseId, assessmentConfigId, targetC
   );
   return response.data;
 }
+
+export async function listEnrolledUser(courseId) {
+  const response = await api.get(
+    `/courses/${courseId}/enrolledusers`,
+  );
+  return response.data;
+}
