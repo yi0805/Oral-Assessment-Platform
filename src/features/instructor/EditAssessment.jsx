@@ -144,7 +144,7 @@ export default function EditAssessment() {
     isDirty &&
     rubricValid &&
     !isSavingRubric;
-  const canUpdatePublished = formEnabled;
+  const canUpdatePublished = formEnabled && isDirty;
 
   async function handleSave() {
     if (!canSave) return;
@@ -380,7 +380,7 @@ export default function EditAssessment() {
                     {isPublished
                       ? "Update Published Assessment"
                       : "Publish Draft Assessment"}
-                    {isDirty && !isPublished && (
+                    {isDirty && (
                       <span className="ml-2 text-xs font-medium text-on-surface-variant">
                         • Unsaved changes
                       </span>
