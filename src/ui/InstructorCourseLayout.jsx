@@ -13,7 +13,7 @@ export default function InstructorCourseLayout() {
   const course = courses.find((c) => String(c.id) === String(courseId));
 
   if (!course) {
-    toast.error("That course is no longer available");
+    toast.error("That course is not available");
     return <Navigate replace to="/home" />;
   }
 
