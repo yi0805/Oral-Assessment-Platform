@@ -160,42 +160,48 @@ export default function AssessmentManagement() {
                                   {a.title}
                                 </p>
 
-                                <div className="hidden items-center gap-5 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant md:flex">
-                                  {a.main_question_num != null && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <span
-                                        className="material-symbols-outlined text-[15px]"
-                                        style={{ verticalAlign: "middle" }}
-                                      >
-                                        quiz
-                                      </span>
-                                      {a.main_question_num} questions
-                                    </span>
-                                  )}
+                                <div className="hidden items-center gap-x-4 text-[10px] font-bold uppercase tracking-wider text-on-surface-variant md:grid md:grid-cols-[120px_80px_115px]">
+                                  <span className="inline-flex items-center gap-1">
+                                    {a.main_question_num != null && (
+                                      <>
+                                        <span
+                                          className="material-symbols-outlined text-[15px]"
+                                          style={{ verticalAlign: "middle" }}
+                                        >
+                                          quiz
+                                        </span>
+                                        {a.main_question_num} questions
+                                      </>
+                                    )}
+                                  </span>
 
-                                  {a.total_time_minute != null && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <span
-                                        className="material-symbols-outlined text-[15px]"
-                                        style={{ verticalAlign: "middle" }}
-                                      >
-                                        schedule
-                                      </span>
-                                      {a.total_time_minute} min
-                                    </span>
-                                  )}
+                                  <span className="inline-flex items-center gap-1">
+                                    {a.total_time_minute != null && (
+                                      <>
+                                        <span
+                                          className="material-symbols-outlined text-[15px]"
+                                          style={{ verticalAlign: "middle" }}
+                                        >
+                                          schedule
+                                        </span>
+                                        {a.total_time_minute} min
+                                      </>
+                                    )}
+                                  </span>
 
-                                  {dueLabel && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <span
-                                        className="material-symbols-outlined text-[15px]"
-                                        style={{ verticalAlign: "middle" }}
-                                      >
-                                        event
-                                      </span>
-                                      Due {dueLabel}
-                                    </span>
-                                  )}
+                                  <span className="inline-flex items-center gap-1">
+                                    {dueLabel && (
+                                      <>
+                                        <span
+                                          className="material-symbols-outlined text-[15px]"
+                                          style={{ verticalAlign: "middle" }}
+                                        >
+                                          event
+                                        </span>
+                                        Due {dueLabel}
+                                      </>
+                                    )}
+                                  </span>
                                 </div>
 
                                 <span
