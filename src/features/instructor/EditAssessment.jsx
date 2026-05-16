@@ -16,6 +16,8 @@ import CopyAssessmentModal from "./CopyAssessmentModal";
 import AssessmentConfigForm from "./AssessmentConfigForm";
 import RubricEditor from "./RubricEditor";
 import QuestionEditor from "./QuestionEditor";
+import PageNotFound from "../../pages/PageNotFound";
+import Spinner from "../../ui/Spinner";
 import {
   MAX_QUESTIONS,
   isAssessmentConfigValid,
@@ -61,10 +63,11 @@ export default function EditAssessment() {
   const [initialSnapshot, setInitialSnapshot] = useState(null);
   const [initializedFor, setInitializedFor] = useState(null);
 
-  const { assessment, isLoading: isDetailLoading } = useAssessmentDetail(
-    courseId,
-    assessmentId,
-  );
+  const {
+    assessment,
+    isLoading: isDetailLoading,
+    isError: isDetailError,
+  } = useAssessmentDetail(courseId, assessmentId);
   const { updateAssessment, isPending: isSaving } = useUpdateAssessment();
   const { publishAssessment, isPending: isPublishing } = usePublishAssessment();
   const { deleteAssessment, isDeleting } = useDeleteAssessment();
@@ -107,6 +110,14 @@ export default function EditAssessment() {
     setInitialSnapshot(snapshotKey({ form, rubricRows: rows }));
     setInitializedFor(assessmentId);
   }, [assessment, rubric, assessmentId, initializedFor]);
+
+  if (isDetailError) {
+    return <PageNotFound />;
+  }
+
+  if (isDetailLoading) {
+    return <Spinner />;
+  }
 
   const isPublished = assessment?.status === "published";
   const formEnabled =
@@ -168,8 +179,7 @@ export default function EditAssessment() {
   }
 
   async function handlePublish() {
-    if (isPublishing) return;
-    setConfirmingPublish(false);
+    if (isPublishing || isSaving) return;
     try {
       await updateAssessment({
         courseId,
@@ -193,9 +203,14 @@ export default function EditAssessment() {
           })),
         },
       });
-      publishAssessment({ courseId, assessmentConfigId: assessmentId });
+      await publishAssessment({
+        courseId,
+        assessmentConfigId: assessmentId,
+      });
     } catch {
       //
+    } finally {
+      setConfirmingPublish(false);
     }
   }
 
@@ -249,7 +264,9 @@ export default function EditAssessment() {
           title="Publish Assessment"
           message={`Are you sure you want to publish the assessment "${assessment?.title}"? Once published, the students gain access to it and only the name and due date can be changed. This action cannot be undone.`}
           confirmLabel="Yes, Publish"
-          isLoading={isPublishing}
+          loadingLabel="Publishing…"
+          tone="primary"
+          isLoading={isSaving || isSavingRubric || isPublishing}
           onConfirm={handlePublish}
           onCancel={() => setConfirmingPublish(false)}
         />
@@ -287,181 +304,182 @@ export default function EditAssessment() {
               {course?.course_code} • {course?.course_name}
             </span>
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
-              {isDetailLoading ? "Loading…" : (assessment?.title ?? "Edit Assessment")}
+              {assessment?.title ?? "Edit Assessment"}
             </h1>
-            {isPublished && (
-              <span className="mt-2 inline-block rounded-md bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">
-                Published
-              </span>
-            )}
+            {assessment &&
+              (isPublished ? (
+                <span className="mt-2 inline-block rounded-md bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">
+                  Published
+                </span>
+              ) : (
+                <span className="mt-2 inline-block rounded-md bg-surface-container px-3 py-1 text-xs font-bold uppercase tracking-wider text-on-surface-variant">
+                  Draft
+                </span>
+              ))}
           </div>
 
-          {isDetailLoading ? (
-            <p className="text-sm text-outline">Loading assessment details…</p>
-          ) : (
-            <div className="grid grid-cols-12 gap-6">
-              <div className="col-span-12 space-y-6 lg:col-span-8">
-                <AssessmentConfigForm
-                  courses={courses}
-                  courseId={courseId}
-                  onCourseIdChange={() => {}}
-                  hideCourseSelect={true}
-                  assessmentName={assessmentName}
-                  onAssessmentNameChange={setAssessmentName}
-                  numQuestions={numQuestions}
-                  onNumQuestionsChange={setNumQuestions}
-                  assessmentTime={assessmentTime}
-                  onAssessmentTimeChange={setAssessmentTime}
-                  releaseTime={releaseTime}
-                  onReleaseTimeChange={setReleaseTime}
-                  dueTime={dueTime}
-                  onDueTimeChange={setDueTime}
-                  disabled={!formEnabled}
-                  onlyDueDate={isPublished}
-                  releaseHelperText=""
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-12 space-y-6 lg:col-span-8">
+              <AssessmentConfigForm
+                courses={courses}
+                courseId={courseId}
+                onCourseIdChange={() => {}}
+                hideCourseSelect={true}
+                assessmentName={assessmentName}
+                onAssessmentNameChange={setAssessmentName}
+                numQuestions={numQuestions}
+                onNumQuestionsChange={setNumQuestions}
+                assessmentTime={assessmentTime}
+                onAssessmentTimeChange={setAssessmentTime}
+                releaseTime={releaseTime}
+                onReleaseTimeChange={setReleaseTime}
+                dueTime={dueTime}
+                onDueTimeChange={setDueTime}
+                disabled={!formEnabled}
+                onlyDueDate={isPublished}
+                releaseHelperText=""
+              />
+            </div>
+
+            {!isRubricLoading && (
+              <div className="col-span-12">
+                <RubricEditor
+                  rows={rubricRows}
+                  onRowsChange={setRubricRows}
+                  disabled={!formEnabled || isPublished}
                 />
               </div>
+            )}
 
-              {!isRubricLoading && (
-                <div className="col-span-12">
-                  <RubricEditor
-                    rows={rubricRows}
-                    onRowsChange={setRubricRows}
-                    disabled={!formEnabled || isPublished}
-                  />
-                </div>
-              )}
-
-              {!isPublished && (
-                <div className="col-span-12">
-                  <QuestionEditor
-                    assessmentConfigId={assessmentId}
-                    mainQuestionNum={Number(numQuestions) || 0}
-                    disabled={!formEnabled}
-                    onQuestionAdded={(newPoolSize) => {
-                      const current = Number(numQuestions);
-                      if (
-                        current === newPoolSize - 1 &&
-                        newPoolSize <= MAX_QUESTIONS
-                      ) {
-                        setNumQuestions(String(newPoolSize));
-                        toast.success(
-                          `Question count updated to ${newPoolSize}.`,
-                        );
-                      }
-                    }}
-                  />
-                </div>
-              )}
-
+            {!isPublished && (
               <div className="col-span-12">
-                <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
-                  <div>
-                    <p className="text-sm font-bold text-primary">
-                      {isPublished
-                        ? "Update Published Assessment"
-                        : "Publish Draft Assessment"}
-                      {isDirty && !isPublished && (
-                        <span className="ml-2 text-xs font-medium text-on-surface-variant">
-                          • Unsaved changes
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[11px] text-on-surface-variant">
-                      {isPublished
-                        ? "Copy published assessments and update name and due date of published assessments."
-                        : "Change assessment parameters, copy and delete assessments and publish to students."}
-                    </p>
-                  </div>
+                <QuestionEditor
+                  assessmentConfigId={assessmentId}
+                  mainQuestionNum={Number(numQuestions) || 0}
+                  disabled={!formEnabled}
+                  onQuestionAdded={(newPoolSize) => {
+                    const current = Number(numQuestions);
+                    if (
+                      current === newPoolSize - 1 &&
+                      newPoolSize <= MAX_QUESTIONS
+                    ) {
+                      setNumQuestions(String(newPoolSize));
+                      toast.success(
+                        `Question count updated to ${newPoolSize}.`,
+                      );
+                    }
+                  }}
+                />
+              </div>
+            )}
 
-                  <div className="flex items-center gap-3">
-                    {isPublished ? (
-                      <>
-                        <button
-                          type="button"
-                          aria-label="Copy assessment"
-                          title="Copy assessment"
-                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={isCopying}
-                          onClick={() => setCopyModalOpen(true)}
-                        >
-                          <span
-                            className="material-symbols-outlined text-xl"
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            content_copy
-                          </span>
-                        </button>
-
-                        <button
-                          className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={!canUpdatePublished || isSaving}
-                          onClick={handleUpdatePublished}
-                        >
-                          {isSaving ? "Saving…" : "Update"}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          aria-label="Delete assessment"
-                          title="Delete assessment"
-                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={isSaving || isPublishing || isCopying}
-                          onClick={() => setConfirmingDelete(true)}
-                        >
-                          <span
-                            className="material-symbols-outlined text-xl"
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            delete
-                          </span>
-                        </button>
-
-                        <button
-                          type="button"
-                          aria-label="Copy assessment"
-                          title="Copy assessment"
-                          className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={isSaving || isPublishing || isCopying}
-                          onClick={() => setCopyModalOpen(true)}
-                        >
-                          <span
-                            className="material-symbols-outlined text-xl"
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            content_copy
-                          </span>
-                        </button>
-
-                        <div
-                          aria-hidden="true"
-                          className="mx-1 h-8 w-px bg-outline-variant/30"
-                        />
-
-                        <button
-                          className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={isPublishing || isSaving}
-                          onClick={() => setConfirmingPublish(true)}
-                        >
-                          {isPublishing ? "Publishing…" : "Publish"}
-                        </button>
-
-                        <button
-                          className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-                          disabled={!canSave || isSaving || isPublishing}
-                          onClick={handleSave}
-                        >
-                          {isSaving ? "Saving…" : "Save"}
-                        </button>
-                      </>
+            <div className="col-span-12">
+              <div className="flex items-center justify-between rounded-xl border border-primary/10 bg-primary/5 p-6">
+                <div>
+                  <p className="text-sm font-bold text-primary">
+                    {isPublished
+                      ? "Update Published Assessment"
+                      : "Publish Draft Assessment"}
+                    {isDirty && !isPublished && (
+                      <span className="ml-2 text-xs font-medium text-on-surface-variant">
+                        • Unsaved changes
+                      </span>
                     )}
-                  </div>
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant">
+                    {isPublished
+                      ? "Copy published assessments and update name and due date of published assessments."
+                      : "Change assessment parameters, copy and delete assessments and publish to students."}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {isPublished ? (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Copy assessment"
+                        title="Copy assessment"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isCopying}
+                        onClick={() => setCopyModalOpen(true)}
+                      >
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          content_copy
+                        </span>
+                      </button>
+
+                      <button
+                        className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!canUpdatePublished || isSaving}
+                        onClick={handleUpdatePublished}
+                      >
+                        {isSaving ? "Saving…" : "Update"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        aria-label="Delete assessment"
+                        title="Delete assessment"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl border border-error/30 bg-transparent text-error transition-all hover:bg-error/10 active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isSaving || isPublishing || isCopying}
+                        onClick={() => setConfirmingDelete(true)}
+                      >
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          delete
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        aria-label="Copy assessment"
+                        title="Copy assessment"
+                        className="flex h-11 w-11 items-center justify-center rounded-xl border border-outline-variant/40 bg-transparent text-on-surface-variant transition-all hover:bg-surface-container active:scale-[0.95] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isSaving || isPublishing || isCopying}
+                        onClick={() => setCopyModalOpen(true)}
+                      >
+                        <span
+                          className="material-symbols-outlined text-xl"
+                          style={{ verticalAlign: "middle" }}
+                        >
+                          content_copy
+                        </span>
+                      </button>
+
+                      <div
+                        aria-hidden="true"
+                        className="mx-1 h-8 w-px bg-outline-variant/30"
+                      />
+
+                      <button
+                        className="rounded-xl border border-primary bg-transparent px-6 py-3 text-sm font-bold tracking-tight text-primary transition-all hover:bg-primary/10 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={isPublishing || isSaving}
+                        onClick={() => setConfirmingPublish(true)}
+                      >
+                        {isPublishing ? "Publishing…" : "Publish"}
+                      </button>
+
+                      <button
+                        className="rounded-xl bg-primary px-6 py-3 text-sm font-bold tracking-tight text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={!canSave || isSaving || isPublishing}
+                        onClick={handleSave}
+                      >
+                        {isSaving ? "Saving…" : "Save"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </main>
       </div>
     </>
