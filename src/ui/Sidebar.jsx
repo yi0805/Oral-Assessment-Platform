@@ -2,7 +2,6 @@ import { NavLink } from "react-router";
 
 import { useUser } from "../features/authentication/useUser";
 import { useActiveCourseId } from "../hooks/useActiveCourseId";
-import CourseSwitcher from "./CourseSwitcher";
 
 function Sidebar() {
   const { user } = useUser();
