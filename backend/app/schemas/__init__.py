@@ -4,7 +4,8 @@ from app.schemas.enums import *
 
 from app.schemas.user import UserResponse, GoogleLoginResponse, Userupi
 from app.schemas.course import (
-    CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, CourseInfoOut
+    CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, 
+    CourseInfoOut, EnrolledUser
 )
 
 from app.schemas.feedback import (

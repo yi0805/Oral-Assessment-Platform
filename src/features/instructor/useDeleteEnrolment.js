@@ -8,11 +8,12 @@ export function useDeleteEnrolment() {
 
   const { mutate: deleteEnrolment, isPending } = useMutation({
     mutationFn: ({ courseId, upi, role }) => deleteEnrolmentApi(courseId, upi, role),
-    onSuccess: (data) => {
+    onSuccess: (data, { courseId }) => {
       toast.success(data.message || "Enrolment delete successful");
 
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["enrolledUsers", courseId] });
     },
     onError: (error) => {
       const message =

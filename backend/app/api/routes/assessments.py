@@ -69,6 +69,22 @@ def release_assessment(
     if config.status != "draft":
         raise HTTPException(status_code=409, detail="Assessment is already published or closed.")
 
+    duplicate_title = (
+        db.query(AssessmentConfig)
+        .filter(
+            AssessmentConfig.course_id == course_id,
+            AssessmentConfig.title == config.title,
+            AssessmentConfig.status == "published",
+        )
+        .first()
+    )
+
+    if duplicate_title:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A published assessment titled '{config.title}' already exists in this course.",
+        )
+
     if config.main_question_num is None:
         raise HTTPException(status_code=422, detail="main_question_num must be set before publishing.")
 
@@ -317,7 +333,7 @@ def delete_assessment(
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
 
-    if config.status != "draft":
+    if config.status == "published":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot delete a published assessment.")
 
     try:

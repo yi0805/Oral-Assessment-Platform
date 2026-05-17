@@ -13,7 +13,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_instructor
 
 from app.models import Course, CourseEnrollment, AISummary, SessionFeedback, User, AssessmentConfig, AssessmentSession
-from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, Userupi, UserRole
+from app.schemas import CourseOut, CourseCreate, InstructorDashboardStudentRow, InstructorDashboardAssessmentOut, Userupi, UserRole, EnrolledUser
 
 router = APIRouter()
 
@@ -543,3 +543,38 @@ def delete_enrolment(
         raise HTTPException(status_code=500, detail="Database deletion failed")
 
     return {"message": "Enrolment deleted successfully."}
+
+
+# List all enrolled users from a course
+
+@router.get(
+    "/{course_id}/enrolledusers",
+    response_model=list[EnrolledUser],
+    summary="List all enrolled user in the course",
+)
+def list_enrolled_users(
+    course_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    caller_enrolment = db.query(CourseEnrollment).filter(
+        CourseEnrollment.course_id == course_id,
+        CourseEnrollment.user_id == current_user.id
+    ).first()
+
+    if not caller_enrolment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an instructor of this course.",
+        )
+
+    enrolled_users = (
+        db.query(User.full_name, CourseEnrollment.upi, User.role)
+        .select_from(CourseEnrollment)
+        .outerjoin(User, User.id == CourseEnrollment.user_id)
+        .filter(CourseEnrollment.course_id == course_id)
+        .order_by(User.role)
+        .all()
+    )
+
+    return enrolled_users
