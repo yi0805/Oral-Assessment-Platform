@@ -54,6 +54,6 @@ class InstructorDashboardAssessmentOut(BaseModel):
 class EnrolledUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    full_name: str
+    full_name: str | None = None
     upi: str
-    role: UserRole
+    role: UserRole | None = None

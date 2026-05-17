@@ -557,10 +557,21 @@ def list_enrolled_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_instructor),
 ):
+    caller_enrolment = db.query(CourseEnrollment).filter(
+        CourseEnrollment.course_id == course_id,
+        CourseEnrollment.user_id == current_user.id
+    ).first()
+
+    if not caller_enrolment:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not an instructor of this course.",
+        )
 
     enrolled_users = (
         db.query(User.full_name, CourseEnrollment.upi, User.role)
-        .join(User, User.id == CourseEnrollment.user_id)
+        .select_from(CourseEnrollment)
+        .outerjoin(User, User.id == CourseEnrollment.user_id)
         .filter(CourseEnrollment.course_id == course_id)
         .order_by(User.role)
         .all()
