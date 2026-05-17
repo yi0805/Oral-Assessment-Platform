@@ -136,21 +136,26 @@ export default function AssessmentConfigForm({
 
           <div className="space-y-2">
             <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-              Total Timer (mins)
+              Time Limit
             </label>
 
-            <input
-              className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-              min={1}
-              max={MAX_TIME_MIN}
-              step={0.5}
-              placeholder="e.g. 30"
-              type="number"
-              value={assessmentTime}
-              disabled={disabled || onlyDueDate}
-              onChange={(e) => onAssessmentTimeChange(e.target.value)}
-              onBlur={() => markTouched("assessmentTime")}
-            />
+            <div className="relative">
+              <input
+                className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 pr-20 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                min={1}
+                max={MAX_TIME_MIN}
+                step={0.5}
+                placeholder="e.g. 30"
+                type="number"
+                value={assessmentTime}
+                disabled={disabled || onlyDueDate}
+                onChange={(e) => onAssessmentTimeChange(e.target.value)}
+                onBlur={() => markTouched("assessmentTime")}
+              />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-outline">
+                minutes
+              </span>
+            </div>
 
             {touched.assessmentTime && assessmentTimeError && (
               <p className="ml-1 text-xs font-medium text-error">

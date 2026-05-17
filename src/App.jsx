@@ -16,7 +16,9 @@ import Transcript from "./features/instructor/Transcript";
 import StudentManagement from "./features/instructor/StudentManagement";
 import ProtectedLayout from "./ui/ProtectedRoute";
 import Setting from "./features/instructor/Setting";
-import AssessmentManagement from "./features/instructor/AssessmentManagement"
+import AssessmentManagement from "./features/instructor/AssessmentManagement";
+import EditAssessment from "./features/instructor/EditAssessment";
+import GenerateAssessment from "./features/instructor/UploadMaterial";
 import InstructorCourseLayout from "./ui/InstructorCourseLayout";
 
 const queryClient = new QueryClient({
@@ -60,7 +62,7 @@ function App() {
               <Route path="instructor" element={<InstructorCourseLayout />}>
                 <Route
                   path=":courseId"
-                  element={<Navigate replace to="dashboard" />}
+                  element={<Navigate replace to="assessments" />}
                 />
                 <Route
                   path=":courseId/dashboard"
@@ -73,6 +75,14 @@ function App() {
                 <Route
                   path=":courseId/assessments"
                   element={<AssessmentManagement />}
+                />
+                <Route
+                  path=":courseId/assessments/generate"
+                  element={<GenerateAssessment />}
+                />
+                <Route
+                  path=":courseId/assessments/:assessmentId"
+                  element={<EditAssessment />}
                 />
               </Route>
             </Route>

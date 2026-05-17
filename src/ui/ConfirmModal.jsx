@@ -1,4 +1,13 @@
-export default function ConfirmModal({ title, message, confirmLabel = "Confirm", onConfirm, onCancel, isLoading = false }) {
+export default function ConfirmModal({
+  title,
+  message,
+  confirmLabel = "Confirm",
+  loadingLabel = "Deleting…",
+  tone = "danger",
+  onConfirm,
+  onCancel,
+  isLoading = false,
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
       <div className="w-full max-w-sm rounded-2xl bg-surface p-8 shadow-2xl">
@@ -14,11 +23,15 @@ export default function ConfirmModal({ title, message, confirmLabel = "Confirm",
             Cancel
           </button>
           <button
-            className="rounded-xl bg-error px-5 py-2.5 text-sm font-bold text-on-error shadow-md transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            className={
+              tone === "primary"
+                ? "rounded-xl bg-primary px-5 py-2.5 text-sm font-bold text-on-primary shadow-md transition-all hover:bg-primary-dim active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                : "rounded-xl bg-error px-5 py-2.5 text-sm font-bold text-on-error shadow-md transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+            }
             onClick={onConfirm}
             disabled={isLoading}
           >
-            {isLoading ? "Deleting…" : confirmLabel}
+            {isLoading ? loadingLabel : confirmLabel}
           </button>
         </div>
       </div>

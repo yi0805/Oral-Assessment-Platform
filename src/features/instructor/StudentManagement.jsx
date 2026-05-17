@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useParams } from "react-router";
 
+import { useCourses } from "../../hooks/useCourses";
 import { useDashboard } from "./useDashboard";
 import { useImportStudents } from "./useImportStudents";
 import { useExportResults } from "./useExportResults";
@@ -21,6 +22,8 @@ export default function StudentManagement() {
   const [role, setRole] = useState("student");
 
   const [currentPage, setCurrentPage] = useState(1);
+  const { courses } = useCourses();
+  const course = courses.find((c) => String(c.id) === String(courseId));
 
   const { dashboard = [], isLoading: isDashboardLoading } =
     useDashboard(courseId);
@@ -116,6 +119,9 @@ export default function StudentManagement() {
             </span>
           </NavLink>
 
+          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+            {course?.course_code} • {course?.course_name}
+          </span>
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
             Users Management
           </h1>
