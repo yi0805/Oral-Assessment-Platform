@@ -2,7 +2,6 @@ import { NavLink } from "react-router";
 
 import { useUser } from "../features/authentication/useUser";
 import { useActiveCourseId } from "../hooks/useActiveCourseId";
-import CourseSwitcher from "./CourseSwitcher";
 
 function Sidebar() {
   const { user } = useUser();
@@ -40,8 +39,6 @@ function Sidebar() {
           )}
         </div>
       </div>
-
-      {user.role === "instructor" && <CourseSwitcher />}
 
       <nav className="flex flex-col gap-y-1">
         {user.role === "student" && (

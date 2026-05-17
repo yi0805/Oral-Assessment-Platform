@@ -152,11 +152,15 @@ function Header() {
       )}
 
       <header className="fixed top-0 z-40 flex h-16 w-full items-center justify-between bg-[#f8f9fa] px-8 dark:bg-slate-900">
-        <div className="flex items-center gap-8">
+        <button className="flex items-center gap-8 transition-transform duration-200 hover:scale-110"
+          onClick={() => {
+              navigate("/home");
+          }}
+        >
           <span className="headline-font text-xl font-bold tracking-tight text-[#4f6073] dark:text-white">
             WhereRU
           </span>
-        </div>
+        </button>
         <div className="flex items-center gap-4">
           <div className="mr-4 flex gap-2">
             {isInstructor && (

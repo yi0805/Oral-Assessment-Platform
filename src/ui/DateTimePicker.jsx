@@ -19,7 +19,7 @@ export default function DateTimePicker({
         onChange={onChange}
         showTimeSelect
         timeIntervals={1}
-        dateFormat="yyyy-MM-dd HH:mm:ss"
+        dateFormat="yyyy-MM-dd HH:mm"
         minDate={minDate ? minDate : new Date()}
         placeholderText="Select date & time"
         disabled={disabled}
