@@ -160,23 +160,33 @@ function Header() {
         <div className="flex items-center gap-4">
           <div className="mr-4 flex gap-2">
             {isInstructor && (
-              <button
-                className="relative rounded-full p-2 text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"
-                onClick={() => setShowNotifications((v) => !v)}
-              >
-                <span
-                  className="material-symbols-outlined"
-                  data-icon="notifications"
+              <>
+                <button
+                  className="relative rounded-full p-2 text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"
+                  onClick={() => setShowNotifications((v) => !v)}
                 >
-                  notifications
-                </span>
-
-                {unreadCount > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-on-error">
-                    {unreadCount > 99 ? "99+" : unreadCount}
+                  <span
+                    className="material-symbols-outlined"
+                    data-icon="notifications"
+                  >
+                    notifications
                   </span>
-                )}
-              </button>
+
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-error px-1 text-[10px] font-bold text-on-error">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  className="rounded-full p-2 text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"
+                  onClick={() => navigate("/instructor/setting")}
+                >
+                  <span className="material-symbols-outlined" data-icon="settings">
+                    settings
+                  </span>
+                </button>
+              </>
             )}
             <button
               className="rounded-full p-2 text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"

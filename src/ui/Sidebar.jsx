@@ -44,46 +44,66 @@ function Sidebar() {
       {user.role === "instructor" && <CourseSwitcher />}
 
       <nav className="flex flex-col gap-y-1">
-        <NavLink
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-              isActive
-                ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
-                : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
-            }`
-          }
-          to="/home"
-        >
-          <span
-            className="material-symbols-outlined text-[20px]"
-            data-icon="school"
-          >
-            school
-          </span>
-          <span>Courses</span>
-        </NavLink>
         {user.role === "student" && (
-          <NavLink
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-                isActive
-                  ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
-                  : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
-              }`
-            }
-            to="/student/gradedAssessments"
-          >
-            <span
-              className="material-symbols-outlined text-[20px]"
-              data-icon="history"
+          <>
+            <NavLink
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+                  isActive
+                    ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                    : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+                }`
+              }
+              to="/home"
             >
-              history
-            </span>
-            <span>Graded Assessments</span>
-          </NavLink>
+              <span
+                className="material-symbols-outlined text-[20px]"
+                data-icon="school"
+              >
+                school
+              </span>
+              <span>Assessments</span>
+            </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+                  isActive
+                    ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                    : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+                }`
+              }
+              to="/student/gradedAssessments"
+            >
+              <span
+                className="material-symbols-outlined text-[20px]"
+                data-icon="history"
+              >
+                history
+              </span>
+              <span>Graded Assessments</span>
+            </NavLink>
+          </>
         )}
         {user.role === "instructor" && activeCourseId && (
           <>
+            <NavLink
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
+                  isActive
+                    ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
+                    : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
+                }`
+              }
+              to={`/instructor/${activeCourseId}/assessments`}
+            >
+              <span
+                className="material-symbols-outlined text-[20px]"
+                data-icon="assignment"
+              >
+                assignment
+              </span>
+              <span>Assessments</span>
+            </NavLink>
             <NavLink
               className={({ isActive }) =>
                 `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
@@ -120,44 +140,8 @@ function Sidebar() {
               </span>
               <span>Users & Records</span>
             </NavLink>
-            <NavLink
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-                  isActive
-                    ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
-                    : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
-                }`
-              }
-              to={`/instructor/${activeCourseId}/assessments`}
-            >
-              <span
-                className="material-symbols-outlined text-[20px]"
-                data-icon="assignment"
-              >
-                assignment
-              </span>
-              <span>Assessments</span>
-            </NavLink>
           </>
         )}
-        <NavLink
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
-              isActive
-                ? "rounded-r-full bg-white text-[#4f6073] shadow-sm dark:bg-slate-700 dark:text-white"
-                : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
-            }`
-          }
-          to="/instructor/setting"
-        >
-          <span
-            className="material-symbols-outlined text-[20px]"
-            data-icon="settings"
-          >
-            settings
-          </span>
-          <span>Settings</span>
-        </NavLink>
       </nav>
     </aside>
   );
