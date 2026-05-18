@@ -15,9 +15,14 @@ export default function StudentHome() {
 
   if (isLoading || isUserLoading) return <Spinner />;
 
-  const filteredCouses = courses.filter((course) =>
-    course.course_code.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filteredCouses = courses.filter((course) => {
+    const query = search.toLowerCase();
+
+    return (
+      course.course_code.toLowerCase().includes(query) ||
+      course.course_name.toLowerCase().includes(query)
+    );
+  });
 
   return (
     <main className="min-h-screen pt-16">
@@ -59,18 +64,38 @@ export default function StudentHome() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredCouses.map((course, index) => (
-            <CourseCard
-              key={course.id}
-              courseId={course.id}
-              courseCode={course.course_code}
-              courseName={course.course_name}
-              description={course.description}
-              index={index}
-            />
-          ))}
-        </div>
+        {courses.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-12 text-center shadow-sm">
+            <span className="material-symbols-outlined text-6xl text-on-surface-variant">
+              school
+            </span>
+
+            <p className="text-lg font-medium text-on-surface">
+              No courses yet
+            </p>
+
+            <p className="text-sm text-on-surface-variant">
+              Contact your instructor to be enrolled.
+            </p>
+          </div>
+        ) : filteredCouses.length === 0 ? (
+          <p className="py-3 text-sm text-outline">
+            No courses match &ldquo;{search}&rdquo;
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredCouses.map((course, index) => (
+              <CourseCard
+                key={course.id}
+                courseId={course.id}
+                courseCode={course.course_code}
+                courseName={course.course_name}
+                description={course.description}
+                index={index}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </main>
   );
