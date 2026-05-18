@@ -27,7 +27,7 @@ function GeneratePanel() {
   const { courseId } = useParams();
   const { courses } = useCourses();
   const course = courses.find((c) => String(c.id) === String(courseId));
-  const [materialFile, setMaterialFile] = useState(null);
+  const [materialFiles, setMaterialFiles] = useState([]);
 
   const [source, setSource] = useState("pdf");
   const [githubUrl, setGithubUrl] = useState("");
@@ -73,7 +73,9 @@ function GeneratePanel() {
       : "";
 
   const materialReady =
-    (source === "pdf" && !!materialFile) ||
+    (source === "pdf" &&
+      materialFiles.length > 0 &&
+      materialFiles.length <= 5) ||
     (source === "github" && isValidGithubUrl(githubUrl));
 
   const configValid = isAssessmentConfigValid({
@@ -93,17 +95,18 @@ function GeneratePanel() {
           : "Uploading material...",
       );
 
-      const MaterialId =
+      const materialIds =
         source === "pdf"
-          ? await uploadMaterial({
-              courseId,
-              file: materialFile,
-            })
-          : await uploadGithubRepo({
-              courseId,
-              url: githubUrl.trim(),
-              ref: githubRef.trim() || null,
-            });
+          ? await Promise.all(
+              materialFiles.map((file) => uploadMaterial({ courseId, file })),
+            )
+          : [
+              await uploadGithubRepo({
+                courseId,
+                url: githubUrl.trim(),
+                ref: githubRef.trim() || null,
+              }),
+            ];
 
       setStatusMessage("Creating rubric...");
       const rubricPayload = {
@@ -126,7 +129,7 @@ function GeneratePanel() {
       setStatusMessage("Generating questions with AI...");
       const updateResponse = await questionGenerate({
         courseId,
-        materialId: MaterialId,
+        materialIds,
         rubricId: RubricId,
         assessmentName,
         numQuestions: Number(numQuestions),
@@ -344,9 +347,23 @@ function GeneratePanel() {
                         className="hidden"
                         type="file"
                         accept=".pdf"
-                        onChange={(e) =>
-                          setMaterialFile(e.target.files[0] || null)
-                        }
+                        multiple
+                        onChange={(e) => {
+                          const incoming = Array.from(e.target.files || []);
+
+                          setMaterialFiles((prev) => {
+                            const seen = new Set(
+                              prev.map((f) => `${f.name}:${f.size}`),
+                            );
+
+                            const additions = incoming.filter(
+                              (f) => !seen.has(`${f.name}:${f.size}`),
+                            );
+
+                            return [...prev, ...additions].slice(0, 5);
+                          });
+                          e.target.value = "";
+                        }}
                       />
 
                       <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-outline-variant/30 bg-surface-container-low px-6 py-10 text-center transition-colors hover:border-primary/40 hover:bg-primary/5">
@@ -359,51 +376,63 @@ function GeneratePanel() {
                         </span>
 
                         <p className="text-sm font-bold text-primary">
-                          {materialFile
-                            ? "Replace File"
-                            : "Click to browse PDF"}
+                          {materialFiles.length === 0
+                            ? "Click to browse PDFs"
+                            : `Add more PDFs (${materialFiles.length}/5)`}
                         </p>
 
                         <p className="mt-1 text-[11px] text-outline">
-                          PDF only · Max 50 MB
+                          PDF only · Up to 5 files · Max 50 MB each
                         </p>
                       </div>
                     </label>
 
-                    {materialFile && (
-                      <div className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-low p-4 text-left">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
-                          <span
-                            className="material-symbols-outlined text-2xl"
-                            data-icon="picture_as_pdf"
-                            style={{ verticalAlign: "middle" }}
+                    {materialFiles.length > 0 && (
+                      <div className="space-y-2">
+                        {materialFiles.map((file, index) => (
+                          <div
+                            key={`${file.name}-${file.size}-${index}`}
+                            className="flex items-center gap-3 rounded-xl border border-outline-variant/10 bg-surface-container-low p-4 text-left"
                           >
-                            picture_as_pdf
-                          </span>
-                        </div>
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-error/10 text-error">
+                              <span
+                                className="material-symbols-outlined text-2xl"
+                                data-icon="picture_as_pdf"
+                                style={{ verticalAlign: "middle" }}
+                              >
+                                picture_as_pdf
+                              </span>
+                            </div>
 
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-on-surface">
-                            {materialFile.name}
-                          </p>
-                          <p className="text-xs text-outline">
-                            {(materialFile.size / 1024 / 1024).toFixed(1)} MB
-                          </p>
-                        </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-on-surface">
+                                {file.name}
+                              </p>
 
-                        <button
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error"
-                          onClick={() => setMaterialFile(null)}
-                          aria-label="Remove file"
-                        >
-                          <span
-                            className="material-symbols-outlined text-lg"
-                            data-icon="close"
-                            style={{ verticalAlign: "middle" }}
-                          >
-                            close
-                          </span>
-                        </button>
+                              <p className="text-xs text-outline">
+                                {(file.size / 1024 / 1024).toFixed(1)} MB
+                              </p>
+                            </div>
+
+                            <button
+                              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error/10 hover:text-error"
+                              onClick={() =>
+                                setMaterialFiles((prev) =>
+                                  prev.filter((_, i) => i !== index),
+                                )
+                              }
+                              aria-label={`Remove ${file.name}`}
+                            >
+                              <span
+                                className="material-symbols-outlined text-lg"
+                                data-icon="close"
+                                style={{ verticalAlign: "middle" }}
+                              >
+                                close
+                              </span>
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
