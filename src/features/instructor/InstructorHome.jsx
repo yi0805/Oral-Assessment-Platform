@@ -70,7 +70,7 @@ function InstructorHome() {
 
   return (
     <>
-      <main className="min-h-screen bg-surface pl-64 pt-24">
+      <main className="min-h-screen bg-surface pt-24">
         <div className="mx-auto max-w-7xl px-10 pb-20">
           <header className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>

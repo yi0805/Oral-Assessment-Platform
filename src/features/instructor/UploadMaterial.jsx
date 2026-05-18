@@ -188,7 +188,7 @@ function GeneratePanel() {
 
   return (
     <div className="min-h-screen">
-      <main className="ml-64 px-10 pb-12 pt-24">
+      <main className="px-10 pb-12 pt-24">
         <div className="mb-4">
           <NavLink
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"

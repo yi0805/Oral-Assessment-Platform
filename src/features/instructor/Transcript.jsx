@@ -92,7 +92,7 @@ function Transcript() {
 
   return (
     <div className="font-body">
-      <main className="min-h-screen pl-64 pt-16">
+      <main className="min-h-screen pt-16">
         <div className="mx-auto max-w-6xl px-12 py-16">
           <button
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
