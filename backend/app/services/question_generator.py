@@ -61,7 +61,7 @@ async def generate_pool(
     db: Session,
     config_id: UUID,
     pool_id: UUID,
-    material_id: UUID,
+    material_ids: list[UUID],
     rubric_id: UUID,
     num_main_questions: int,
 ) -> QuestionPool:
@@ -95,14 +95,16 @@ async def generate_pool(
 
     try:
         chunks_per_query = max(6, (20 // len(_COVERAGE_QUERIES)) + 2)
-        for query in _COVERAGE_QUERIES:
-            hits = await rag_search.search(
-                db=db,
-                query_text=query,
-                top_k=chunks_per_query,
-                material_id=material_id,
-            )
-            all_chunks.extend(hits)
+
+        for mid in material_ids:
+            for query in _COVERAGE_QUERIES:
+                hits = await rag_search.search(
+                    db=db,
+                    query_text=query,
+                    top_k=chunks_per_query,
+                    material_id=mid,
+                )
+                all_chunks.extend(hits)
 
     except Exception as exc:  # noqa: BLE001
         rag_error = f"{type(exc).__name__}: {exc}"
@@ -123,10 +125,10 @@ async def generate_pool(
     )[:25]
 
     logger.info(
-        "generate_pool %s: %d unique RAG vector chunks for material %s%s",
+        "generate_pool %s: %d unique RAG vector chunks across %d material(s)%s",
         pool_id,
         len(unique_chunks),
-        material_id,
+        len(material_ids),
         f" (RAG error: {rag_error})" if rag_error else "",
     )
 
@@ -139,17 +141,27 @@ async def generate_pool(
             "To enable vector RAG, ensure GEMINI_API_KEY is set and re-upload materials.",
             pool_id,
         )
-        text_fallback_excerpts = rag_search.get_extracted_text_chunks(
-            db=db,
-            material_id=material_id,
-            max_chars=12000,
-        )
+        
+        remaining_chars = 12000
+        for mid in material_ids:
+            if remaining_chars <= 0:
+                break
+
+            excerpts = rag_search.get_extracted_text_chunks(
+                db=db,
+                material_id=mid,
+                max_chars=remaining_chars,
+            )
+
+            for ex in excerpts:
+                text_fallback_excerpts.append(ex)
+                remaining_chars -= len(ex["text"])
 
         if not text_fallback_excerpts:
             logger.error(
-                "generate_pool %s: No extracted_text found for material %s. "
-                "Material may not have completed the Extract pipeline stage.",
-                pool_id, material_id,
+                "generate_pool %s: No extracted_text found for materials %s. "
+                "Materials may not have completed the Extract pipeline stage.",
+                pool_id, material_ids,
             )
 
 

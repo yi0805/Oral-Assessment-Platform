@@ -66,17 +66,19 @@ async def generate_question(
         raise HTTPException(status_code=404, detail="Rubric not found")
     
 
-    material = (
+    unique_material_ids = list(dict.fromkeys(payload.material_ids))
+
+    materials = (
         db.query(Material)
         .filter(
-            Material.id == payload.material_id,
+            Material.id.in_(unique_material_ids),
             Material.material_category == "course_material",
         )
-        .first()
+        .all()
     )
 
-    if not material:
-        raise HTTPException(status_code=404, detail="Material not found")
+    if len(materials) != len(unique_material_ids):
+        raise HTTPException(status_code=404, detail="One or more materials not found, please upload them again")
 
     published = (
         db.query(AssessmentConfig)
@@ -116,19 +118,20 @@ async def generate_question(
 
     pool = QuestionPool(
         assessment_config_id=config.id,
-        material_id=payload.material_id,
         status="draft",
     )
 
     db.add(pool)
     db.flush()
 
-    #  Run AI generation 
+    pool.materials = materials
+
+    #  Run AI generation
     try:
         pool = await generate_pool(
             db=db,
             pool_id=pool.id,
-            material_id=payload.material_id,
+            material_ids=unique_material_ids,
             rubric_id=payload.rubric_id,
             num_main_questions=payload.num_main_questions,
             config_id=config.id,
