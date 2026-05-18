@@ -436,7 +436,7 @@ export default function EditPanel({ courseId, courses, onSwitchCourse }) {
                     ? "Select an assessment above to begin editing."
                     : isPublished
                       ? "This assessment is live to students. You can update the name and due date here — other details are locked. Use Copy to create a new draft based on this assessment."
-                      : "Change assessment parameters, copy and delete assessments and publish to students."}
+                      : "Edit any details, questions, or rubric. Use Save to keep working as a draft, or Publish to release this assessment to students. Copy duplicates it; Delete removes it."}
                 </p>
               </div>
             </div>
