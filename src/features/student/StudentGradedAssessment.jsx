@@ -1,31 +1,23 @@
-import { useEffect, useState } from "react";
-import { NavLink } from "react-router";
+import { NavLink, useParams } from "react-router";
 
 import { useCourses } from "../../hooks/useCourses";
 import { useAssessmentHistory } from "./useAssessmentHistory";
 
 import Spinner from "../../ui/Spinner";
 import InstructorFeedback from "../../ui/InstructorFeedback";
-import CourseSelector from "../../ui/CourseSelector";
 
 function StudentGradedAssessment() {
-  const [selectedCourse, setSelectedCourse] = useState("");
+  const { courseId } = useParams();
 
   const { courses, isLoading: coursesLoading } = useCourses();
+  const { history, isLoading } = useAssessmentHistory(courseId);
 
-  useEffect(() => {
-    if (courses.length > 0 && !selectedCourse) {
-      setSelectedCourse(courses[0].id);
-    }
-  }, [courses, selectedCourse]);
-
-  const { history, isLoading } = useAssessmentHistory(selectedCourse);
-
-  if (coursesLoading) return <Spinner />;
-  if (selectedCourse && isLoading) return <Spinner />;
+  if (coursesLoading || isLoading) return <Spinner />;
 
   const items = history?.items ?? [];
-  const currentCourse = courses.find((c) => c.id === selectedCourse);
+  const currentCourse = courses.find(
+    (c) => String(c.id) === String(courseId),
+  );
 
   const assessmentResults = items.map((item) => ({
     sessionId: item.session_id,
@@ -76,7 +68,7 @@ function StudentGradedAssessment() {
 
   return (
     <div className="min-h-screen">
-      <main className="px-8 pb-12 pt-24 md:ml-64">
+      <main className="px-8 pb-12 pt-24">
         <div className="mx-auto max-w-6xl">
           <div className="mb-10">
             <NavLink
@@ -93,24 +85,17 @@ function StudentGradedAssessment() {
               </span>
             </NavLink>
 
+            <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+              {currentCourse?.course_code} • {currentCourse?.course_name}
+            </span>
+
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
               Graded Assessments
             </h1>
 
             <p className="mt-2 text-sm text-on-surface-variant">
-              Performance History
+              Review your past results and performance.
             </p>
-            <div className="mt-4 flex items-center gap-3">
-              <span className="text-sm font-semibold text-on-surface-variant">
-                Course:
-              </span>
-
-              <CourseSelector
-                courses={courses}
-                selectedCourse={selectedCourse}
-                onChange={setSelectedCourse}
-              />
-            </div>
           </div>
 
           {assessmentResults.length === 0 ? (

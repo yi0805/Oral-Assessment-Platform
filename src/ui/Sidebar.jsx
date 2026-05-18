@@ -23,6 +23,7 @@ function Sidebar() {
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
                 Instructor Portal
               </h2>
+
               <p className="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">
                 Academic Management
               </p>
@@ -32,6 +33,7 @@ function Sidebar() {
               <h2 className="font-['Manrope'] font-bold leading-tight text-[#4f6073] dark:text-white">
                 Student Portal
               </h2>
+
               <p className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
                 Academic Engagement
               </p>
@@ -41,7 +43,7 @@ function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-y-1">
-        {user.role === "student" && (
+        {user.role === "student" && activeCourseId && (
           <>
             <NavLink
               className={({ isActive }) =>
@@ -51,16 +53,18 @@ function Sidebar() {
                     : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
                 }`
               }
-              to="/home"
+              to={`/student/${activeCourseId}/assessments`}
             >
               <span
                 className="material-symbols-outlined text-[20px]"
-                data-icon="school"
+                data-icon="assignment"
               >
-                school
+                assignment
               </span>
+
               <span>Assessments</span>
             </NavLink>
+
             <NavLink
               className={({ isActive }) =>
                 `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
@@ -69,7 +73,7 @@ function Sidebar() {
                     : "rounded-r-full text-[#586064] hover:bg-white/50 hover:text-[#4f6073]"
                 }`
               }
-              to="/student/gradedAssessments"
+              to={`/student/${activeCourseId}/gradedAssessments`}
             >
               <span
                 className="material-symbols-outlined text-[20px]"
@@ -77,10 +81,12 @@ function Sidebar() {
               >
                 history
               </span>
+
               <span>Graded Assessments</span>
             </NavLink>
           </>
         )}
+
         {user.role === "instructor" && activeCourseId && (
           <>
             <NavLink
@@ -99,8 +105,10 @@ function Sidebar() {
               >
                 assignment
               </span>
+
               <span>Assessments</span>
             </NavLink>
+
             <NavLink
               className={({ isActive }) =>
                 `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
@@ -117,8 +125,10 @@ function Sidebar() {
               >
                 dashboard
               </span>
+
               <span>Dashboard</span>
             </NavLink>
+
             <NavLink
               className={({ isActive }) =>
                 `flex items-center gap-3 px-6 py-3 font-['Inter'] text-sm font-medium transition-all duration-300 ease-in-out dark:text-slate-400 dark:hover:bg-slate-700/50 ${
@@ -135,6 +145,7 @@ function Sidebar() {
               >
                 people
               </span>
+
               <span>Users & Records</span>
             </NavLink>
           </>

@@ -56,7 +56,7 @@ export default function StudentCourse() {
 
   return (
     <>
-      <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
+      <main className="min-h-screen px-12 pb-12 pt-24">
         <div className="mb-10">
           <NavLink
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
@@ -70,13 +70,17 @@ export default function StudentCourse() {
             </span>
           </NavLink>
 
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-widest text-outline">
-            {course.course_code ? course.course_code : "Unknown Course Code"}
+          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+            {course?.course_code} • {course?.course_name}
           </span>
 
-          <h1 className="text-4xl font-extrabold tracking-tight text-on-background">
-            {course.course_name ? course.course_name : "Unknown Course Name"}
+          <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
+            Assessments
           </h1>
+
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Your upcoming and submitted assessments.
+          </p>
         </div>
 
         {hasAnyAssessment ? (
@@ -293,7 +297,7 @@ export default function StudentCourse() {
 
                   <NavLink
                     className="group inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-outline-variant transition-colors hover:text-primary"
-                    to="/student/gradedAssessments"
+                    to={`/student/${courseId}/gradedAssessments`}
                   >
                     View past assessments
                     <span className="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">
