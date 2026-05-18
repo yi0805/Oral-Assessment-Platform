@@ -128,9 +128,28 @@ function InstructorHome() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            <InstructorCourseCard courses={courses} />
-          </div>
+          {courses.length === 0 ? (
+            <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-12 text-center">
+              <span
+                className="material-symbols-outlined mb-3 text-4xl text-outline"
+                style={{ verticalAlign: "middle" }}
+              >
+                library_books
+              </span>
+
+              <p className="text-sm font-bold text-on-surface">
+                No courses yet
+              </p>
+
+              <p className="mt-1 text-xs text-on-surface-variant">
+                Create your first course using the + button in the bottom right.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+              <InstructorCourseCard courses={courses} />
+            </div>
+          )}
         </div>
       </main>
       <div className="fixed bottom-8 right-8 z-50">
