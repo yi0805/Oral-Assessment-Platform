@@ -92,7 +92,8 @@ export default function AssessmentManagement() {
               No assessments yet
             </p>
             <p className="mt-1 text-xs text-on-surface-variant">
-              Use the button below to generate your first assessment.
+              Generate your first assessment using the + button in the bottom
+              right.
             </p>
           </div>
         ) : (
