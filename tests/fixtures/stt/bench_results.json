@@ -1,0 +1,329 @@
+{
+  "run_at": "2026-05-18T01:08:22+1200",
+  "region": "ap-southeast-2",
+  "sample_rate_hz": 16000,
+  "frame_ms": 100,
+  "poll_interval_s": 1.0,
+  "recordings": [
+    "Recording (2).m4a",
+    "Recording (3).m4a",
+    "Recording (4).m4a",
+    "Recording (5).m4a",
+    "Recording (6).m4a",
+    "Recording (7).m4a",
+    "Recording (8).m4a",
+    "Recording.m4a"
+  ],
+  "streaming": [
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 1,
+      "ttfp": 2.0405393000110053,
+      "ttfr": 8.72880760001135,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.72880760001135,
+      "transcript": "123456 78910123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 1,
+      "ttfp": 1.8489052999939304,
+      "ttfr": 8.318771099991864,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.318771099991864,
+      "transcript": "12345678 91212",
+      "error": null
+    },
+    {
+      "recording": "Recording (4).m4a",
+      "trial": 1,
+      "ttfp": 1.837063799990574,
+      "ttfr": 8.728200499986997,
+      "partials": 15,
+      "finals": 1,
+      "duration": 8.728200499986997,
+      "transcript": "1234567891234.",
+      "error": null
+    },
+    {
+      "recording": "Recording (5).m4a",
+      "trial": 1,
+      "ttfp": 1.8363880999968387,
+      "ttfr": 8.897638099995675,
+      "partials": 15,
+      "finals": 1,
+      "duration": 8.897638099995675,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (6).m4a",
+      "trial": 1,
+      "ttfp": 1.9037875000212807,
+      "ttfr": 9.292737200012198,
+      "partials": 16,
+      "finals": 1,
+      "duration": 9.292737200012198,
+      "transcript": "123456789 10 123",
+      "error": null
+    },
+    {
+      "recording": "Recording (7).m4a",
+      "trial": 1,
+      "ttfp": 1.786751199979335,
+      "ttfr": 8.739026299997931,
+      "partials": 15,
+      "finals": 1,
+      "duration": 8.739026299997931,
+      "transcript": "1234, 567891012.",
+      "error": null
+    },
+    {
+      "recording": "Recording (8).m4a",
+      "trial": 1,
+      "ttfp": 1.8468723999976646,
+      "ttfr": 8.914063099975465,
+      "partials": 15,
+      "finals": 1,
+      "duration": 8.914063099975465,
+      "transcript": "12345678 91123",
+      "error": null
+    },
+    {
+      "recording": "Recording.m4a",
+      "trial": 1,
+      "ttfp": 2.0621836000063922,
+      "ttfr": 8.488641999982065,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.488641999982065,
+      "transcript": "1234, 5678911234.",
+      "error": null
+    },
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 2,
+      "ttfp": 2.049519299995154,
+      "ttfr": 8.727899299992714,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.727899299992714,
+      "transcript": "123456 78910123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 3,
+      "ttfp": 2.0456704000243917,
+      "ttfr": 8.717899800016312,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.717899800016312,
+      "transcript": "123456 78910123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 4,
+      "ttfp": 2.0729814000078477,
+      "ttfr": 8.75340660000802,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.75340660000802,
+      "transcript": "123456 78910123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 2,
+      "ttfp": 1.8738626000122167,
+      "ttfr": 8.297503999987384,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.297503999987384,
+      "transcript": "12345678 91212",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 3,
+      "ttfp": 1.8557440000004135,
+      "ttfr": 8.317275100009283,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.317275100009283,
+      "transcript": "12345678 91212",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 4,
+      "ttfp": 1.863822400016943,
+      "ttfr": 8.306912900006864,
+      "partials": 14,
+      "finals": 1,
+      "duration": 8.306912900006864,
+      "transcript": "12345678 91212",
+      "error": null
+    }
+  ],
+  "batch": [
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 1,
+      "submit": 0.5582611999998335,
+      "poll": 6.601401199994143,
+      "poll_count": 7,
+      "fetch": 0.36665119999088347,
+      "total": 7.52631359998486,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 1,
+      "submit": 0.12855629998375662,
+      "poll": 7.647612800006755,
+      "poll_count": 8,
+      "fetch": 0.35387090002768673,
+      "total": 8.130040000018198,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (4).m4a",
+      "trial": 1,
+      "submit": 0.15212239997345023,
+      "poll": 6.548204800026724,
+      "poll_count": 7,
+      "fetch": 0.3380294000089634,
+      "total": 7.038356600009138,
+      "transcript": "123456789 10 1234.",
+      "error": null
+    },
+    {
+      "recording": "Recording (5).m4a",
+      "trial": 1,
+      "submit": 0.14143499999772757,
+      "poll": 6.599376199999824,
+      "poll_count": 7,
+      "fetch": 0.3585687000013422,
+      "total": 7.099379899998894,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (6).m4a",
+      "trial": 1,
+      "submit": 0.1299705000128597,
+      "poll": 7.62505569998757,
+      "poll_count": 8,
+      "fetch": 0.2980822999961674,
+      "total": 8.053108499996597,
+      "transcript": "123456789 10 123",
+      "error": null
+    },
+    {
+      "recording": "Recording (7).m4a",
+      "trial": 1,
+      "submit": 0.13251100000343286,
+      "poll": 6.543169399985345,
+      "poll_count": 7,
+      "fetch": 0.2852481000008993,
+      "total": 6.960928499989677,
+      "transcript": "123456789 1012.",
+      "error": null
+    },
+    {
+      "recording": "Recording (8).m4a",
+      "trial": 1,
+      "submit": 0.14261749997967854,
+      "poll": 7.6180851999961305,
+      "poll_count": 8,
+      "fetch": 0.35843610001029447,
+      "total": 8.119138799986104,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording.m4a",
+      "trial": 1,
+      "submit": 0.13664719997905195,
+      "poll": 7.613806900015334,
+      "poll_count": 8,
+      "fetch": 0.3381678000150714,
+      "total": 8.088621900009457,
+      "transcript": "123456789 10 1234.",
+      "error": null
+    },
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 2,
+      "submit": 0.12512640000204556,
+      "poll": 7.639505099999951,
+      "poll_count": 8,
+      "fetch": 0.29258179999305867,
+      "total": 8.057213299995055,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 3,
+      "submit": 0.1309635000070557,
+      "poll": 7.605268499988597,
+      "poll_count": 8,
+      "fetch": 0.3264897000044584,
+      "total": 8.062721700000111,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (2).m4a",
+      "trial": 4,
+      "submit": 0.13832190001267008,
+      "poll": 6.815447299974039,
+      "poll_count": 7,
+      "fetch": 0.27448399999411777,
+      "total": 7.228253199980827,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 2,
+      "submit": 0.16658859999733977,
+      "poll": 7.652235300018219,
+      "poll_count": 8,
+      "fetch": 0.29352899998775683,
+      "total": 8.112352900003316,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 3,
+      "submit": 0.14738380000926554,
+      "poll": 7.634155599982478,
+      "poll_count": 8,
+      "fetch": 0.2916490000206977,
+      "total": 8.073188400012441,
+      "transcript": "123456789 10 123.",
+      "error": null
+    },
+    {
+      "recording": "Recording (3).m4a",
+      "trial": 4,
+      "submit": 0.1431940000038594,
+      "poll": 8.720017100014957,
+      "poll_count": 9,
+      "fetch": 0.31537789999856614,
+      "total": 9.178589000017382,
+      "transcript": "123456789 10 123.",
+      "error": null
+    }
+  ]
+}

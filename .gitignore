@@ -22,7 +22,7 @@ __pycache__/
 *$py.class
 *.so
 venv/
-.venv/
+.venv*/
 *.egg-info/
 build/
 
@@ -44,6 +44,10 @@ local_uploads/
 
 # AWS cert
 global-bundle.pem
+
+# STT bench audio fixtures — not tracked (binary, contains author's voice).
+# Harness + raw results JSON are tracked; audio available on request.
+tests/fixtures/stt/*.m4a
 
 # Editor / IDE
 .vs/
