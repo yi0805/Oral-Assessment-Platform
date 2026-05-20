@@ -10,6 +10,7 @@ import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 import { useStudentSpeechStream } from "./useStudentSpeechStream";
 import { useRecordBlurNotification } from "./useRecordBlurNotification";
+import { useRecordReconnect } from "./useRecordReconnect";
 
 // [STT #72] Streaming path is the default after the rollout in
 // commit 28 of feature/audio-to-text. Set VITE_STT_STREAMING=0 in
@@ -57,6 +58,8 @@ export default function StudentAssessment() {
 
   const [blurCount, setBlurCount] = useState(0);
 
+  const [disconnectCount, setDisconnectCount] = useState(0);
+
   const hasAutoCompleted = useRef(false);
   const autoRetryTimerRef = useRef(null);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -83,6 +86,7 @@ export default function StudentAssessment() {
   } = useAudioRecorder();
   const { completeAssessment } = useCompleteAssessment();
   const { recordBlurNotification } = useRecordBlurNotification();
+  const { recordReconnectNotification } = useRecordReconnect();
 
   // [STT #72] Streaming hook is always instantiated so React's
   // rules-of-hooks stay happy; the rest of the component branches on
@@ -145,6 +149,53 @@ export default function StudentAssessment() {
   }, []);
 
   useEffect(() => {
+    if (!sessionId) return;
+
+    const offlineKey = `assessment_offline_${sessionId}`;
+    const countKey = `assessment_reconnects_${sessionId}`;
+
+    let restored = Number(localStorage.getItem(countKey)) || 0;
+
+    if (localStorage.getItem(offlineKey) && navigator.onLine) {
+      localStorage.removeItem(offlineKey);
+      restored += 1;
+      localStorage.setItem(countKey, String(restored));
+    }
+
+    setDisconnectCount(restored);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const offlineKey = `assessment_offline_${sessionId}`;
+    const countKey = `assessment_reconnects_${sessionId}`;
+
+    function handleOffline() {
+      localStorage.setItem(offlineKey, "1");
+    }
+
+    function handleOnline() {
+      if (!localStorage.getItem(offlineKey)) return;
+
+      localStorage.removeItem(offlineKey);
+      setDisconnectCount((count) => {
+        const next = count + 1;
+        localStorage.setItem(countKey, String(next));
+        return next;
+      });
+    }
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [sessionId]);
+
+  useEffect(() => {
     if (timeLeft == null) return;
     if (timeLeft > 0) return;
     if (!sessionId) return;
@@ -178,7 +229,22 @@ export default function StudentAssessment() {
           }
         }
 
+        if (disconnectCount > 0) {
+          try {
+            await recordReconnectNotification({ sessionId, disconnectCount });
+          } catch (reconnectError) {
+            setError(
+              getErrorMessage(
+                reconnectError,
+                "Failed to record reconnect notification.",
+              ),
+            );
+          }
+        }
+
         await completeAssessment({ sessionId, courseId });
+        localStorage.removeItem(`assessment_reconnects_${sessionId}`);
+        localStorage.removeItem(`assessment_offline_${sessionId}`);
         navigate(`/student/${courseId}`);
       } catch (error) {
         setError(getErrorMessage(error, "Failed to submit assessment."));
@@ -202,8 +268,10 @@ export default function StudentAssessment() {
     isRecording,
     completeAssessment,
     recordBlurNotification,
+    recordReconnectNotification,
     submitAnswer,
     blurCount,
+    disconnectCount,
     typedAnswer,
     navigate,
     courseId,
@@ -399,7 +467,22 @@ export default function StudentAssessment() {
         }
       }
 
+      if (disconnectCount > 0 && sessionId) {
+        try {
+          await recordReconnectNotification({ sessionId, disconnectCount });
+        } catch (reconnectError) {
+          setError(
+            getErrorMessage(
+              reconnectError,
+              "Failed to record reconnect notification.",
+            ),
+          );
+        }
+      }
+
       await completeAssessment({ sessionId, courseId });
+      localStorage.removeItem(`assessment_reconnects_${sessionId}`);
+      localStorage.removeItem(`assessment_offline_${sessionId}`);
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
@@ -675,7 +758,7 @@ export default function StudentAssessment() {
           </h1>
 
           <p className="mt-2 text-xs text-on-surface-variant">
-            The exam clock continues running while you are away from this page.
+            Assessment timer continues if you logout or disconnect.
           </p>
         </div>
 
@@ -835,7 +918,7 @@ export default function StudentAssessment() {
                       role="progressbar"
                       aria-label="Transcribing your answer"
                     >
-                      <div className="animate-indeterminate-bar h-full w-1/3 rounded-full bg-primary" />
+                      <div className="h-full w-1/3 animate-indeterminate-bar rounded-full bg-primary" />
                     </div>
                   )}
 

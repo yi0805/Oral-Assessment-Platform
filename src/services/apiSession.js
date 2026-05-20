@@ -134,6 +134,16 @@ export async function recordBlurNotification(sessionId, blurCount) {
   return response.data;
 }
 
+export async function recordReconnectNotification(sessionId, disconnectCount) {
+  const response = await api.post(
+    `/sessions/${sessionId}/reconnect-notification`,
+    {
+      disconnect_count: disconnectCount,
+    },
+  );
+  return response.data;
+}
+
 export async function getNotifications() {
   const response = await api.get("/notifications");
   return response.data;
