@@ -20,6 +20,7 @@ import { useRecordReconnect } from "./useRecordReconnect";
 const STREAMING_ENABLED = import.meta.env.VITE_STT_STREAMING !== "0";
 
 import Loading from "../../ui/Loading";
+import ConfirmModal from "../../ui/ConfirmModal";
 import { toRoman } from "../../utils/toRomanNumber";
 import { getErrorMessage } from "../../utils/getErrorMessage";
 
@@ -93,7 +94,9 @@ export default function StudentAssessment() {
   // STREAMING_ENABLED to decide whether to use it.
   const speech = useStudentSpeechStream();
 
-  const { logout } = useLogout();
+  const { logout, isPending: isLoggingOut } = useLogout();
+
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
 
   // [STT #72] Unified "isRecording" / "isTranscribing" derived from
   // whichever flow is active. Downstream UI (mic-button styling,
@@ -708,6 +711,18 @@ export default function StudentAssessment() {
 
   return (
     <div className="font-body selection:bg-primary-container selection:text-on-primary-container">
+      {confirmingLogout && (
+        <ConfirmModal
+          title="Log out of assessment?"
+          message="The assessment timer keeps running after you log out, and the assessment will be submitted automatically when time runs out. Are you sure you want to log out?"
+          confirmLabel="Yes, log out"
+          loadingLabel="Logging out…"
+          isLoading={isLoggingOut}
+          onConfirm={() => logout()}
+          onCancel={() => setConfirmingLogout(false)}
+        />
+      )}
+
       <header className="fixed top-0 z-40 flex h-16 w-full items-center justify-between bg-[#f8f9fa] px-8">
         <div className="flex items-center gap-4">
           <span className="font-headline text-xl font-bold tracking-tight text-[#4f6073]">
@@ -737,7 +752,7 @@ export default function StudentAssessment() {
 
             <button
               className="rounded-lg px-4 py-2 text-sm font-semibold text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"
-              onClick={() => logout()}
+              onClick={() => setConfirmingLogout(true)}
             >
               Logout
             </button>
@@ -757,9 +772,9 @@ export default function StudentAssessment() {
             {assessmentTitle || "Assessment Title Not Available"}
           </h1>
 
-          <p className="mt-2 text-xs text-on-surface-variant">
+          {/* <p className="mt-2 text-xs text-on-surface-variant">
             Assessment timer continues if you logout or disconnect.
-          </p>
+          </p> */}
         </div>
 
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
