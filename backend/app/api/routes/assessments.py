@@ -521,6 +521,7 @@ def copy_assessment(
             description=source_config.description,
             rubric_id=new_rubric.id,
             total_time_minute=source_config.total_time_minute,
+            buffer_time_minute=source_config.buffer_time_minute,
             main_question_num=source_config.main_question_num,
             follow_up_num=source_config.follow_up_num,
             release_time=None,

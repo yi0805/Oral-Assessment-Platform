@@ -38,6 +38,7 @@ function GeneratePanel() {
 
   const [numQuestions, setNumQuestions] = useState("");
   const [assessmentTime, setAssessmentTime] = useState("");
+  const [bufferTime, setBufferTime] = useState("");
 
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
@@ -82,6 +83,7 @@ function GeneratePanel() {
     assessmentName,
     numQuestions,
     assessmentTime,
+    bufferTime,
   });
 
   const isValid = configValid && materialReady && isRubricValid(rubricRows);
@@ -134,6 +136,7 @@ function GeneratePanel() {
         assessmentName,
         numQuestions: Number(numQuestions),
         totalTime: Number(assessmentTime),
+        bufferTime: bufferTime === "" ? 0 : Number(bufferTime),
         releaseTime: release,
         dueTime: due,
       });
@@ -268,6 +271,8 @@ function GeneratePanel() {
                 onNumQuestionsChange={setNumQuestions}
                 assessmentTime={assessmentTime}
                 onAssessmentTimeChange={setAssessmentTime}
+                bufferTime={bufferTime}
+                onBufferTimeChange={setBufferTime}
                 releaseTime={releaseTime}
                 onReleaseTimeChange={setReleaseTime}
                 dueTime={dueTime}

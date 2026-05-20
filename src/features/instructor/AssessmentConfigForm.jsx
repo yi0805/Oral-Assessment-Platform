@@ -2,10 +2,12 @@ import { useState } from "react";
 
 import DateTimePicker from "../../ui/DateTimePicker";
 import {
+  MAX_BUFFER_MIN,
   MAX_QUESTIONS,
   MAX_TIME_MIN,
   validateAssessmentName,
   validateAssessmentTime,
+  validateBufferTime,
   validateNumQuestions,
 } from "./assessmentFormUtils";
 
@@ -19,6 +21,8 @@ export default function AssessmentConfigForm({
   onNumQuestionsChange,
   assessmentTime,
   onAssessmentTimeChange,
+  bufferTime,
+  onBufferTimeChange,
   releaseTime,
   onReleaseTimeChange,
   dueTime,
@@ -32,11 +36,13 @@ export default function AssessmentConfigForm({
     assessmentName: false,
     numQuestions: false,
     assessmentTime: false,
+    bufferTime: false,
   });
 
   const assessmentNameError = validateAssessmentName(assessmentName);
   const numQuestionsError = validateNumQuestions(numQuestions);
   const assessmentTimeError = validateAssessmentTime(assessmentTime);
+  const bufferTimeError = validateBufferTime(bufferTime);
 
   function markTouched(field) {
     setTouched((current) => ({ ...current, [field]: true }));
@@ -57,33 +63,33 @@ export default function AssessmentConfigForm({
 
       <form className="space-y-6">
         {!hideCourseSelect && (
-        <div className="space-y-2">
-          <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
-            Select Course
-          </label>
+          <div className="space-y-2">
+            <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+              Select Course
+            </label>
 
-          <div className="group relative">
-            <select
-              className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
-              value={courseId}
-              onChange={(e) => onCourseIdChange(e.target.value)}
-            >
-              {courses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.course_code || "Unknown Course"}
-                </option>
-              ))}
-            </select>
+            <div className="group relative">
+              <select
+                className="w-full cursor-pointer appearance-none rounded-xl border-none bg-surface-container-low px-4 py-3 text-on-surface transition-all focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                value={courseId}
+                onChange={(e) => onCourseIdChange(e.target.value)}
+              >
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.course_code || "Unknown Course"}
+                  </option>
+                ))}
+              </select>
 
-            <span
-              className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
-              data-icon="expand_more"
-              style={{ verticalAlign: "middle" }}
-            >
-              expand_more
-            </span>
+              <span
+                className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                data-icon="expand_more"
+                style={{ verticalAlign: "middle" }}
+              >
+                expand_more
+              </span>
+            </div>
           </div>
-        </div>
         )}
 
         <div className="space-y-2">
@@ -163,6 +169,42 @@ export default function AssessmentConfigForm({
               </p>
             )}
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="ml-1 block text-sm font-semibold text-on-surface-variant">
+            Buffer Time{" "}
+            <span className="font-normal text-outline">(optional)</span>
+          </label>
+
+          <div className="relative">
+            <input
+              className="w-full rounded-xl border-none bg-surface-container-low px-4 py-3 pr-20 text-on-surface transition-all placeholder:text-outline focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+              min={0}
+              max={MAX_BUFFER_MIN}
+              step={1}
+              placeholder="e.g. 5"
+              type="number"
+              value={bufferTime}
+              disabled={disabled || onlyDueDate}
+              onChange={(e) => onBufferTimeChange(e.target.value)}
+              onBlur={() => markTouched("bufferTime")}
+            />
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-outline">
+              minutes
+            </span>
+          </div>
+
+          {touched.bufferTime && bufferTimeError ? (
+            <p className="ml-1 text-xs font-medium text-error">
+              {bufferTimeError}
+            </p>
+          ) : (
+            <p className="ml-1 text-[11px] text-outline">
+              Extra time for technical issues, added to every student&apos;s
+              time limit.
+            </p>
+          )}
         </div>
 
         <div className="space-y-1.5">

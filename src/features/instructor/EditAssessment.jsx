@@ -54,6 +54,7 @@ export default function EditAssessment() {
   const [assessmentName, setAssessmentName] = useState("");
   const [numQuestions, setNumQuestions] = useState("");
   const [assessmentTime, setAssessmentTime] = useState("");
+  const [bufferTime, setBufferTime] = useState("");
   const [releaseTime, setReleaseTime] = useState(null);
   const [dueTime, setDueTime] = useState(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -94,6 +95,10 @@ export default function EditAssessment() {
         assessment.total_time_minute != null
           ? String(assessment.total_time_minute)
           : "",
+      bufferTime:
+        assessment.buffer_time_minute != null
+          ? String(assessment.buffer_time_minute)
+          : "",
       releaseTime: assessment.release_time
         ? new Date(assessment.release_time)
         : null,
@@ -104,6 +109,7 @@ export default function EditAssessment() {
     setAssessmentName(form.assessmentName);
     setNumQuestions(form.numQuestions);
     setAssessmentTime(form.assessmentTime);
+    setBufferTime(form.bufferTime);
     setReleaseTime(form.releaseTime);
     setDueTime(form.dueTime);
     setRubricRows(rows);
@@ -128,6 +134,7 @@ export default function EditAssessment() {
       assessmentName,
       numQuestions,
       assessmentTime,
+      bufferTime,
       releaseTime,
       dueTime,
     },
@@ -140,7 +147,12 @@ export default function EditAssessment() {
 
   const canSave =
     formEnabled &&
-    isAssessmentConfigValid({ assessmentName, numQuestions, assessmentTime }) &&
+    isAssessmentConfigValid({
+      assessmentName,
+      numQuestions,
+      assessmentTime,
+      bufferTime,
+    }) &&
     isDirty &&
     rubricValid &&
     !isSavingRubric;
@@ -156,6 +168,8 @@ export default function EditAssessment() {
         payload: {
           title: assessmentName,
           total_time_minute: Math.round(Number(assessmentTime)),
+          buffer_time_minute:
+            bufferTime === "" ? 0 : Math.round(Number(bufferTime)),
           main_question_num: Number(numQuestions),
           release_time: releaseTime?.toISOString() ?? null,
           due_time: dueTime?.toISOString() ?? null,
@@ -187,6 +201,8 @@ export default function EditAssessment() {
         payload: {
           title: assessmentName,
           total_time_minute: Math.round(Number(assessmentTime)),
+          buffer_time_minute:
+            bufferTime === "" ? 0 : Math.round(Number(bufferTime)),
           main_question_num: Number(numQuestions),
           release_time: releaseTime?.toISOString() ?? null,
           due_time: dueTime?.toISOString() ?? null,
@@ -331,6 +347,8 @@ export default function EditAssessment() {
                 onNumQuestionsChange={setNumQuestions}
                 assessmentTime={assessmentTime}
                 onAssessmentTimeChange={setAssessmentTime}
+                bufferTime={bufferTime}
+                onBufferTimeChange={setBufferTime}
                 releaseTime={releaseTime}
                 onReleaseTimeChange={setReleaseTime}
                 dueTime={dueTime}

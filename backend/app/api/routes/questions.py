@@ -106,6 +106,7 @@ async def generate_question(
         title=payload.assessment_title,
         rubric_id=payload.rubric_id,
         total_time_minute=payload.total_time_minutes,
+        buffer_time_minute=payload.buffer_time_minutes,
         main_question_num=payload.num_main_questions,
         follow_up_num=payload.max_followups_per_main,
         status="draft",

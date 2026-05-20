@@ -15,6 +15,7 @@ export function useQuestionGenerate() {
       assessmentName,
       numQuestions,
       totalTime,
+      bufferTime,
       releaseTime,
       dueTime,
     }) =>
@@ -27,6 +28,7 @@ export function useQuestionGenerate() {
         numQuestions,
         releaseTime,
         dueTime,
+        bufferTime,
       ),
 
     onSuccess: (data, variables) => {
