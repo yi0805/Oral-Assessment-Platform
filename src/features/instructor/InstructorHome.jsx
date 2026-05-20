@@ -4,29 +4,58 @@ import { useState } from "react";
 import { useCourses } from "../../hooks/useCourses";
 import { usePendingReviews } from "./usePendingReviews";
 import { useCreateCourse } from "./useCreateCourse";
+import { useCreateJoinRequest } from "./useCreateJoinRequest";
 
 import InstructorCourseCard from "../../ui/InstructorCourseCard";
 import Spinner from "../../ui/Spinner";
-import { courseCodeRegex } from "../../utils/constants";
+import {
+  courseCodeRegex,
+  formatTermLabel,
+  getDefaultTerm,
+  getYearOptions,
+  groupCoursesByTerm,
+  termOptions,
+} from "../../utils/constants";
 
 function InstructorHome() {
   const navigate = useNavigate();
+
+  const yearOptions = getYearOptions();
+  const defaultTerm = getDefaultTerm();
 
   const [showCourseModal, setShowCourseModal] = useState(false);
 
   const [courseCode, setCourseCode] = useState("");
   const [courseName, setCourseName] = useState("");
+  const [year, setYear] = useState(yearOptions[0]);
+  const [term, setTerm] = useState(defaultTerm);
   const [description, setDescription] = useState("");
 
   const [courseCodeError, setCourseCodeError] = useState("");
   const [courseNameError, setCourseNameError] = useState("");
   const [courseDescriptionError, setCourseDescriptionError] = useState("");
 
+  const [conflict, setConflict] = useState(null);
+
   const { courses, isLoading } = useCourses();
   const { createCourse, isPending } = useCreateCourse();
+  const { requestJoin, isPending: isJoinPending } = useCreateJoinRequest();
 
   const { pendingReviews, isLoading: isPendingReviewsLoading } =
     usePendingReviews();
+
+  const termGroups = groupCoursesByTerm(courses);
+
+  function resetForm() {
+    setCourseCode("");
+    setCourseName("");
+    setDescription("");
+    setCourseCodeError("");
+    setCourseNameError("");
+    setCourseDescriptionError("");
+    setYear(yearOptions[0]);
+    setTerm(defaultTerm);
+  }
 
   if (isLoading || isPendingReviewsLoading) return <Spinner />;
 
@@ -50,27 +79,51 @@ function InstructorHome() {
       return;
     }
 
+    const payloadTerm = `${year}${term}`;
+
     createCourse(
       {
         course_code: trimmedCourseCode,
         course_name: trimmedCourseName,
+        term: payloadTerm,
         description: trimmedDescription,
       },
       {
         onSuccess: () => {
-          setCourseCode("");
-          setCourseName("");
-          setDescription("");
-          setCourseCodeError("");
+          resetForm();
           setShowCourseModal(false);
+        },
+        onError: (err) => {
+          const conflictData =
+            err?.response?.status === 409 &&
+            typeof err?.response?.data === "object" &&
+            err?.response?.data?.course_id
+              ? err.response.data
+              : null;
+
+          if (conflictData) {
+            setConflict(conflictData);
+          }
         },
       },
     );
   }
 
+  function handleConfirmJoin() {
+    if (!conflict?.course_id) return;
+
+    requestJoin(conflict.course_id, {
+      onSuccess: () => {
+        setConflict(null);
+        resetForm();
+        setShowCourseModal(false);
+      },
+    });
+  }
+
   return (
     <>
-      <main className="min-h-screen bg-surface pl-64 pt-24">
+      <main className="min-h-screen bg-surface pt-24">
         <div className="mx-auto max-w-7xl px-10 pb-20">
           <header className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
             <div>
@@ -128,9 +181,38 @@ function InstructorHome() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
-            <InstructorCourseCard courses={courses} />
-          </div>
+          {courses.length === 0 ? (
+            <div className="flex flex-col items-center rounded-xl border border-dashed border-outline-variant/30 bg-surface-container-low/40 p-12 text-center">
+              <span
+                className="material-symbols-outlined mb-3 text-4xl text-outline"
+                style={{ verticalAlign: "middle" }}
+              >
+                library_books
+              </span>
+
+              <p className="text-sm font-bold text-on-surface">
+                No courses yet
+              </p>
+
+              <p className="mt-1 text-xs text-on-surface-variant">
+                Create your first course using the + button in the bottom right.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-12">
+              {termGroups.map(({ term: groupTerm, items }) => (
+                <section key={groupTerm}>
+                  <h2 className="mb-6 font-headline text-xl font-bold tracking-tight text-on-surface">
+                    {formatTermLabel(groupTerm)}
+                  </h2>
+
+                  <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
+                    <InstructorCourseCard courses={items} />
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
         </div>
       </main>
       <div className="fixed bottom-8 right-8 z-50">
@@ -212,6 +294,52 @@ function InstructorHome() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label
+                    className="block font-headline text-xs font-bold uppercase tracking-widest text-secondary"
+                    htmlFor="course-year"
+                  >
+                    Year
+                  </label>
+
+                  <select
+                    className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 font-body text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    id="course-year"
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                  >
+                    {yearOptions.map((y) => (
+                      <option key={y} value={y}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label
+                    className="block font-headline text-xs font-bold uppercase tracking-widest text-secondary"
+                    htmlFor="course-term"
+                  >
+                    Term
+                  </label>
+
+                  <select
+                    className="w-full rounded-xl border border-outline-variant/30 bg-surface-container-low px-4 py-3 font-body text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    id="course-term"
+                    value={term}
+                    onChange={(e) => setTerm(e.target.value)}
+                  >
+                    {termOptions.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label
                   className="block font-headline text-xs font-bold uppercase tracking-widest text-secondary"
@@ -252,6 +380,58 @@ function InstructorHome() {
               >
                 {isPending ? "Creating..." : "Confirm"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {conflict && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-inverse-surface/40 p-4 backdrop-blur-sm">
+          <div className="animate-in fade-in zoom-in w-full max-w-md overflow-hidden rounded-2xl border border-outline-variant/20 bg-surface-container-lowest shadow-2xl duration-300">
+            <div className="border-b border-outline-variant/10 p-6">
+              <h3 className="font-headline text-lg font-extrabold tracking-tight text-on-surface">
+                Course already exists
+              </h3>
+            </div>
+
+            <div className="p-6">
+              {conflict.already_enrolled ? (
+                <p className="font-body text-sm text-on-surface-variant">
+                  You&apos;re already enrolled in this course.
+                </p>
+              ) : conflict.has_pending_request ? (
+                <p className="font-body text-sm text-on-surface-variant">
+                  You&apos;ve already requested to join this course. Awaiting
+                  response from the original instructor.
+                </p>
+              ) : (
+                <p className="font-body text-sm text-on-surface-variant">
+                  This course was created by another instructor. Would you like
+                  to request to join as an instructor?
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-outline-variant/10 bg-surface-container-low p-4">
+              <button
+                className="rounded-xl px-5 py-2 font-headline text-sm font-bold text-secondary transition-all hover:bg-surface-container-high"
+                onClick={() => setConflict(null)}
+              >
+                {conflict.already_enrolled || conflict.has_pending_request
+                  ? "Close"
+                  : "Cancel"}
+              </button>
+
+              {!conflict.already_enrolled && !conflict.has_pending_request && (
+                <button
+                  className="rounded-xl bg-primary px-5 py-2 font-headline text-sm font-bold text-on-primary shadow-lg shadow-primary/20 transition-all hover:bg-primary-dim active:scale-95 disabled:opacity-50"
+                  type="button"
+                  onClick={handleConfirmJoin}
+                  disabled={isJoinPending}
+                >
+                  {isJoinPending ? "Requesting..." : "Request to join"}
+                </button>
+              )}
             </div>
           </div>
         </div>

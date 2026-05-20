@@ -10,15 +10,12 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.limiter import limiter
 
-# [STT Instrumentation - issue #72]
-# Surface app.* loggers (e.g. logger = logging.getLogger(__name__) inside
-# app.utils.audio_transcriber) at INFO level so the [STT timings] lines
-# show up in uvicorn's stdout. Without this the root logger sits at
-# WARNING by default and INFO calls get dropped silently.
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
+
+logging.getLogger("app").setLevel(logging.INFO)
 
 
 # application entry point, FastAPI app instance, and global middleware setup.

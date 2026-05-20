@@ -92,7 +92,7 @@ function Transcript() {
 
   return (
     <div className="font-body">
-      <main className="min-h-screen pl-64 pt-16">
+      <main className="min-h-screen pt-16">
         <div className="mx-auto max-w-6xl px-12 py-16">
           <button
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
@@ -160,11 +160,35 @@ function Transcript() {
                     <span className="rounded-full bg-tertiary-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-tertiary-container">
                       Active Enrollment
                     </span>
-                    {transcript.blur_count != null && transcript.blur_count >= 3 && (
-                      <span className="rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-error-container">
-                        Tab Switches · {transcript.blur_count}
-                      </span>
-                    )}
+                    {transcript.resume_count != null &&
+                      transcript.resume_count > 0 && (
+                        <span
+                          title="Times the student reopened or logged back into the assessment."
+                          className="rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-error-container"
+                        >
+                          Re-entries · {transcript.resume_count}
+                        </span>
+                      )}
+
+                    {transcript.blur_count != null &&
+                      transcript.blur_count > 0 && (
+                        <span
+                          title="Times the student switched away from question tab during the assessment."
+                          className="rounded-full bg-error-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-error-container"
+                        >
+                          Tab Switches · {transcript.blur_count}
+                        </span>
+                      )}
+
+                    {transcript.disconnect_count != null &&
+                      transcript.disconnect_count > 0 && (
+                        <span
+                          title="Times the student's network dropped and reconnected during the assessment."
+                          className="rounded-full bg-tertiary-container px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-on-tertiary-container"
+                        >
+                          Reconnects · {transcript.disconnect_count}
+                        </span>
+                      )}
                   </div>
                 </div>
               </div>
@@ -190,25 +214,26 @@ function Transcript() {
                   </span>
                 </div>
 
-                {Object.entries(transcript.ai_summary?.detailed_feedback ?? {}).length > 0 ? (
+                {Object.entries(transcript.ai_summary?.detailed_feedback ?? {})
+                  .length > 0 ? (
                   <div className="mt-4 space-y-3">
-                    {Object.entries(transcript.ai_summary.detailed_feedback).map(
-                      ([criterion, data]) => (
-                        <div key={criterion} className="space-y-1">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <h4 className="text-[11px] font-bold uppercase tracking-widest text-on-primary-container">
-                              {criterion}
-                            </h4>
-                            <span className="text-xs font-bold text-on-primary-container opacity-70">
-                              {data?.suggested_points ?? "-"}
-                            </span>
-                          </div>
-                          <p className="text-xs font-medium leading-snug text-on-primary-container opacity-90">
-                            {data?.feedback || "No feedback for this criterion."}
-                          </p>
+                    {Object.entries(
+                      transcript.ai_summary.detailed_feedback,
+                    ).map(([criterion, data]) => (
+                      <div key={criterion} className="space-y-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <h4 className="text-[11px] font-bold uppercase tracking-widest text-on-primary-container">
+                            {criterion}
+                          </h4>
+                          <span className="text-xs font-bold text-on-primary-container opacity-70">
+                            {data?.suggested_points ?? "-"}
+                          </span>
                         </div>
-                      )
-                    )}
+                        <p className="text-xs font-medium leading-snug text-on-primary-container opacity-90">
+                          {data?.feedback || "No feedback for this criterion."}
+                        </p>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p className="mt-4 text-xs font-medium leading-snug text-on-primary-container">
@@ -355,7 +380,9 @@ function Transcript() {
                           max="100"
                           step="1"
                           value={finalGrade}
-                          onChange={(e) => setFinalGrade(e.target.value.replace(/\D/g, ""))}
+                          onChange={(e) =>
+                            setFinalGrade(e.target.value.replace(/\D/g, ""))
+                          }
                         />
 
                         <span className="text-lg font-bold text-outline">

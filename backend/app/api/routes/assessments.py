@@ -69,6 +69,22 @@ def release_assessment(
     if config.status != "draft":
         raise HTTPException(status_code=409, detail="Assessment is already published or closed.")
 
+    duplicate_title = (
+        db.query(AssessmentConfig)
+        .filter(
+            AssessmentConfig.course_id == course_id,
+            AssessmentConfig.title == config.title,
+            AssessmentConfig.status == "published",
+        )
+        .first()
+    )
+
+    if duplicate_title:
+        raise HTTPException(
+            status_code=409,
+            detail=f"A published assessment titled '{config.title}' already exists in this course.",
+        )
+
     if config.main_question_num is None:
         raise HTTPException(status_code=422, detail="main_question_num must be set before publishing.")
 
@@ -317,7 +333,7 @@ def delete_assessment(
     if not config:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
 
-    if config.status != "draft":
+    if config.status == "published":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Cannot delete a published assessment.")
 
     try:
@@ -395,79 +411,99 @@ def copy_assessment(
     new_title = payload.title if payload.title else f"Copy of {source_config.title}"
 
     is_cross_course = payload.target_course_id != course_id
-    new_material_id: UUID | None = None
-    new_storage_key: str | None = None
 
-    pool_material_id = source_pool.material_id
+    source_materials = list(source_pool.materials)
+
+    if not source_materials:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Source assessment has no materials to copy.",
+        )
+
+    new_storage_keys: list[str] = []
+
+    new_material_specs: list[dict] = []
 
     if is_cross_course:
-        source_material = (
-            db.query(Material).filter(Material.id == source_pool.material_id).first()
-        )
-
-        if not source_material:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Source material no longer exists.",
+        for src_mat in source_materials:
+            new_mid = uuid4()
+            new_key = s3_client.generate_key(
+                payload.target_course_id, new_mid, src_mat.filename
             )
 
-        new_material_id = uuid4()
-        new_storage_key = s3_client.generate_key(
-            payload.target_course_id, new_material_id, source_material.filename
-        )
+            try:
+                s3_client.copy_object(src_mat.storage_key, new_key)
 
-        try:
-            s3_client.copy_object(source_material.storage_key, new_storage_key)
+            except RuntimeError as exc:
+                for k in new_storage_keys:
+                    try:
+                        s3_client.delete_file(k)
 
-        except RuntimeError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Storage copy failed: {exc}",
-            ) from exc
+                    except Exception:
+                        logger.exception(
+                            "Cleanup failed during copy_assessment S3 rollback: key=%s",
+                            k,
+                        )
 
-        pool_material_id = new_material_id
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=f"Storage copy failed: {exc}",
+                ) from exc
 
-    # Orphan cleanup: if the S3 copy succeeded but DB writes fail, drop the new
+            new_storage_keys.append(new_key)
+            new_material_specs.append({
+                "new_id": new_mid,
+                "new_storage_key": new_key,
+                "source": src_mat,
+            })
+
+    # Orphan cleanup: if S3 copies succeeded but DB writes fail, drop the new objects
     def _cleanup_orphan_storage() -> None:
-        if new_storage_key is None:
-            return
-        try:
-            s3_client.delete_file(new_storage_key)
-        except Exception:
-            logger.exception(
-                "Orphan S3 object after copy_assessment rollback; "
-                "manual cleanup needed: storage_key=%s",
-                new_storage_key,
-            )
+        for key in new_storage_keys:
+            try:
+                s3_client.delete_file(key)
+
+            except Exception:
+                logger.exception(
+                    "Orphan S3 object after copy_assessment rollback; "
+                    "manual cleanup needed: storage_key=%s",
+                    key,
+                )
 
     try:
+        new_materials: list[Material] = []
+
         if is_cross_course:
-            new_material = Material(
-                id=new_material_id,
-                course_id=payload.target_course_id,
-                filename=source_material.filename,
-                mime_type=source_material.mime_type,
-                storage_key=new_storage_key,
-                material_category=source_material.material_category,
-            )
-            db.add(new_material)
-
-            source_chunks = (
-                db.query(MaterialChunk)
-                .filter(MaterialChunk.material_id == source_material.id)
-                .order_by(MaterialChunk.chunk_index)
-                .all()
-            )
-
-            db.add_all([
-                MaterialChunk(
-                    material_id=new_material_id,
-                    chunk_index=ch.chunk_index,
-                    chunk_text=ch.chunk_text,
-                    embedding=ch.embedding,
+            for spec in new_material_specs:
+                src = spec["source"]
+                new_material = Material(
+                    id=spec["new_id"],
+                    course_id=payload.target_course_id,
+                    filename=src.filename,
+                    mime_type=src.mime_type,
+                    storage_key=spec["new_storage_key"],
+                    material_category=src.material_category,
                 )
-                for ch in source_chunks
-            ])
+                
+                db.add(new_material)
+                new_materials.append(new_material)
+
+                source_chunks = (
+                    db.query(MaterialChunk)
+                    .filter(MaterialChunk.material_id == src.id)
+                    .order_by(MaterialChunk.chunk_index)
+                    .all()
+                )
+
+                db.add_all([
+                    MaterialChunk(
+                        material_id=spec["new_id"],
+                        chunk_index=ch.chunk_index,
+                        chunk_text=ch.chunk_text,
+                        embedding=ch.embedding,
+                    )
+                    for ch in source_chunks
+                ])
 
         # Copy rubric (independent from original)
         new_rubric = Rubric(
@@ -485,6 +521,7 @@ def copy_assessment(
             description=source_config.description,
             rubric_id=new_rubric.id,
             total_time_minute=source_config.total_time_minute,
+            buffer_time_minute=source_config.buffer_time_minute,
             main_question_num=source_config.main_question_num,
             follow_up_num=source_config.follow_up_num,
             release_time=None,
@@ -497,11 +534,13 @@ def copy_assessment(
         # Copy question pool and its questions
         new_pool = QuestionPool(
             assessment_config_id=new_config.id,
-            material_id=pool_material_id,
             status="draft",
         )
         db.add(new_pool)
         db.flush()
+
+
+        new_pool.materials = new_materials if is_cross_course else source_materials
 
         source_questions = (
             db.query(Question)

@@ -4,23 +4,36 @@ import { useCourses } from "../../hooks/useCourses";
 import { useUser } from "../authentication/useUser";
 
 import SearchCouse from "../../ui/SearchCouse";
-import CourseCard from "../../ui/CourseCard";
+import CourseGrid from "../../ui/CourseGrid";
 import Spinner from "../../ui/Spinner";
+import { formatTermLabel, groupCoursesByTerm } from "../../utils/constants";
 
 export default function StudentHome() {
   const [search, setSearch] = useState("");
+  const [showPast, setShowPast] = useState(false);
 
   const { user, isLoading: isUserLoading } = useUser();
   const { courses, isLoading } = useCourses();
 
   if (isLoading || isUserLoading) return <Spinner />;
 
-  const filteredCouses = courses.filter((course) =>
-    course.course_code.toLowerCase().includes(search.toLowerCase()),
-  );
+  const isSearching = search.trim() !== "";
+
+  const filteredCouses = courses.filter((course) => {
+    const query = search.toLowerCase();
+
+    return (
+      course.course_code.toLowerCase().includes(query) ||
+      course.course_name.toLowerCase().includes(query)
+    );
+  });
+
+  // Courses arrive newest-term-first; the first group is the latest term
+  const termGroups = groupCoursesByTerm(courses);
+  const [currentGroup, ...pastGroups] = termGroups;
 
   return (
-    <main className="min-h-screen pt-16 md:ml-64">
+    <main className="min-h-screen pt-16">
       <div className="mx-auto max-w-7xl px-8 py-12">
         <div className="mb-12">
           <h1 className="headline-font text-4xl font-extrabold tracking-tight text-on-surface">
@@ -59,18 +72,67 @@ export default function StudentHome() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredCouses.map((course, index) => (
-            <CourseCard
-              key={course.id}
-              courseId={course.id}
-              courseCode={course.course_code}
-              courseName={course.course_name}
-              description={course.description}
-              index={index}
-            />
-          ))}
-        </div>
+        {courses.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 rounded-xl border border-outline-variant/10 bg-surface-container-lowest p-12 text-center shadow-sm">
+            <span className="material-symbols-outlined text-6xl text-on-surface-variant">
+              school
+            </span>
+
+            <p className="text-lg font-medium text-on-surface">
+              No courses yet
+            </p>
+
+            <p className="text-sm text-on-surface-variant">
+              Contact your instructor to be enrolled.
+            </p>
+          </div>
+        ) : isSearching ? (
+          filteredCouses.length === 0 ? (
+            <p className="py-3 text-sm text-outline">
+              No courses match &ldquo;{search}&rdquo;
+            </p>
+          ) : (
+            <CourseGrid courses={filteredCouses} />
+          )
+        ) : (
+          <div className="space-y-14">
+            <section>
+              <h2 className="headline-font mb-6 text-xl font-bold tracking-tight text-on-surface">
+                {formatTermLabel(currentGroup.term)}
+              </h2>
+
+              <CourseGrid courses={currentGroup.items} />
+            </section>
+
+            {pastGroups.length > 0 && (
+              <div>
+                <button
+                  className="flex items-center gap-1.5 text-sm font-bold text-on-surface-variant transition-colors hover:text-primary"
+                  onClick={() => setShowPast((v) => !v)}
+                >
+                  <span className="material-symbols-outlined text-lg">
+                    {showPast ? "expand_less" : "expand_more"}
+                  </span>
+                  Past courses
+                </button>
+
+                {showPast && (
+                  <div className="mt-8 space-y-14">
+                    {pastGroups.map(({ term, items }) => (
+                      <section key={term}>
+                        <h2 className="headline-font mb-6 text-xl font-bold tracking-tight text-on-surface-variant">
+                          {formatTermLabel(term)}
+                        </h2>
+
+                        <CourseGrid courses={items} />
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );

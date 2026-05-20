@@ -11,7 +11,14 @@ export function useStartSession(assessmentConfigId) {
     refetch,
   } = useQuery({
     queryKey: ["startSession", assessmentConfigId],
-    queryFn: () => startSessionApi(assessmentConfigId),
+    queryFn: async () => {
+      const markerKey = `assessment_reentry_${assessmentConfigId}`;
+      const isReentry = !sessionStorage.getItem(markerKey);
+
+      const data = await startSessionApi(assessmentConfigId, isReentry);
+      sessionStorage.setItem(markerKey, "1");
+      return data;
+    },
     enabled: !!assessmentConfigId,
     refetchOnWindowFocus: false,
     retry: 1,

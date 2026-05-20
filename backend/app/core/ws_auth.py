@@ -81,7 +81,7 @@ async def _reject(websocket: WebSocket, *, reason: str) -> None:
         logger.debug("[WS auth] close() raised on rejection", exc_info=True)
 
 
-async def authenticate_ws(
+async def _authenticate_ws(
     websocket: WebSocket,
     db: Session,
 ) -> User:
@@ -95,6 +95,10 @@ async def authenticate_ws(
 
     The WebSocket is *not* accepted on success; the caller must call
     ``await websocket.accept()`` afterwards.
+
+    Private helper — role-specific wrappers like
+    :func:`authenticate_ws_student` are the public surface. Add a
+    sibling wrapper here if another role needs WebSocket auth.
     """
     token = _extract_token(websocket)
     if not token:
@@ -126,14 +130,14 @@ async def authenticate_ws_student(
     db: Session,
 ) -> User:
     """
-    Same as :func:`authenticate_ws` but additionally requires the
+    Same as :func:`_authenticate_ws` but additionally requires the
     user's role to be ``"student"``. Mirrors
     :func:`app.core.dependencies.require_student` for WebSockets.
 
     Used by the streaming-transcription route — instructors and other
     roles must not be able to open a student-only stream.
     """
-    user = await authenticate_ws(websocket, db)
+    user = await _authenticate_ws(websocket, db)
 
     if user.role != "student":
         await _reject(websocket, reason="student role required")

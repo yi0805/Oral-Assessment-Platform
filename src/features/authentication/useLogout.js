@@ -9,6 +9,10 @@ export function useLogout() {
   const { mutate: logout, isPending } = useMutation({
     mutationFn: logoutWithGoogle,
     onSuccess: () => {
+      Object.keys(sessionStorage)
+        .filter((key) => key.startsWith("assessment_reentry_"))
+        .forEach((key) => sessionStorage.removeItem(key));
+
       queryClient.removeQueries();
       navigate("/login", { replace: true });
     },

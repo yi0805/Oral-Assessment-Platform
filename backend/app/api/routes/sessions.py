@@ -20,7 +20,8 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -49,7 +50,8 @@ from app.schemas import (
     StudentInfoOut, SessionFeedbackOut, CourseInfoOut,
     AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
     AudioTranscriptionResponse,
-    BlurNotificationRequest, NotificationOut, InstructorNotificationOut,
+    BlurNotificationRequest, ReconnectNotificationRequest,
+    InstructorNotificationOut,
 )
 from app.services.ai_gateway import smart_chat_complete
 
@@ -147,7 +149,9 @@ def _validate_session_for_transcribe(
     )
 
     if session.started_at and config and config.total_time_minute:
-        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+        expires_at = session.started_at + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         if datetime.now(timezone.utc) > expires_at:
             raise HTTPException(
@@ -271,6 +275,86 @@ async def _run_ai_summary_background(session_id: UUID) -> None:
         db.close()
 
 
+def _finalize_if_expired(
+    session: AssessmentSession,
+    config: AssessmentConfig | None,
+    db: Session,
+    background_tasks: BackgroundTasks,
+) -> bool:
+    if session.status != "in_progress":
+        return False
+
+    if not (session.started_at and config and config.total_time_minute):
+        return False
+
+    expires_at = session.started_at + timedelta(
+        minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+    )
+
+    if datetime.now(timezone.utc) <= expires_at:
+        return False
+
+    session.status = "under_review"
+    session.completed_at = expires_at
+    db.commit()
+
+    if session.resume_count and session.resume_count > 0:
+        _upsert_notification(
+            db, session.id, session.user_s_id, resume_count=session.resume_count
+        )
+
+    background_tasks.add_task(_run_ai_summary_background, session.id)
+
+    return True
+
+
+def _backfill_student_sessions(
+    db: Session,
+    course_id: UUID,
+    user_id: UUID,
+) -> None:
+    published_ids = [
+        config_id
+        for (config_id,) in db.query(AssessmentConfig.id)
+        .filter(
+            AssessmentConfig.course_id == course_id,
+            AssessmentConfig.status == "published",
+        )
+        .all()
+    ]
+
+    if not published_ids:
+        return
+
+    existing_ids = {
+        config_id
+        for (config_id,) in db.query(AssessmentSession.assessment_config_id)
+        .filter(
+            AssessmentSession.user_s_id == user_id,
+            AssessmentSession.assessment_config_id.in_(published_ids),
+        )
+        .all()
+    }
+
+    missing_ids = [cid for cid in published_ids if cid not in existing_ids]
+
+    if not missing_ids:
+        return
+
+    for config_id in missing_ids:
+        db.add(AssessmentSession(
+            assessment_config_id=config_id,
+            user_s_id=user_id,
+            status="not_started",
+        ))
+
+    try:
+        db.commit()
+
+    except IntegrityError:
+        db.rollback()
+
+
 # Pending reviews
 
 @router.get(
@@ -372,6 +456,8 @@ def get_transcript_detail(
         ai_summary=AISummaryInfoOut.model_validate(ai_obj) if ai_obj else None,
         session_feedback=SessionFeedbackOut.model_validate(feedback_obj) if feedback_obj else None,
         blur_count=notif.blur_count if notif else None,
+        disconnect_count=notif.disconnect_count if notif else None,
+        resume_count=session_obj.resume_count,
         transcript=[TranscriptMessageOut.model_validate(t) for t in transcripts],
     )
 
@@ -385,6 +471,7 @@ def get_transcript_detail(
 )
 def list_my_course_assessments(
     course_id: UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
@@ -403,6 +490,8 @@ def list_my_course_assessments(
             detail="You are not enrolled in this course.",
         )
 
+    _backfill_student_sessions(db, course_id, current_user.id)
+
     rows = (
         db.query(AssessmentConfig, AssessmentSession)
         .join(AssessmentSession, AssessmentSession.assessment_config_id == AssessmentConfig.id)
@@ -414,6 +503,9 @@ def list_my_course_assessments(
         .order_by(AssessmentConfig.release_time.desc())
         .all()
     )
+
+    for config, session in rows:
+        _finalize_if_expired(session, config, db, background_tasks)
 
     items = [
         StudentCourseAssessmentOut(
@@ -523,6 +615,8 @@ def get_my_assessment_history(
 )
 def start_session(
     assessment_config_id: UUID,
+    background_tasks: BackgroundTasks,
+    count_reentry: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
@@ -568,6 +662,8 @@ def start_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This assessment has closed.",
         )
+
+    _backfill_student_sessions(db, config.course_id, current_user.id)
 
     # Fetch session
     session = (
@@ -631,7 +727,9 @@ def start_session(
         db.add(msg)
         db.commit()
 
-        expires_at = now + timedelta(minutes=config.total_time_minute)
+        expires_at = now + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         return SessionStartResponse(
             session_id=session.id,
@@ -650,6 +748,17 @@ def start_session(
 
     # Handle in_progress
     if session.status == "in_progress":
+
+        if _finalize_if_expired(session, config, db, background_tasks):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This session has already been submitted or completed.",
+            )
+
+        if count_reentry:
+            session.resume_count = (session.resume_count or 0) + 1
+            db.commit()
+
         last_item = (
             db.query(SessionQuestionItem)
             .filter(SessionQuestionItem.session_id == session.id)
@@ -687,7 +796,9 @@ def start_session(
                 )
 
         started_at = getattr(session, "started_at", None) or now
-        expires_at = started_at + timedelta(minutes=config.total_time_minute)
+        expires_at = started_at + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         all_answered = current_question is None and last_item is not None
 
@@ -720,11 +831,8 @@ async def submit_response(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    # Issue #71 — server-side answer validation. The frontend disables the
-    # Submit Answer button on whitespace-only input, but we revalidate
-    # here because (a) we can't trust the client, and (b) the legacy
-    # /respond/audio path also routes through here with whatever AWS
-    # Transcribe returned, which may be an empty string for silent audio.
+    # The frontend disables the
+    # Submit Answer button on whitespace-only input, but we revalidate here
     answer_text = (payload.answer_text or "").strip()
 
     if not answer_text:
@@ -767,7 +875,9 @@ async def submit_response(
 
     # Time check
     if session.started_at and config and config.total_time_minute:
-        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+        expires_at = session.started_at + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         if datetime.now(timezone.utc) > expires_at:
             raise HTTPException(
@@ -935,7 +1045,7 @@ async def submit_response(
     )
 
 
-# Submit voice response
+# MIME types used when uploading student audio to S3 before an AWS Transcribe job
 
 _AUDIO_MIME_MAP = {
     "mp3": "audio/mpeg",
@@ -949,149 +1059,11 @@ _AUDIO_MIME_MAP = {
 }
 
 
-@router.post(
-    "/sessions/{session_id}/respond/audio",
-    response_model=StudentResponseResponse,
-    summary="Submit student's voice answer (transcribed via AWS Transcribe) and get next question",
-)
-async def submit_response_audio(
-    session_id: UUID,
-    audio: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_student),
-):
-    # Validate audio extension up-front (cheap fail)
-    filename = audio.filename or ""
-    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
-    if not is_audio_extension(ext):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported audio format: {ext!r}. Supported: mp3, mp4, m4a, wav, flac, ogg, webm, amr.",
-        )
-
-    # Validate session (mirrors submit_response so we fail fast before uploading)
-    session = db.query(AssessmentSession).filter(AssessmentSession.id == session_id).first()
-
-    if not session:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
-    if session.user_s_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this session.",
-        )
-
-    if session.status != "in_progress":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Session is not in progress.",
-        )
-
-    config = (
-        db.query(AssessmentConfig)
-        .filter(AssessmentConfig.id == session.assessment_config_id)
-        .first()
-    )
-
-    # Time check
-    if session.started_at and config and config.total_time_minute:
-        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
-
-        if datetime.now(timezone.utc) > expires_at:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="The time limit for this assessment has expired.",
-            )
-
-    # Enforce upload size limit (25 MB)
-    max_audio_bytes = 25 * 1024 * 1024
-    content_length = audio.headers.get("content-length") if audio.headers else None
-
-    if content_length is not None:
-        try:
-            declared_size = int(content_length)
-            
-        except ValueError:
-            declared_size = None
-
-        if declared_size is not None and declared_size > max_audio_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="Audio file exceeds the 25 MB upload limit.",
-            )
-
-    # Read audio bytes
-    audio_bytes = await audio.read()
-
-    if not audio_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The uploaded audio is empty.",
-        )
-
-    if len(audio_bytes) > max_audio_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Audio file exceeds the 25 MB upload limit.",
-        )
-
-    # Upload to S3 under an ephemeral key (Transcribe requires an S3 source)
-    storage_key = f"sessions/{session_id}/audio/{uuid4()}.{ext}"
-    content_type = audio.content_type or _AUDIO_MIME_MAP.get(ext, "application/octet-stream")
-
-    try:
-        s3_client.upload_file(audio_bytes, storage_key, content_type=content_type)
-
-    except RuntimeError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Audio upload failed: {exc}",
-        ) from exc
-
-    # Transcribe (blocking call — run off the event loop)
-    try:
-        result = await asyncio.to_thread(transcribe_audio_from_s3, storage_key, ext)
-
-    except Exception as exc:
-        logger.exception("Session %s: transcription failed for %s", session_id, storage_key)
-        # Best-effort cleanup before surfacing the error
-        try:
-            s3_client.delete_file(storage_key)
-
-        except Exception:
-            logger.warning("Session %s: also failed to clean up audio %s", session_id, storage_key)
-
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Transcription failed: {exc}",
-        ) from exc
-
-    # Delete the audio now that we have the text (best-effort)
-    try:
-        s3_client.delete_file(storage_key)
-
-    except Exception:
-        logger.warning("Session %s: failed to delete session audio %s", session_id, storage_key)
-
-    # Hand the transcript off to the existing text-answer flow
-    payload = StudentResponseRequest(answer_text=result.text)
-    return await submit_response(
-        session_id=session_id,
-        payload=payload,
-        db=db,
-        current_user=current_user,
-    )
-
-
-# Issue #71 — Edit-before-submit transcribe-only endpoint.
-# Mirrors the validate→upload→transcribe→cleanup pipeline of
-# /respond/audio but returns just the transcript text. The client is
-# then responsible for showing the text in the answer input, allowing
-# the student to correct it, and submitting via /respond when the
-# student clicks "Submit Answer". Crucially this endpoint never writes
-# to the Transcript table and never advances the session.
-
+# Edit-before-submit transcribe-only endpoint: validates,
+# uploads, transcribes, and cleans up, returning just the transcript
+# for the client to display, edit, and submit via /respond — without
+# writing to the Transcript table or advancing the session.
 @router.post(
     "/sessions/{session_id}/transcribe/audio",
     response_model=AudioTranscriptionResponse,
@@ -1118,7 +1090,7 @@ async def transcribe_response_audio(
     # with the upcoming streaming route — see _validate_session_for_transcribe.
     _validate_session_for_transcribe(session_id, current_user, db)
 
-    # Enforce upload size limit (25 MB) — same as /respond/audio
+    # Enforce upload size limit (25 MB)
     max_audio_bytes = 25 * 1024 * 1024
     content_length = audio.headers.get("content-length") if audio.headers else None
 
@@ -1579,11 +1551,82 @@ def complete_session(
             detail="Session is not in progress (already completed, doesn't exist, or not yours).",
         )
 
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+    
+    if session and session.resume_count and session.resume_count > 0:
+        _upsert_notification(
+            db, session_id, current_user.id, resume_count=session.resume_count
+        )
+
     background_tasks.add_task(_run_ai_summary_background, session_id)
 
     return {"session_id": str(session_id), "status": "under_review"}
 
 BLUR_NOTIFICATION_THRESHOLD = 3
+DISCONNECT_NOTIFICATION_THRESHOLD = 3
+RESUME_NOTIFICATION_THRESHOLD = 3
+
+
+def _owned_session_or_404(
+    session_id: UUID,
+    current_user: User,
+    db: Session,
+) -> AssessmentSession:
+    session = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.id == session_id,
+            AssessmentSession.user_s_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Assessment session not found")
+
+    return session
+
+
+def _upsert_notification(
+    db: Session,
+    session_id: UUID,
+    user_id: UUID,
+    *,
+    blur_count: int | None = None,
+    disconnect_count: int | None = None,
+    resume_count: int | None = None,
+) -> None:
+    notif = (
+        db.query(Notification)
+        .filter(Notification.session_id == session_id)
+        .first()
+    )
+
+    if notif is None:
+        notif = Notification(
+            user_id=user_id,
+            session_id=session_id,
+            blur_count=blur_count or 0,
+            disconnect_count=disconnect_count or 0,
+            resume_count=resume_count or 0,
+        )
+        db.add(notif)
+
+    else:
+        if blur_count is not None:
+            notif.blur_count = blur_count
+
+        if disconnect_count is not None:
+            notif.disconnect_count = disconnect_count
+
+        if resume_count is not None:
+            notif.resume_count = resume_count
+
+    db.commit()
 
 
 @router.post(
@@ -1597,29 +1640,29 @@ def record_blur_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    session = (
-        db.query(AssessmentSession)
-        .filter(
-            AssessmentSession.id == session_id,
-            AssessmentSession.user_s_id == current_user.id,
-        )
-        .first()
+    _owned_session_or_404(session_id, current_user, db)
+    
+    _upsert_notification(
+        db, session_id, current_user.id, blur_count=payload.blur_count
     )
 
-    if not session:
-        raise HTTPException(status_code=404, detail="Assessment session not found")
 
-    if payload.blur_count < BLUR_NOTIFICATION_THRESHOLD:
-        return
+@router.post(
+    "/sessions/{session_id}/reconnect-notification",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Record network reconnect notification for an assessment session",
+)
+def record_reconnect_notification(
+    session_id: UUID,
+    payload: ReconnectNotificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    _owned_session_or_404(session_id, current_user, db)
 
-    notification = Notification(
-        user_id=current_user.id,
-        session_id=session_id,
-        blur_count=payload.blur_count,
+    _upsert_notification(
+        db, session_id, current_user.id, disconnect_count=payload.disconnect_count
     )
-
-    db.add(notification)
-    db.commit()
 
 
 @router.get(
@@ -1640,7 +1683,13 @@ def list_notifications(
         .join(User, User.id == Notification.user_id)
         .filter(CourseEnrollment.user_id == current_user.id)
         .filter(Notification.is_read == False)
-        .filter(Notification.blur_count >= BLUR_NOTIFICATION_THRESHOLD)
+        .filter(
+            or_(
+                Notification.blur_count >= BLUR_NOTIFICATION_THRESHOLD,
+                Notification.disconnect_count >= DISCONNECT_NOTIFICATION_THRESHOLD,
+                Notification.resume_count >= RESUME_NOTIFICATION_THRESHOLD,
+            )
+        )
         .order_by(AssessmentConfig.title.asc())
         .all()
     )
@@ -1650,6 +1699,8 @@ def list_notifications(
             id=notif.id,
             session_id=notif.session_id,
             blur_count=notif.blur_count,
+            disconnect_count=notif.disconnect_count,
+            resume_count=notif.resume_count,
             course_code=course.course_code,
             course_name=course.course_name,
             assessment_title=config.title,

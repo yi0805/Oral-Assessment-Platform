@@ -2,20 +2,22 @@ import api from "./api";
 
 export async function questionGenerate(
   courseId,
-  materialId,
+  materialIds,
   rubricId,
   assessmentName,
   totalTime,
   numQuestions,
   releaseTime,
   dueTime,
+  bufferTime = 0,
 ) {
   const response = await api.post(`/courses/${courseId}/generate-question`, {
-    material_id: materialId,
+    material_ids: materialIds,
     rubric_id: rubricId,
     assessment_title: assessmentName,
     total_time_minutes: totalTime,
     num_main_questions: numQuestions,
+    buffer_time_minutes: bufferTime,
     release_time: releaseTime,
     due_time: dueTime,
   });

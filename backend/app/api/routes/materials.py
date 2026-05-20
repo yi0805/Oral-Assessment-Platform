@@ -73,6 +73,7 @@ async def upload_material(
         .filter(
             Material.course_id == course_id,
             Material.filename == filename,
+            Material.material_category == "course_material",
         )
         .first()
     )
@@ -169,6 +170,7 @@ async def import_github_repo(
         .filter(
             Material.course_id == course_id,
             Material.filename == filename,
+            Material.material_category == "course_material",
         )
         .first()
     )

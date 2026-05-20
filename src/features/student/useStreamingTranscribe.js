@@ -51,29 +51,6 @@ function buildStreamUrl(sessionId) {
   return `${wsBase}/sessions/${sessionId}/transcribe/stream`;
 }
 
-// [STT Instrumentation - issue #72] Bumps the per-window stream-stats
-// snapshot read by SttDebugOverlay. Stays a no-op for users without
-// the debug flag — checks the localStorage gate before publishing so
-// production sessions don't accumulate stats dicts that no one reads.
-function publishStreamStats(updater) {
-  if (typeof window === "undefined") return;
-  try {
-    if (window.localStorage.getItem("stt_debug") !== "1") return;
-  } catch {
-    return;
-  }
-  const prev = window.__sttStreamStats || {
-    framesSent: 0,
-    bytesSent: 0,
-    sendSkippedNotOpen: 0,
-    lastSendAt: null,
-    wsState: "idle",
-  };
-  const next = updater(prev);
-  window.__sttStreamStats = next;
-  window.dispatchEvent(new CustomEvent("stt:stream-stats", { detail: next }));
-}
-
 export function useStreamingTranscribe() {
   const [partial, setPartial] = useState("");
   const [final, setFinal] = useState("");
@@ -113,15 +90,6 @@ export function useStreamingTranscribe() {
       // pointing at the same hook.
       disconnect();
       reset();
-      // Reset the per-session stat snapshot so a fresh recording is
-      // countable from zero in the debug overlay.
-      publishStreamStats(() => ({
-        framesSent: 0,
-        bytesSent: 0,
-        sendSkippedNotOpen: 0,
-        lastSendAt: null,
-        wsState: "connecting",
-      }));
 
       return new Promise((resolve, reject) => {
         const url = buildStreamUrl(sessionId);
@@ -267,39 +235,13 @@ export function useStreamingTranscribe() {
 
   const sendPcm = useCallback((arrayBuffer) => {
     const ws = wsRef.current;
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      // Track these misses so the debug overlay can distinguish
-      // "worklet not producing" from "worklet producing but WS not
-      // ready" — both cause the same frames=0 server-side outcome.
-      publishStreamStats((prev) => ({
-        ...prev,
-        sendSkippedNotOpen: prev.sendSkippedNotOpen + 1,
-        wsState: ws ? ["connecting", "open", "closing", "closed"][ws.readyState] : "no-ws",
-      }));
-      return false;
-    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
     try {
       ws.send(arrayBuffer);
-      const bytes =
-        arrayBuffer && typeof arrayBuffer.byteLength === "number"
-          ? arrayBuffer.byteLength
-          : 0;
-      publishStreamStats((prev) => ({
-        ...prev,
-        framesSent: prev.framesSent + 1,
-        bytesSent: prev.bytesSent + bytes,
-        lastSendAt: Date.now(),
-        wsState: "open",
-      }));
       return true;
     } catch {
       // send() can throw if the socket entered CLOSING between the
       // readyState check and the call. Treat the same as "not sent".
-      publishStreamStats((prev) => ({
-        ...prev,
-        sendSkippedNotOpen: prev.sendSkippedNotOpen + 1,
-        wsState: "send-threw",
-      }));
       return false;
     }
   }, []);

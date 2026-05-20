@@ -8,11 +8,12 @@ export function useImportStudents() {
 
   const { mutate: importStudents, isPending } = useMutation({
     mutationFn: ({ courseId, file }) => importStudentsCSV(courseId, file),
-    onSuccess: (data) => {
+    onSuccess: (data, { courseId }) => {
       toast.success(`${data.newly_enrolled} student(s) newly enrolled.`);
 
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["enrolledUsers", courseId] });
     },
     onError: (error) => {
       const message =

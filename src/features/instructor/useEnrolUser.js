@@ -8,11 +8,12 @@ export function useEnrolUser() {
 
   const { mutate: enrolUser, isPending } = useMutation({
     mutationFn: ({ courseId, upi, role }) => enrolUserApi(courseId, upi, role),
-    onSuccess: (data) => {
+    onSuccess: (data, { courseId }) => {
       toast.success(data.message || "User enrolment successful");
 
       queryClient.invalidateQueries({ queryKey: ["courses"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["enrolledUsers", courseId] });
     },
     onError: (error) => {
       const message =

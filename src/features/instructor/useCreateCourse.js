@@ -7,8 +7,8 @@ export function useCreateCourse() {
   const queryClient = useQueryClient();
 
   const { mutate: createCourse, isPending } = useMutation({
-    mutationFn: ({ course_code, course_name, description }) =>
-      createCourseApi(course_code, course_name, description),
+    mutationFn: ({ course_code, course_name, term, description }) =>
+      createCourseApi(course_code, course_name, term, description),
 
     onSuccess: (data) => {
       toast.success(data?.message || "Course created successfully.");
@@ -16,6 +16,13 @@ export function useCreateCourse() {
     },
 
     onError: (error) => {
+      const isAlreadyExistsConflict =
+        error?.response?.status === 409 &&
+        typeof error?.response?.data === "object" &&
+        error?.response?.data?.course_id;
+
+      if (isAlreadyExistsConflict) return;
+
       const message =
         error?.response?.data?.detail ||
         error.message ||

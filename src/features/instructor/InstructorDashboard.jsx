@@ -109,7 +109,7 @@ export default function InstructorDashboard() {
 
   return (
     <div className="min-h-screen">
-      <main className="ml-64 px-10 pb-12 pt-24">
+      <main className="px-10 pb-12 pt-24">
         <div className="mb-12 flex flex-col justify-between gap-6 md:flex-row md:items-end">
           <div>
             <NavLink
@@ -131,6 +131,10 @@ export default function InstructorDashboard() {
             <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
               Assessment Dashboard
             </h1>
+
+            <p className="mt-2 text-sm text-on-surface-variant">
+              Overview of class assessment activity.
+            </p>
           </div>
 
           <div className="relative min-w-[320px]">

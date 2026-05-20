@@ -157,7 +157,7 @@ _END_OF_RESULTS: Any = object()
 # 16 kHz mono is the recommended rate for English speech models and
 # matches what the client-side AudioWorklet (added in the frontend
 # commits of issue #72) downsamples to before sending.
-DEFAULT_SAMPLE_RATE_HZ = 16000
+_DEFAULT_SAMPLE_RATE_HZ = 16000
 
 
 def fmt_optional_seconds(t: Optional[float]) -> str:
@@ -300,7 +300,7 @@ class TranscribeStreamer:
         *,
         region: str,
         language_code: str = "en-US",
-        sample_rate_hz: int = DEFAULT_SAMPLE_RATE_HZ,
+        sample_rate_hz: int = _DEFAULT_SAMPLE_RATE_HZ,
         profile_name: Optional[str] = None,
     ) -> None:
         """
@@ -457,14 +457,25 @@ class TranscribeStreamer:
             finally:
                 self._input_ended = True
 
-        # Cancel the handler task if it's still running. handle_events()
-        # naturally returns once AWS closes the output stream after
-        # end_stream(), so on the happy path the cancel is a no-op.
         if self._handler_task is not None and not self._handler_task.done():
-            self._handler_task.cancel()
+
             try:
-                await self._handler_task
-            except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                await asyncio.wait_for(
+                    asyncio.shield(self._handler_task),
+                    timeout=2.0,
+                )
+
+            except asyncio.TimeoutError:
+                logger.debug("[TranscribeStream] handler task did not finish in time, cancelling")
+                self._handler_task.cancel()
+
+                try:
+                    await self._handler_task
+
+                except (asyncio.CancelledError, Exception):
+                    pass
+                
+            except Exception:
                 pass
 
         self._opened = False
