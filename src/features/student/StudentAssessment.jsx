@@ -138,9 +138,26 @@ export default function StudentAssessment() {
   }, [expiresAtIso]);
 
   useEffect(() => {
+    if (!sessionId) return;
+
+    const restored =
+      Number(localStorage.getItem(`assessment_blur_${sessionId}`)) || 0;
+    setBlurCount(restored);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const blurKey = `assessment_blur_${sessionId}`;
+
     function handleVisibilityChange() {
       if (document.visibilityState === "hidden") {
         setBlurCount((count) => count + 1);
+      } else if (document.visibilityState === "visible") {
+        setBlurCount((count) => {
+          localStorage.setItem(blurKey, String(count));
+          return count;
+        });
       }
     }
 
@@ -149,7 +166,7 @@ export default function StudentAssessment() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [sessionId]);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -248,6 +265,7 @@ export default function StudentAssessment() {
         await completeAssessment({ sessionId, courseId });
         localStorage.removeItem(`assessment_reconnects_${sessionId}`);
         localStorage.removeItem(`assessment_offline_${sessionId}`);
+        localStorage.removeItem(`assessment_blur_${sessionId}`);
         navigate(`/student/${courseId}`);
       } catch (error) {
         setError(getErrorMessage(error, "Failed to submit assessment."));
@@ -486,6 +504,7 @@ export default function StudentAssessment() {
       await completeAssessment({ sessionId, courseId });
       localStorage.removeItem(`assessment_reconnects_${sessionId}`);
       localStorage.removeItem(`assessment_offline_${sessionId}`);
+      localStorage.removeItem(`assessment_blur_${sessionId}`);
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
