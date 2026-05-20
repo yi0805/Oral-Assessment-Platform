@@ -1452,12 +1452,24 @@ def complete_session(
             detail="Session is not in progress (already completed, doesn't exist, or not yours).",
         )
 
+    session = (
+        db.query(AssessmentSession)
+        .filter(AssessmentSession.id == session_id)
+        .first()
+    )
+    
+    if session and session.resume_count and session.resume_count > 0:
+        _upsert_notification(
+            db, session_id, current_user.id, resume_count=session.resume_count
+        )
+
     background_tasks.add_task(_run_ai_summary_background, session_id)
 
     return {"session_id": str(session_id), "status": "under_review"}
 
 BLUR_NOTIFICATION_THRESHOLD = 3
 DISCONNECT_NOTIFICATION_THRESHOLD = 3
+RESUME_NOTIFICATION_THRESHOLD = 3
 
 
 def _owned_session_or_404(
@@ -1487,6 +1499,7 @@ def _upsert_notification(
     *,
     blur_count: int | None = None,
     disconnect_count: int | None = None,
+    resume_count: int | None = None,
 ) -> None:
     notif = (
         db.query(Notification)
@@ -1500,6 +1513,7 @@ def _upsert_notification(
             session_id=session_id,
             blur_count=blur_count or 0,
             disconnect_count=disconnect_count or 0,
+            resume_count=resume_count or 0,
         )
         db.add(notif)
 
@@ -1509,6 +1523,9 @@ def _upsert_notification(
 
         if disconnect_count is not None:
             notif.disconnect_count = disconnect_count
+
+        if resume_count is not None:
+            notif.resume_count = resume_count
 
     db.commit()
 
@@ -1571,6 +1588,7 @@ def list_notifications(
             or_(
                 Notification.blur_count >= BLUR_NOTIFICATION_THRESHOLD,
                 Notification.disconnect_count >= DISCONNECT_NOTIFICATION_THRESHOLD,
+                Notification.resume_count >= RESUME_NOTIFICATION_THRESHOLD,
             )
         )
         .order_by(AssessmentConfig.title.asc())
@@ -1583,6 +1601,7 @@ def list_notifications(
             session_id=notif.session_id,
             blur_count=notif.blur_count,
             disconnect_count=notif.disconnect_count,
+            resume_count=notif.resume_count,
             course_code=course.course_code,
             course_name=course.course_name,
             assessment_title=config.title,

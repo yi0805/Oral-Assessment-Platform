@@ -152,6 +152,12 @@ class Notification(Base):
         server_default="0",
         comment="Number of network reconnects recorded during the session (best-effort, client-reported).",
     )
+    resume_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Re-entries into the in-progress session, copied from AssessmentSession.resume_count at completion.",
+    )
     is_read: Mapped[bool] = mapped_column(
         Boolean,
         nullable=False,

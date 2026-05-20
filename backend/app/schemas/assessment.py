@@ -185,6 +185,7 @@ class InstructorNotificationOut(BaseModel):
     session_id: UUID
     blur_count: int
     disconnect_count: int
+    resume_count: int
     course_code: str
     course_name: str
     assessment_title: str
