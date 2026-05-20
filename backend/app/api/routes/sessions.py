@@ -566,6 +566,7 @@ def get_my_assessment_history(
 def start_session(
     assessment_config_id: UUID,
     background_tasks: BackgroundTasks,
+    count_reentry: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
@@ -702,8 +703,9 @@ def start_session(
                 detail="This session has already been submitted or completed.",
             )
 
-        session.resume_count = (session.resume_count or 0) + 1
-        db.commit()
+        if count_reentry:
+            session.resume_count = (session.resume_count or 0) + 1
+            db.commit()
 
         last_item = (
             db.query(SessionQuestionItem)
