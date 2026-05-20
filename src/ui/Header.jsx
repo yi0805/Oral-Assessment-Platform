@@ -283,7 +283,20 @@ function Header() {
                           </p>
 
                           <p className="mt-1 text-xs text-error">
-                            Possible cheating · {n.blur_count} tab switches
+                            Possible cheating ·{" "}
+                            {[
+                              n.resume_count >= 3
+                                ? `${n.resume_count} re-entries`
+                                : null,
+                              n.blur_count >= 3
+                                ? `${n.blur_count} tab switches`
+                                : null,
+                              n.disconnect_count >= 3
+                                ? `${n.disconnect_count} Internet reconnects`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </p>
                         </div>
                       </button>
