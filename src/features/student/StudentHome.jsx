@@ -4,16 +4,20 @@ import { useCourses } from "../../hooks/useCourses";
 import { useUser } from "../authentication/useUser";
 
 import SearchCouse from "../../ui/SearchCouse";
-import CourseCard from "../../ui/CourseCard";
+import CourseGrid from "../../ui/CourseGrid";
 import Spinner from "../../ui/Spinner";
+import { formatTermLabel, groupCoursesByTerm } from "../../utils/constants";
 
 export default function StudentHome() {
   const [search, setSearch] = useState("");
+  const [showPast, setShowPast] = useState(false);
 
   const { user, isLoading: isUserLoading } = useUser();
   const { courses, isLoading } = useCourses();
 
   if (isLoading || isUserLoading) return <Spinner />;
+
+  const isSearching = search.trim() !== "";
 
   const filteredCouses = courses.filter((course) => {
     const query = search.toLowerCase();
@@ -23,6 +27,10 @@ export default function StudentHome() {
       course.course_name.toLowerCase().includes(query)
     );
   });
+
+  // Courses arrive newest-term-first; the first group is the latest term
+  const termGroups = groupCoursesByTerm(courses);
+  const [currentGroup, ...pastGroups] = termGroups;
 
   return (
     <main className="min-h-screen pt-16">
@@ -78,22 +86,51 @@ export default function StudentHome() {
               Contact your instructor to be enrolled.
             </p>
           </div>
-        ) : filteredCouses.length === 0 ? (
-          <p className="py-3 text-sm text-outline">
-            No courses match &ldquo;{search}&rdquo;
-          </p>
+        ) : isSearching ? (
+          filteredCouses.length === 0 ? (
+            <p className="py-3 text-sm text-outline">
+              No courses match &ldquo;{search}&rdquo;
+            </p>
+          ) : (
+            <CourseGrid courses={filteredCouses} />
+          )
         ) : (
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredCouses.map((course, index) => (
-              <CourseCard
-                key={course.id}
-                courseId={course.id}
-                courseCode={course.course_code}
-                courseName={course.course_name}
-                description={course.description}
-                index={index}
-              />
-            ))}
+          <div className="space-y-14">
+            <section>
+              <h2 className="headline-font mb-6 text-xl font-bold tracking-tight text-on-surface">
+                {formatTermLabel(currentGroup.term)}
+              </h2>
+
+              <CourseGrid courses={currentGroup.items} />
+            </section>
+
+            {pastGroups.length > 0 && (
+              <div>
+                <button
+                  className="flex items-center gap-1.5 text-sm font-bold text-on-surface-variant transition-colors hover:text-primary"
+                  onClick={() => setShowPast((v) => !v)}
+                >
+                  <span className="material-symbols-outlined text-lg">
+                    {showPast ? "expand_less" : "expand_more"}
+                  </span>
+                  Past courses
+                </button>
+
+                {showPast && (
+                  <div className="mt-8 space-y-14">
+                    {pastGroups.map(({ term, items }) => (
+                      <section key={term}>
+                        <h2 className="headline-font mb-6 text-xl font-bold tracking-tight text-on-surface-variant">
+                          {formatTermLabel(term)}
+                        </h2>
+
+                        <CourseGrid courses={items} />
+                      </section>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
