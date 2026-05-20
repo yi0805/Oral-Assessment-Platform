@@ -274,6 +274,39 @@ async def _run_ai_summary_background(session_id: UUID) -> None:
         db.close()
 
 
+def _finalize_if_expired(
+    session: AssessmentSession,
+    config: AssessmentConfig | None,
+    db: Session,
+    background_tasks: BackgroundTasks,
+) -> bool:
+    if session.status != "in_progress":
+        return False
+
+    if not (session.started_at and config and config.total_time_minute):
+        return False
+
+    expires_at = session.started_at + timedelta(
+        minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+    )
+
+    if datetime.now(timezone.utc) <= expires_at:
+        return False
+
+    session.status = "under_review"
+    session.completed_at = expires_at
+    db.commit()
+
+    if session.resume_count and session.resume_count > 0:
+        _upsert_notification(
+            db, session.id, session.user_s_id, resume_count=session.resume_count
+        )
+
+    background_tasks.add_task(_run_ai_summary_background, session.id)
+
+    return True
+
+
 # Pending reviews
 
 @router.get(
@@ -390,6 +423,7 @@ def get_transcript_detail(
 )
 def list_my_course_assessments(
     course_id: UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
@@ -419,6 +453,9 @@ def list_my_course_assessments(
         .order_by(AssessmentConfig.release_time.desc())
         .all()
     )
+
+    for config, session in rows:
+        _finalize_if_expired(session, config, db, background_tasks)
 
     items = [
         StudentCourseAssessmentOut(
@@ -528,6 +565,7 @@ def get_my_assessment_history(
 )
 def start_session(
     assessment_config_id: UUID,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
@@ -657,6 +695,13 @@ def start_session(
 
     # Handle in_progress
     if session.status == "in_progress":
+
+        if _finalize_if_expired(session, config, db, background_tasks):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This session has already been submitted or completed.",
+            )
+
         session.resume_count = (session.resume_count or 0) + 1
         db.commit()
 
