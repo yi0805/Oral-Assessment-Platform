@@ -170,6 +170,7 @@ class TranscriptDetailOut(BaseModel):
     session_feedback: SessionFeedbackOut | None = None
     blur_count: int | None = None
     disconnect_count: int | None = None
+    resume_count: int | None = None
     transcript: list[TranscriptMessageOut]
 
 class BlurNotificationRequest(BaseModel):

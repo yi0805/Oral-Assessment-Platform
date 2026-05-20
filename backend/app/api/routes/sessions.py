@@ -376,6 +376,7 @@ def get_transcript_detail(
         session_feedback=SessionFeedbackOut.model_validate(feedback_obj) if feedback_obj else None,
         blur_count=notif.blur_count if notif else None,
         disconnect_count=notif.disconnect_count if notif else None,
+        resume_count=session_obj.resume_count,
         transcript=[TranscriptMessageOut.model_validate(t) for t in transcripts],
     )
 
@@ -656,6 +657,9 @@ def start_session(
 
     # Handle in_progress
     if session.status == "in_progress":
+        session.resume_count = (session.resume_count or 0) + 1
+        db.commit()
+
         last_item = (
             db.query(SessionQuestionItem)
             .filter(SessionQuestionItem.session_id == session.id)

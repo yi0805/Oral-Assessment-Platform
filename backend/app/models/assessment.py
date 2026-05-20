@@ -103,6 +103,12 @@ class AssessmentSession(Base):
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
     )
+    resume_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Times the student re-entered the in-progress session.",
+    )
 
     config = relationship("AssessmentConfig", back_populates="sessions")
     student = relationship("User", back_populates="sessions")
