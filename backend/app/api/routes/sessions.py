@@ -21,6 +21,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from sqlalchemy.exc import IntegrityError
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -307,6 +308,53 @@ def _finalize_if_expired(
     return True
 
 
+def _backfill_student_sessions(
+    db: Session,
+    course_id: UUID,
+    user_id: UUID,
+) -> None:
+    published_ids = [
+        config_id
+        for (config_id,) in db.query(AssessmentConfig.id)
+        .filter(
+            AssessmentConfig.course_id == course_id,
+            AssessmentConfig.status == "published",
+        )
+        .all()
+    ]
+
+    if not published_ids:
+        return
+
+    existing_ids = {
+        config_id
+        for (config_id,) in db.query(AssessmentSession.assessment_config_id)
+        .filter(
+            AssessmentSession.user_s_id == user_id,
+            AssessmentSession.assessment_config_id.in_(published_ids),
+        )
+        .all()
+    }
+
+    missing_ids = [cid for cid in published_ids if cid not in existing_ids]
+
+    if not missing_ids:
+        return
+
+    for config_id in missing_ids:
+        db.add(AssessmentSession(
+            assessment_config_id=config_id,
+            user_s_id=user_id,
+            status="not_started",
+        ))
+
+    try:
+        db.commit()
+
+    except IntegrityError:
+        db.rollback()
+
+
 # Pending reviews
 
 @router.get(
@@ -441,6 +489,8 @@ def list_my_course_assessments(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not enrolled in this course.",
         )
+
+    _backfill_student_sessions(db, course_id, current_user.id)
 
     rows = (
         db.query(AssessmentConfig, AssessmentSession)
@@ -612,6 +662,8 @@ def start_session(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This assessment has closed.",
         )
+
+    _backfill_student_sessions(db, config.course_id, current_user.id)
 
     # Fetch session
     session = (

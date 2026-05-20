@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -79,6 +80,12 @@ class AssessmentConfig(Base):
 
 class AssessmentSession(Base):
     __tablename__ = "assessment_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "assessment_config_id", "user_s_id",
+            name="uq_assessment_sessions_config_user",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
