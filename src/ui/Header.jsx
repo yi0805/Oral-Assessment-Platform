@@ -26,7 +26,7 @@ function Header() {
   const { markRead } = useMarkNotificationRead();
   const { markAllRead } = useMarkAllNotificationsRead();
 
-  const { pendingForReview, myResults } = useJoinRequests({
+  const { pendingForReview, myPending, myResults } = useJoinRequests({
     enabled: isInstructor,
   });
   const { approve, isPending: isApproving } = useApproveJoinRequest();
@@ -35,8 +35,10 @@ function Header() {
 
   const blurAlertCount = notifications.length;
   const pendingReviewCount = pendingForReview.length;
+  const myPendingCount = myPending.length;
   const myResultsCount = myResults.length;
-  const totalCount = blurAlertCount + pendingReviewCount + myResultsCount;
+  const totalCount =
+    blurAlertCount + pendingReviewCount + myPendingCount + myResultsCount;
   const hasAnyNotification = totalCount > 0;
 
   function handleOpenNotification(notification) {
@@ -171,11 +173,39 @@ function Header() {
                 </>
               )}
 
-              {myResultsCount > 0 && (
+              {(myPendingCount > 0 || myResultsCount > 0) && (
                 <>
                   <p className="px-5 pb-1 pt-3 text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant">
                     My requests
                   </p>
+
+                  {myPending.map((req) => (
+                    <div
+                      key={req.id}
+                      className="flex w-full items-start gap-3 border-b border-outline-variant/5 px-5 py-3"
+                    >
+                      <span
+                        className="material-symbols-outlined mt-0.5 text-on-surface-variant"
+                        data-icon="hourglass_empty"
+                      >
+                        hourglass_empty
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-semibold text-on-surface">
+                          Request pending
+                        </p>
+
+                        <p className="truncate text-xs text-on-surface-variant">
+                          {req.course_code} · {formatTermLabel(req.term)}
+                        </p>
+
+                        <p className="mt-1 text-xs text-on-surface-variant">
+                          Awaiting response from the original instructor
+                        </p>
+                      </div>
+                    </div>
+                  ))}
 
                   {myResults.map((req) => {
                     const approved = req.status === "approved";

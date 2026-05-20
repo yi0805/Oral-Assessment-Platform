@@ -633,6 +633,16 @@ def list_join_requests(
         .all()
     )
 
+    my_pending_rows = (
+        db.query(CourseJoinRequest, Course, User)
+        .join(Course, Course.id == CourseJoinRequest.course_id)
+        .join(User, User.id == CourseJoinRequest.requester_user_id)
+        .filter(CourseJoinRequest.requester_user_id == current_user.id)
+        .filter(CourseJoinRequest.status == "pending")
+        .order_by(CourseJoinRequest.created_at.desc())
+        .all()
+    )
+
     result_rows = (
         db.query(CourseJoinRequest, Course, User)
         .join(Course, Course.id == CourseJoinRequest.course_id)
@@ -645,6 +655,7 @@ def list_join_requests(
 
     return JoinRequestsListOut(
         pending_for_review=[_join_request_to_out(r, c, u) for (r, c, u) in pending_rows],
+        my_pending=[_join_request_to_out(r, c, u) for (r, c, u) in my_pending_rows],
         my_results=[_join_request_to_out(r, c, u) for (r, c, u) in result_rows],
     )
 
@@ -705,11 +716,22 @@ def approve_join_request(
         db.rollback()
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requester user not found.")
 
-    db.add(CourseEnrollment(
-        course_id=join_request.course_id,
-        user_id=requester.id,
-        upi=requester.upi,
-    ))
+    already_enrolled = (
+        db.query(CourseEnrollment)
+        .filter(
+            CourseEnrollment.course_id == join_request.course_id,
+            CourseEnrollment.user_id == requester.id,
+        )
+        .first()
+        is not None
+    )
+
+    if not already_enrolled:
+        db.add(CourseEnrollment(
+            course_id=join_request.course_id,
+            user_id=requester.id,
+            upi=requester.upi,
+        ))
 
     db.commit()
 

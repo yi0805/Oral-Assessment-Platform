@@ -82,4 +82,5 @@ class JoinRequestOut(BaseModel):
 
 class JoinRequestsListOut(BaseModel):
     pending_for_review: list[JoinRequestOut]
+    my_pending: list[JoinRequestOut]
     my_results: list[JoinRequestOut]
