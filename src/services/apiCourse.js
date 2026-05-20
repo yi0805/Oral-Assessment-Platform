@@ -5,13 +5,43 @@ export async function getCourses() {
   return response.data;
 }
 
-export async function createCourse(course_code, course_name, description) {
+export async function createCourse(course_code, course_name, term, description) {
   const response = await api.post("/courses", {
     course_code: course_code,
     course_name: course_name,
+    term: term,
     description: description,
   });
 
+  return response.data;
+}
+
+export async function getJoinRequests() {
+  const response = await api.get("/courses/join-requests");
+  return response.data;
+}
+
+export async function createJoinRequest(courseId) {
+  const response = await api.post(`/courses/${courseId}/join-request`);
+  return response.data;
+}
+
+export async function approveJoinRequest(requestId) {
+  const response = await api.post(
+    `/courses/join-requests/${requestId}/approve`,
+  );
+  return response.data;
+}
+
+export async function rejectJoinRequest(requestId) {
+  const response = await api.post(
+    `/courses/join-requests/${requestId}/reject`,
+  );
+  return response.data;
+}
+
+export async function dismissJoinRequest(requestId) {
+  const response = await api.delete(`/courses/join-requests/${requestId}`);
   return response.data;
 }
 
