@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas import CourseInfoOut, AISummaryInfoOut
 
@@ -41,6 +41,7 @@ class AssessmentConfigDetailOut(BaseModel):
     id: UUID
     title: str
     total_time_minute: int
+    buffer_time_minute: int
     main_question_num: int
     release_time: datetime | None = None
     due_time: datetime | None = None
@@ -50,6 +51,7 @@ class AssessmentConfigDetailOut(BaseModel):
 class AssessmentConfigUpdate(BaseModel):
     title: str | None = None
     total_time_minute: int | None = None
+    buffer_time_minute: int | None = Field(default=None, ge=0, le=30)
     main_question_num: int | None = None
     release_time: datetime | None = None
     due_time: datetime | None = None
@@ -167,22 +169,21 @@ class TranscriptDetailOut(BaseModel):
     ai_summary: AISummaryInfoOut | None = None
     session_feedback: SessionFeedbackOut | None = None
     blur_count: int | None = None
+    disconnect_count: int | None = None
     transcript: list[TranscriptMessageOut]
 
 class BlurNotificationRequest(BaseModel):
     blur_count: int
 
-class NotificationOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    session_id: UUID
-    user_id: UUID
-    blur_count: int
+class ReconnectNotificationRequest(BaseModel):
+    disconnect_count: int = Field(ge=0)
 
 class InstructorNotificationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID
     session_id: UUID
     blur_count: int
+    disconnect_count: int
     course_code: str
     course_name: str
     assessment_title: str

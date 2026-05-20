@@ -36,6 +36,12 @@ class AssessmentConfig(Base):
     total_time_minute: Mapped[int] = mapped_column(
         Integer, nullable=False,
     )
+    buffer_time_minute: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Extra minutes for technical issues, added to total_time_minute.",
+    )
     main_question_num: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
@@ -133,6 +139,12 @@ class Notification(Base):
     blur_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
+    )
+    disconnect_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Number of network reconnects recorded during the session (best-effort, client-reported).",
     )
     is_read: Mapped[bool] = mapped_column(
         Boolean,

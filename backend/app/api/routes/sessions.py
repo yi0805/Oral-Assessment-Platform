@@ -20,7 +20,7 @@ from fastapi import (
     status,
 )
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -49,7 +49,8 @@ from app.schemas import (
     StudentInfoOut, SessionFeedbackOut, CourseInfoOut,
     AISummaryInfoOut, SessionInfoOut, AssessmentConfigInfoOut,
     AudioTranscriptionResponse,
-    BlurNotificationRequest, NotificationOut, InstructorNotificationOut,
+    BlurNotificationRequest, ReconnectNotificationRequest,
+    InstructorNotificationOut,
 )
 from app.services.ai_gateway import smart_chat_complete
 
@@ -147,7 +148,9 @@ def _validate_session_for_transcribe(
     )
 
     if session.started_at and config and config.total_time_minute:
-        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+        expires_at = session.started_at + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         if datetime.now(timezone.utc) > expires_at:
             raise HTTPException(
@@ -372,6 +375,7 @@ def get_transcript_detail(
         ai_summary=AISummaryInfoOut.model_validate(ai_obj) if ai_obj else None,
         session_feedback=SessionFeedbackOut.model_validate(feedback_obj) if feedback_obj else None,
         blur_count=notif.blur_count if notif else None,
+        disconnect_count=notif.disconnect_count if notif else None,
         transcript=[TranscriptMessageOut.model_validate(t) for t in transcripts],
     )
 
@@ -631,7 +635,9 @@ def start_session(
         db.add(msg)
         db.commit()
 
-        expires_at = now + timedelta(minutes=config.total_time_minute)
+        expires_at = now + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         return SessionStartResponse(
             session_id=session.id,
@@ -687,7 +693,9 @@ def start_session(
                 )
 
         started_at = getattr(session, "started_at", None) or now
-        expires_at = started_at + timedelta(minutes=config.total_time_minute)
+        expires_at = started_at + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         all_answered = current_question is None and last_item is not None
 
@@ -764,7 +772,9 @@ async def submit_response(
 
     # Time check
     if session.started_at and config and config.total_time_minute:
-        expires_at = session.started_at + timedelta(minutes=config.total_time_minute)
+        expires_at = session.started_at + timedelta(
+            minutes=config.total_time_minute + (config.buffer_time_minute or 0)
+        )
 
         if datetime.now(timezone.utc) > expires_at:
             raise HTTPException(
@@ -1443,6 +1453,60 @@ def complete_session(
     return {"session_id": str(session_id), "status": "under_review"}
 
 BLUR_NOTIFICATION_THRESHOLD = 3
+DISCONNECT_NOTIFICATION_THRESHOLD = 3
+
+
+def _owned_session_or_404(
+    session_id: UUID,
+    current_user: User,
+    db: Session,
+) -> AssessmentSession:
+    session = (
+        db.query(AssessmentSession)
+        .filter(
+            AssessmentSession.id == session_id,
+            AssessmentSession.user_s_id == current_user.id,
+        )
+        .first()
+    )
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Assessment session not found")
+
+    return session
+
+
+def _upsert_notification(
+    db: Session,
+    session_id: UUID,
+    user_id: UUID,
+    *,
+    blur_count: int | None = None,
+    disconnect_count: int | None = None,
+) -> None:
+    notif = (
+        db.query(Notification)
+        .filter(Notification.session_id == session_id)
+        .first()
+    )
+
+    if notif is None:
+        notif = Notification(
+            user_id=user_id,
+            session_id=session_id,
+            blur_count=blur_count or 0,
+            disconnect_count=disconnect_count or 0,
+        )
+        db.add(notif)
+
+    else:
+        if blur_count is not None:
+            notif.blur_count = blur_count
+
+        if disconnect_count is not None:
+            notif.disconnect_count = disconnect_count
+
+    db.commit()
 
 
 @router.post(
@@ -1456,29 +1520,29 @@ def record_blur_notification(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
-    session = (
-        db.query(AssessmentSession)
-        .filter(
-            AssessmentSession.id == session_id,
-            AssessmentSession.user_s_id == current_user.id,
-        )
-        .first()
+    _owned_session_or_404(session_id, current_user, db)
+    
+    _upsert_notification(
+        db, session_id, current_user.id, blur_count=payload.blur_count
     )
 
-    if not session:
-        raise HTTPException(status_code=404, detail="Assessment session not found")
 
-    if payload.blur_count < BLUR_NOTIFICATION_THRESHOLD:
-        return
+@router.post(
+    "/sessions/{session_id}/reconnect-notification",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Record network reconnect notification for an assessment session",
+)
+def record_reconnect_notification(
+    session_id: UUID,
+    payload: ReconnectNotificationRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_student),
+):
+    _owned_session_or_404(session_id, current_user, db)
 
-    notification = Notification(
-        user_id=current_user.id,
-        session_id=session_id,
-        blur_count=payload.blur_count,
+    _upsert_notification(
+        db, session_id, current_user.id, disconnect_count=payload.disconnect_count
     )
-
-    db.add(notification)
-    db.commit()
 
 
 @router.get(
@@ -1499,7 +1563,12 @@ def list_notifications(
         .join(User, User.id == Notification.user_id)
         .filter(CourseEnrollment.user_id == current_user.id)
         .filter(Notification.is_read == False)
-        .filter(Notification.blur_count >= BLUR_NOTIFICATION_THRESHOLD)
+        .filter(
+            or_(
+                Notification.blur_count >= BLUR_NOTIFICATION_THRESHOLD,
+                Notification.disconnect_count >= DISCONNECT_NOTIFICATION_THRESHOLD,
+            )
+        )
         .order_by(AssessmentConfig.title.asc())
         .all()
     )
@@ -1509,6 +1578,7 @@ def list_notifications(
             id=notif.id,
             session_id=notif.session_id,
             blur_count=notif.blur_count,
+            disconnect_count=notif.disconnect_count,
             course_code=course.course_code,
             course_name=course.course_name,
             assessment_title=config.title,
