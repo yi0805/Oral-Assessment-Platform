@@ -1,11 +1,23 @@
-# COMPSCI 399 Team 8 Capstone Project: WhereRU
+# WhereRU - Team 8 COMPSCI 399 Capstone Project
+
+## Name of the project
+
+WhereRU
+
+---
+
+## Link to the Project Management tool
+
+https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git
+
+---
 
 ## Project Overview
 
 This project is an AI-powered assessment system designed to support instructors in creating assessments and students in completing them within a controlled, timed environment. The system integrates large language models (LLMs) to create questions, evaluate answers and generate feedback.
 
-
 ### Key Features
+
 - Upload course materials and generate a pool of questions which is editable by instructor
 - Rubric table for instructors to define precise evaluation dimensions, ensuring grading consistency
 - Short text-based chat assessment with adaptive follow-up questions
@@ -25,35 +37,146 @@ http://where-areyou.com
 The application is deployed on an AWS EC2 instance and is accessible via a public URL for demonstration and evaluation purposes.
 
 ### Domain Configuration
+
 The application is accessible via a custom domain:
+
 - **Current Version**: v1.0.0
-- **Domain**: where-areyou.com  
-- **DNS**: A record pointing to EC2 public IP  
-- **Hosting**: AWS EC2 instance  
+- **Domain**: where-areyou.com
+- **DNS**: A record pointing to EC2 public IP
+- **Hosting**: AWS EC2 instance
 
 ---
 
 ## Tech Stack
 
 ### Backend
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Pydantic
+
+Languague - Python 3.11+
+
+#### Web framework
+
+fastapi==0.115.0
+uvicorn[standard]==0.30.0
+
+#### Database
+
+sqlalchemy==2.0.35
+psycopg[binary]==3.2.10
+alembic==1.13.2
+pgvector==0.3.5
+
+#### Data validation
+
+pydantic==2.9.0
+pydantic-settings==2.5.0
+
+#### Auth
+
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+#### AWS
+
+boto3==1.43.6
+amazon-transcribe==0.6.2
+
+#### File processing
+
+pandas==3.0.2
+python-multipart==0.0.12
+pdfplumber==0.11.4
+python-docx==1.1.2
+python-pptx==1.0.2
+
+#### HTTP client
+
+httpx==0.27.0
+
+#### Environment
+
+python-dotenv==1.0.1
+
+#### Rate limiting
+
+slowapi==0.1.9
+
+#### Testing
+
+pytest==8.3.0
+pytest-asyncio==0.24.0
+pytest-mock==3.14.0
+httpx==0.27.0
+moto[s3]==5.0.0
+
+#### Production server
+
+gunicorn==23.0.0
 
 ### Frontend
-- React (Vite)
-- JavaScript / JSX
-- Tailwind CSS
+
+#### Core Frontend Frameworks
+
+react 19.2.4
+react-dom 19.2.4
+react-router 7.13.1
+vite 8.0.0
+vitejs/plugin-react 6.0.0
+
+#### API & State Management
+
+tanstack/react-query 4.44.0
+tanstack/react-query-devtools 4.44.0
+axios 1.14.0
+
+#### Authentication
+
+react-oauth/google 0.13.4
+
+#### UI Components & User Experience
+
+react-datepicker 9.1.0
+react-hot-toast 2.6.0
+tailwind-datepicker-react 1.4.3
+recharts 3.8.1
+
+#### Styling & CSS Tools
+
+tailwindcss 3.4.19
+postcss 8.5.8
+autoprefixer 10.4.27
+prettier-plugin-tailwindcss 0.7.2
+
+#### Formatting
+
+eslint/js9.39.4
+types/react 19.2.14
+types/react-dom 19.2.3
+eslint 9.39.4
+eslint-plugin-react-hooks 7.0.1
+eslint-plugin-react-refresh 0.5.2
+globals 17.4.0
+prettier 3.8.1
+
+#### Testing
+
+playwright/test 1.49.0
+
+### Database
+
+- PostgreSQL (via Amazon RDS)
+- pgvector (extension for vector database)
 
 ### Cloud / Infrastructure
-- AWS RDS (PostgreSQL)
-- AWS S3 (optional for file storage)
-- AWS Bedrock (Claude 3 Haiku as primary LLM)
-- AWS Transcribe (STT)
-- AWS EC2 (Deployment and security group)
+
+- Amazon RDS (PostgreSQL database)
+- Amazon S3 (file storage)
+- Amazon Bedrock (Claude 3 Haiku as primary LLM)
+- Amazon Transcribe (Speech-to-Text feature)
+- Amazon EC2 (Deployment and security group)
+- Amazon IAM (Identity and Access Management)
 
 ### AI Integration
+
 - AWS Bedrock – Claude 3 Haiku as Primary Model:
   - Generate questions
   - Answer evaluation
@@ -71,11 +194,11 @@ The application is accessible via a custom domain:
 ## System Architecture
 
 Frontend (React)
-    ↓
+↓
 FastAPI Backend
-    ↓
+↓
 AWS RDS PostgreSQL
-    ↓
+↓
 AWS Bedrock / OpenRouter
 
 ---
@@ -138,7 +261,7 @@ AWS Bedrock / OpenRouter
 1. Clone Repository
 
 ```bash
-git clone https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git`
+git clone https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git
 ```
 
 2. Configure environment variables
@@ -147,7 +270,7 @@ git clone https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-tea
 cp .env.example .env
 ```
 
-3. Start PostgreSQL 
+3. Start PostgreSQL
 
 ```bash
 docker run --name project20-db \
@@ -180,6 +303,16 @@ npm install
 npm run dev
 ```
 
+6. Link
+
+#### Frontend
+
+http://localhost:5173
+
+#### Backend Swagger UI
+
+http://127.0.0.1:8000/docs
+
 ---
 
 ## Assessment Workflow
@@ -204,23 +337,57 @@ Student reviews the results
 
 ---
 
+## Usage Examples
+
+### Instructor Workflow
+
+Example workflow for instructors:
+
+1. Login as instructor using Google Auth
+2. Create a course
+3. Upload learning materials and fill out rubric table
+4. Create an assessment
+5. Review and edit AI-generated questions
+6. Save the draft assessment
+7. Release assessment to students
+8. Review AI-generated grading and feedback
+
+### Student Workflow
+
+Example workflow for students:
+
+1. Login as student
+2. Start assessment session
+3. Answer AI-generated oral questions by recording audio
+4. Correct the transcribed text answer
+5. Respond to adaptive follow-up questions
+6. Submit assessment
+7. View released feedback and results
+8. Review previous assessment feedback and results
+
+---
+
 ## Design Decisions
 
 ### Structured Output
+
 AI responses are enforced in structured JSON format to:
+
 - simplify frontend rendering
 - improve response consistency
 - reduce parsing errors
 
 ### LLM Fallback Strategy
+
 - reliability under failure
 
 ### Layered Architecture
+
 The backend follows a layered architecture:
+
 - API layer
 - service layer
 - database layer
-
 
 ---
 
@@ -241,9 +408,17 @@ The backend follows a layered architecture:
 
 COMPSCI 399 – Team 8 Next Level
 
-* **Bess Zhang**
-* **Joanne Chen**
-* **Yihuan Tang**
-* **Henry Song**
-* **Whilin Zhao**
-* **James Wilner**
+- **Bess Zhang**
+- **Joanne Chen**
+- **Yihuan Tang**
+- **Henry Song**
+- **Whilin Zhao**
+- **James Wilner**
+
+## Acknowledgements
+
+People consulted:
+
+- **Shyamli Sindhwani**
+- **Anna Trofimova**
+- **Tony Feng**

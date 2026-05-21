@@ -259,7 +259,7 @@ export default function Setting() {
 
             <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant/20 pt-4">
               <p className="text-[13px] italic text-outline">
-                Supervised by Shyamli Sindhwani & Anna Trofimova
+                Supervised by Shyamli Sindhwani, Anna Trofimova & Tony Feng
               </p>
             </div>
           </div>
