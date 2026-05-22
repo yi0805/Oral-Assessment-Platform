@@ -345,25 +345,28 @@ Example workflow for instructors:
 
 1. Login as instructor using Google Auth
 2. Create a course
-3. Upload learning materials and fill out rubric table
-4. Create an assessment
-5. Review and edit AI-generated questions
-6. Save the draft assessment
-7. Release assessment to students
-8. Review AI-generated grading and feedback
+3. Enrol students and instructors to the course
+4. Upload learning materials and fill out rubric table
+5. Create an assessment
+6. Review and edit AI-generated questions
+7. Save the draft assessment
+8. Release assessment to students
+9. Detect potential cheating by anti-cheating system
+10. Review AI-generated grading and feedback
 
 ### Student Workflow
 
 Example workflow for students:
 
 1. Login as student
-2. Start assessment session
-3. Answer AI-generated oral questions by recording audio
-4. Correct the transcribed text answer
-5. Respond to adaptive follow-up questions
-6. Submit assessment
-7. View released feedback and results
-8. Review previous assessment feedback and results
+2. View assessment requirment
+3. Start assessment session
+4. Answer AI-generated oral questions by recording audio
+5. Adjust the transcribed text answer before submitting
+6. Respond to adaptive follow-up questions
+7. Submit assessment
+8. View released feedback and results
+9. Review previous assessment feedback and results
 
 ---
 
