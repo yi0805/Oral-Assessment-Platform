@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, useParams } from "react-router";
 
+import { useCourses } from "../../hooks/useCourses";
 import { useDashboard } from "./useDashboard";
 import { useImportStudents } from "./useImportStudents";
 import { useExportResults } from "./useExportResults";
@@ -21,6 +22,8 @@ export default function StudentManagement() {
   const [role, setRole] = useState("student");
 
   const [currentPage, setCurrentPage] = useState(1);
+  const { courses } = useCourses();
+  const course = courses.find((c) => String(c.id) === String(courseId));
 
   const { dashboard = [], isLoading: isDashboardLoading } =
     useDashboard(courseId);
@@ -38,7 +41,11 @@ export default function StudentManagement() {
   }, [courseId]);
 
   const rowsPerPage = 10;
-  const totalPages = Math.ceil(enrolledUsers.length / rowsPerPage);
+  const totalPages = Math.max(1, Math.ceil(enrolledUsers.length / rowsPerPage));
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [totalPages, currentPage]);
 
   const endIndex = currentPage * rowsPerPage;
   const startIndex = endIndex - rowsPerPage;
@@ -102,7 +109,7 @@ export default function StudentManagement() {
 
   return (
     <div className="min-h-screen">
-      <main className="ml-64 px-10 pb-12 pt-24">
+      <main className="px-10 pb-12 pt-24">
         <header className="mb-10">
           <NavLink
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
@@ -116,6 +123,9 @@ export default function StudentManagement() {
             </span>
           </NavLink>
 
+          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+            {course?.course_code} • {course?.course_name}
+          </span>
           <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
             Users Management
           </h1>
@@ -123,6 +133,137 @@ export default function StudentManagement() {
             Manage course enrolments and export assessment results.
           </p>
         </header>
+
+        <div className="mb-8">
+          <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
+            <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-on-surface">
+              <span
+                className="material-symbols-outlined text-primary"
+                data-icon="person"
+                style={{ verticalAlign: "middle" }}
+              >
+                groups
+              </span>
+              Enrolled Users
+            </h2>
+            <p className="mb-6 text-sm text-on-surface-variant">
+              A list of users enrolled to the course
+            </p>
+
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="bg-surface-container-low">
+                      <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
+                        Full Name
+                      </th>
+                      <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
+                        UPI
+                      </th>
+                      <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
+                        Role
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody className="divide-y divide-outline-variant/20">
+                    {currentRows.length === 0 ? (
+                      <tr>
+                        <td colSpan="3" className="px-6 py-10 text-center">
+                          <div className="flex flex-col items-center justify-center gap-2 text-on-surface-variant">
+                            <span className="material-symbols-outlined text-3xl opacity-60">
+                              fact_check
+                            </span>
+                            <p className="text-sm font-medium">
+                              No users enrolled in this course.
+                            </p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      currentRows.map((user, index) => (
+                        <tr
+                          key={user.upi || index}
+                          className="transition-colors hover:bg-surface-container-low/30"
+                        >
+                          <td className="px-6 py-4 font-mono text-xs">
+                            {user.full_name || (
+                              <span className="text-outline">
+                                Pending registration
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 font-mono text-xs">
+                            {user.upi}
+                          </td>
+                          <td className="px-6 py-4">
+                            {user.role ? (
+                              <span
+                                className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium capitalize ${
+                                  user.role === "instructor"
+                                    ? "bg-primary/10 text-primary"
+                                    : "bg-secondary/10 text-secondary"
+                                }`}
+                              >
+                                {user.role}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-outline">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex gap-2">
+                  <span className="text-xs font-medium text-on-surface-variant">
+                    Showing {startIndex + 1}-
+                    {Math.min(endIndex, enrolledUsers.length)} of{" "}
+                    {enrolledUsers.length} users
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      className="rounded p-2 text-outline transition-colors hover:bg-surface-container"
+                      onClick={goToPrevPage}
+                      disabled={currentPage === 1}
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        chevron_left
+                      </span>
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                      (page) => (
+                        <button
+                          className={`rounded p-2 px-4 text-sm font-bold transition-colors hover:bg-surface-container ${currentPage === page ? "text-on-surface" : "text-outline"}`}
+                          key={page}
+                          onClick={() => goToPage(page)}
+                        >
+                          {page}
+                        </button>
+                      ),
+                    )}
+
+                    <button
+                      className="rounded p-2 text-outline transition-colors hover:bg-surface-container"
+                      onClick={goToNextPage}
+                      disabled={currentPage === totalPages}
+                    >
+                      <span className="material-symbols-outlined text-sm">
+                        chevron_right
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
 
         <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
           <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
@@ -355,129 +496,6 @@ export default function StudentManagement() {
                   {isDeleting ? "Removing…" : "Delete Enrolment"}
                 </button>
               </div>
-            </div>
-          </section>
-        </div>
-
-        <div className="mb-8">
-          <section className="rounded-xl bg-surface-container-lowest p-8 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)]">
-            <h2 className="mb-6 flex items-center gap-2 text-xl font-bold text-on-surface">
-              <span
-                className="material-symbols-outlined text-primary"
-                data-icon="person"
-                style={{ verticalAlign: "middle" }}
-              >
-                groups
-              </span>
-              Enrolled Users
-            </h2>
-            <p className="mb-6 text-sm text-on-surface-variant">
-              A list of users enrolled to the course
-            </p>
-
-            <div className="space-y-4">
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="bg-surface-container-low">
-                      <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
-                        Full Name
-                      </th>
-                      <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
-                        UPI
-                      </th>
-                      <th className="px-8 py-4 text-left text-[10px] font-bold uppercase tracking-[0.1em] text-outline-variant">
-                        Role
-                      </th>
-                    </tr>
-                  </thead>
-
-                  <tbody className="divide-y divide-outline-variant/20">
-                    {currentRows.length === 0 ? (
-                      <tr>
-                        <td colSpan="7" className="px-6 py-10 text-center">
-                          <div className="flex flex-col items-center justify-center gap-2 text-on-surface-variant">
-                            <span className="material-symbols-outlined text-3xl opacity-60">
-                              fact_check
-                            </span>
-                            <p className="text-sm font-medium">
-                              No users enrolled in this course.
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      currentRows.map((user, index) => (
-                        <tr
-                          key={user.upi || index}
-                          className="transition-colors hover:bg-surface-container-low/30"
-                        >
-                          <td className="px-6 py-4 font-mono text-xs">
-                            {user.full_name}
-                          </td>
-                          <td className="px-6 py-4 font-mono text-xs">
-                            {user.upi}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span
-                              className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium capitalize ${
-                                user.role === "instructor"
-                                  ? "bg-primary/10 text-primary"
-                                  : "bg-secondary/10 text-secondary"
-                              }`}
-                            >
-                              {user.role}
-                            </span>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {totalPages > 1 && (
-                <div className="flex gap-2">
-                  <span className="text-xs font-medium text-on-surface-variant">
-                    Showing {startIndex + 1}-
-                    {Math.min(endIndex, enrolledUsers.length)} of{" "}
-                    {enrolledUsers.length} submissions
-                  </span>
-                  <div className="flex gap-2">
-                    <button
-                      className="rounded p-2 text-outline transition-colors hover:bg-surface-container"
-                      onClick={goToPrevPage}
-                      disabled={currentPage === 1}
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        chevron_left
-                      </span>
-                    </button>
-
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                      (page) => (
-                        <button
-                          className={`rounded p-2 px-4 text-sm font-bold transition-colors hover:bg-surface-container ${currentPage === page ? "text-on-surface" : "text-outline"}`}
-                          key={page}
-                          onClick={() => goToPage(page)}
-                        >
-                          {page}
-                        </button>
-                      ),
-                    )}
-
-                    <button
-                      className="rounded p-2 text-outline transition-colors hover:bg-surface-container"
-                      onClick={goToNextPage}
-                      disabled={currentPage === totalPages}
-                    >
-                      <span className="material-symbols-outlined text-sm">
-                        chevron_right
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </section>
         </div>

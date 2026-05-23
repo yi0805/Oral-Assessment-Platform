@@ -25,10 +25,11 @@ class QuestionCreate(BaseModel):
 # Question generation
 
 class QuestionGenerationRequest(BaseModel):
-    material_id: UUID
+    material_ids: list[UUID] = Field(min_length=1, max_length=5)
     rubric_id: UUID
     assessment_title: str
     total_time_minutes: int
+    buffer_time_minutes: int = Field(default=0, ge=0, le=30)
     num_main_questions: int
     max_followups_per_main: int = 1
     release_time: datetime | None = None

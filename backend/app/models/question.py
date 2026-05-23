@@ -1,10 +1,28 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import Column, ForeignKey, Integer, String, Table, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+
+question_pool_materials = Table(
+    "question_pool_materials",
+    Base.metadata,
+    Column(
+        "question_pool_id",
+        UUID(as_uuid=True),
+        ForeignKey("question_pools.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "material_id",
+        UUID(as_uuid=True),
+        ForeignKey("materials.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class QuestionPool(Base):
@@ -16,15 +34,13 @@ class QuestionPool(Base):
     assessment_config_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("assessment_configs.id", ondelete="CASCADE"), nullable=False, unique=True,
     )
-    material_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("materials.id", ondelete="CASCADE"), nullable=False
-    )
     status: Mapped[str] = mapped_column(
         String, nullable=False, server_default="draft", comment="draft | published"
     )
 
     assessment_config = relationship("AssessmentConfig", back_populates="question_pool")
     questions = relationship("Question", back_populates="pool",  passive_deletes=True,)
+    materials = relationship("Material", secondary=question_pool_materials, lazy="select")
 
     def __repr__(self) -> str:
         return f"<QuestionPool {self.id} [{self.status}]>"

@@ -1,7 +1,7 @@
 function Spinner() {
   return (
     <div className="flex min-h-screen">
-      <main className="flex flex-1 items-center justify-center bg-surface p-8 pt-16 md:ml-64">
+      <main className="flex flex-1 items-center justify-center bg-surface p-8 pt-16">
         <div className="flex w-full max-w-md flex-col items-center text-center">
           <div className="relative mb-12 flex items-center justify-center">
             <div className="absolute h-28 w-28 rounded-full border-[3px] border-surface-container-highest"></div>

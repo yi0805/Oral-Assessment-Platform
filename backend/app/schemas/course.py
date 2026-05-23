@@ -1,11 +1,16 @@
+from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.schemas.enums import UserRole
 
 
 # Course
+
+# Term format: "YYYYS1" or "YYYYS2" (4-digit year + semester).
+TERM_PATTERN = r"^20\d{2}S[12]$"
+
 
 class CourseInfoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -18,11 +23,13 @@ class CourseOut(BaseModel):
     id: UUID
     course_code: str
     course_name: str
+    term: str
     description: str
 
 class CourseCreate(BaseModel):
     course_code: str
     course_name: str
+    term: str = Field(pattern=TERM_PATTERN)
     description: str
 
 
@@ -54,6 +61,26 @@ class InstructorDashboardAssessmentOut(BaseModel):
 class EnrolledUser(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    full_name: str
+    full_name: str | None = None
     upi: str
-    role: UserRole
+    role: UserRole | None = None
+
+
+# Course join requests
+
+class JoinRequestOut(BaseModel):
+    id: UUID
+    course_id: UUID
+    course_code: str
+    course_name: str
+    term: str
+    status: str
+    requester_full_name: str
+    requester_upi: str
+    created_at: datetime
+
+
+class JoinRequestsListOut(BaseModel):
+    pending_for_review: list[JoinRequestOut]
+    my_pending: list[JoinRequestOut]
+    my_results: list[JoinRequestOut]

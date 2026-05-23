@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import { useCourses } from "../hooks/useCourses";
 import Spinner from "./Spinner";
 
-export default function InstructorCourseLayout() {
+export default function StudentCourseLayout() {
   const { courseId } = useParams();
   const { courses, isLoading } = useCourses();
 

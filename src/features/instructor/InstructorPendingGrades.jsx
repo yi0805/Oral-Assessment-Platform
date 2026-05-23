@@ -118,7 +118,7 @@ function InstructorPendingGrades() {
   }
 
   return (
-    <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
+    <main className="min-h-screen px-12 pb-12 pt-24">
       <div className="mb-8">
         <NavLink
           className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
@@ -131,9 +131,18 @@ function InstructorPendingGrades() {
             Back to Courses
           </span>
         </NavLink>
-        <h1 className="mt-4 font-headline text-4xl font-extrabold tracking-tight text-on-surface">
+
+        <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+          All Courses
+        </span>
+
+        <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
           Review Submissions
         </h1>
+
+        <p className="mt-2 text-sm text-on-surface-variant">
+          Submissions awaiting your grade.
+        </p>
       </div>
 
       <div className="overflow-hidden rounded-xl bg-surface-container-lowest shadow-[0_4px_24px_rgba(43,52,55,0.04)]">

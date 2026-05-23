@@ -10,6 +10,7 @@ import { useLogout } from "../authentication/useLogout";
 import { useCompleteAssessment } from "./useCompleteAssessment";
 import { useStudentSpeechStream } from "./useStudentSpeechStream";
 import { useRecordBlurNotification } from "./useRecordBlurNotification";
+import { useRecordReconnect } from "./useRecordReconnect";
 
 // [STT #72] Streaming path is the default after the rollout in
 // commit 28 of feature/audio-to-text. Set VITE_STT_STREAMING=0 in
@@ -19,6 +20,7 @@ import { useRecordBlurNotification } from "./useRecordBlurNotification";
 const STREAMING_ENABLED = import.meta.env.VITE_STT_STREAMING !== "0";
 
 import Loading from "../../ui/Loading";
+import ConfirmModal from "../../ui/ConfirmModal";
 import { toRoman } from "../../utils/toRomanNumber";
 import { getErrorMessage } from "../../utils/getErrorMessage";
 
@@ -57,6 +59,8 @@ export default function StudentAssessment() {
 
   const [blurCount, setBlurCount] = useState(0);
 
+  const [disconnectCount, setDisconnectCount] = useState(0);
+
   const hasAutoCompleted = useRef(false);
   const autoRetryTimerRef = useRef(null);
   const [retryNonce, setRetryNonce] = useState(0);
@@ -83,13 +87,16 @@ export default function StudentAssessment() {
   } = useAudioRecorder();
   const { completeAssessment } = useCompleteAssessment();
   const { recordBlurNotification } = useRecordBlurNotification();
+  const { recordReconnectNotification } = useRecordReconnect();
 
   // [STT #72] Streaming hook is always instantiated so React's
   // rules-of-hooks stay happy; the rest of the component branches on
   // STREAMING_ENABLED to decide whether to use it.
   const speech = useStudentSpeechStream();
 
-  const { logout } = useLogout();
+  const { logout, isPending: isLoggingOut } = useLogout();
+
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
 
   // [STT #72] Unified "isRecording" / "isTranscribing" derived from
   // whichever flow is active. Downstream UI (mic-button styling,
@@ -131,9 +138,26 @@ export default function StudentAssessment() {
   }, [expiresAtIso]);
 
   useEffect(() => {
+    if (!sessionId) return;
+
+    const restored =
+      Number(localStorage.getItem(`assessment_blur_${sessionId}`)) || 0;
+    setBlurCount(restored);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const blurKey = `assessment_blur_${sessionId}`;
+
     function handleVisibilityChange() {
       if (document.visibilityState === "hidden") {
         setBlurCount((count) => count + 1);
+      } else if (document.visibilityState === "visible") {
+        setBlurCount((count) => {
+          localStorage.setItem(blurKey, String(count));
+          return count;
+        });
       }
     }
 
@@ -142,7 +166,54 @@ export default function StudentAssessment() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, []);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const offlineKey = `assessment_offline_${sessionId}`;
+    const countKey = `assessment_reconnects_${sessionId}`;
+
+    let restored = Number(localStorage.getItem(countKey)) || 0;
+
+    if (localStorage.getItem(offlineKey) && navigator.onLine) {
+      localStorage.removeItem(offlineKey);
+      restored += 1;
+      localStorage.setItem(countKey, String(restored));
+    }
+
+    setDisconnectCount(restored);
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const offlineKey = `assessment_offline_${sessionId}`;
+    const countKey = `assessment_reconnects_${sessionId}`;
+
+    function handleOffline() {
+      localStorage.setItem(offlineKey, "1");
+    }
+
+    function handleOnline() {
+      if (!localStorage.getItem(offlineKey)) return;
+
+      localStorage.removeItem(offlineKey);
+      setDisconnectCount((count) => {
+        const next = count + 1;
+        localStorage.setItem(countKey, String(next));
+        return next;
+      });
+    }
+
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("online", handleOnline);
+    };
+  }, [sessionId]);
 
   useEffect(() => {
     if (timeLeft == null) return;
@@ -178,7 +249,23 @@ export default function StudentAssessment() {
           }
         }
 
+        if (disconnectCount > 0) {
+          try {
+            await recordReconnectNotification({ sessionId, disconnectCount });
+          } catch (reconnectError) {
+            setError(
+              getErrorMessage(
+                reconnectError,
+                "Failed to record reconnect notification.",
+              ),
+            );
+          }
+        }
+
         await completeAssessment({ sessionId, courseId });
+        localStorage.removeItem(`assessment_reconnects_${sessionId}`);
+        localStorage.removeItem(`assessment_offline_${sessionId}`);
+        localStorage.removeItem(`assessment_blur_${sessionId}`);
         navigate(`/student/${courseId}`);
       } catch (error) {
         setError(getErrorMessage(error, "Failed to submit assessment."));
@@ -202,8 +289,10 @@ export default function StudentAssessment() {
     isRecording,
     completeAssessment,
     recordBlurNotification,
+    recordReconnectNotification,
     submitAnswer,
     blurCount,
+    disconnectCount,
     typedAnswer,
     navigate,
     courseId,
@@ -399,7 +488,23 @@ export default function StudentAssessment() {
         }
       }
 
+      if (disconnectCount > 0 && sessionId) {
+        try {
+          await recordReconnectNotification({ sessionId, disconnectCount });
+        } catch (reconnectError) {
+          setError(
+            getErrorMessage(
+              reconnectError,
+              "Failed to record reconnect notification.",
+            ),
+          );
+        }
+      }
+
       await completeAssessment({ sessionId, courseId });
+      localStorage.removeItem(`assessment_reconnects_${sessionId}`);
+      localStorage.removeItem(`assessment_offline_${sessionId}`);
+      localStorage.removeItem(`assessment_blur_${sessionId}`);
       navigate(`/student/${courseId}`);
     } catch (error) {
       setError(getErrorMessage(error, "Failed to complete assessment."));
@@ -625,6 +730,18 @@ export default function StudentAssessment() {
 
   return (
     <div className="font-body selection:bg-primary-container selection:text-on-primary-container">
+      {confirmingLogout && (
+        <ConfirmModal
+          title="Log out of assessment?"
+          message="The assessment timer keeps running after you log out, and the assessment will be submitted automatically when time runs out. Are you sure you want to log out?"
+          confirmLabel="Yes, log out"
+          loadingLabel="Logging out…"
+          isLoading={isLoggingOut}
+          onConfirm={() => logout()}
+          onCancel={() => setConfirmingLogout(false)}
+        />
+      )}
+
       <header className="fixed top-0 z-40 flex h-16 w-full items-center justify-between bg-[#f8f9fa] px-8">
         <div className="flex items-center gap-4">
           <span className="font-headline text-xl font-bold tracking-tight text-[#4f6073]">
@@ -654,7 +771,7 @@ export default function StudentAssessment() {
 
             <button
               className="rounded-lg px-4 py-2 text-sm font-semibold text-[#4f6073] transition-colors duration-200 hover:bg-[#eaeff1] active:scale-95"
-              onClick={() => logout()}
+              onClick={() => setConfirmingLogout(true)}
             >
               Logout
             </button>
@@ -674,9 +791,9 @@ export default function StudentAssessment() {
             {assessmentTitle || "Assessment Title Not Available"}
           </h1>
 
-          <p className="mt-2 text-xs text-on-surface-variant">
-            The exam clock continues running while you are away from this page.
-          </p>
+          {/* <p className="mt-2 text-xs text-on-surface-variant">
+            Assessment timer continues if you logout or disconnect.
+          </p> */}
         </div>
 
         <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-12">
@@ -835,7 +952,7 @@ export default function StudentAssessment() {
                       role="progressbar"
                       aria-label="Transcribing your answer"
                     >
-                      <div className="animate-indeterminate-bar h-full w-1/3 rounded-full bg-primary" />
+                      <div className="h-full w-1/3 animate-indeterminate-bar rounded-full bg-primary" />
                     </div>
                   )}
 

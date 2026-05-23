@@ -62,9 +62,11 @@ export async function upsertReview(sessionId, finalGrade, comments) {
   return response.data;
 }
 
-export async function startSession(assessmentConfigId) {
+export async function startSession(assessmentConfigId, countReentry = false) {
   const response = await api.post(
     `/assessments/${assessmentConfigId}/sessions/start`,
+    null,
+    { params: { count_reentry: countReentry } },
   );
   return response.data;
 }
@@ -131,6 +133,16 @@ export async function recordBlurNotification(sessionId, blurCount) {
   const response = await api.post(`/sessions/${sessionId}/blur-notification`, {
     blur_count: blurCount,
   });
+  return response.data;
+}
+
+export async function recordReconnectNotification(sessionId, disconnectCount) {
+  const response = await api.post(
+    `/sessions/${sessionId}/reconnect-notification`,
+    {
+      disconnect_count: disconnectCount,
+    },
+  );
   return response.data;
 }
 

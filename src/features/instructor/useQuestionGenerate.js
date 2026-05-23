@@ -10,23 +10,25 @@ export function useQuestionGenerate() {
   const { mutateAsync: questionGenerate, isPending } = useMutation({
     mutationFn: ({
       courseId,
-      materialId,
+      materialIds,
       rubricId,
       assessmentName,
       numQuestions,
       totalTime,
+      bufferTime,
       releaseTime,
       dueTime,
     }) =>
       questionGenerateApi(
         courseId,
-        materialId,
+        materialIds,
         rubricId,
         assessmentName,
         totalTime,
         numQuestions,
         releaseTime,
         dueTime,
+        bufferTime,
       ),
 
     onSuccess: (data, variables) => {

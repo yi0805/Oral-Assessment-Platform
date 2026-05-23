@@ -46,17 +46,28 @@ export default function StudentCourse() {
         new Date(a.completed_at ?? 0).getTime(),
     );
 
+  const missedAssessments = assessments
+    .filter(
+      (a) =>
+        a.status === "not_started" && new Date(a.due_time).getTime() <= now,
+    )
+    .sort(
+      (a, b) => new Date(b.due_time).getTime() - new Date(a.due_time).getTime(),
+    );
+
   const earliestDeadline =
     upcomingAssessments.length > 0
       ? formatDeadline(upcomingAssessments[0].due_time)
       : null;
 
   const hasAnyAssessment =
-    upcomingAssessments.length > 0 || attemptedAssessments.length > 0;
+    upcomingAssessments.length > 0 ||
+    attemptedAssessments.length > 0 ||
+    missedAssessments.length > 0;
 
   return (
     <>
-      <main className="ml-64 min-h-screen px-12 pb-12 pt-24">
+      <main className="min-h-screen px-12 pb-12 pt-24">
         <div className="mb-10">
           <NavLink
             className="group mb-4 inline-flex items-center gap-2 text-xs font-bold text-outline-variant transition-colors hover:text-primary"
@@ -70,13 +81,17 @@ export default function StudentCourse() {
             </span>
           </NavLink>
 
-          <span className="mb-1 block text-xs font-semibold uppercase tracking-widest text-outline">
-            {course.course_code ? course.course_code : "Unknown Course Code"}
+          <span className="mb-1 block text-xs font-bold uppercase tracking-[0.2em] text-outline">
+            {course?.course_code} • {course?.course_name}
           </span>
 
-          <h1 className="text-4xl font-extrabold tracking-tight text-on-background">
-            {course.course_name ? course.course_name : "Unknown Course Name"}
+          <h1 className="font-headline text-4xl font-extrabold tracking-tight text-on-surface">
+            Assessments
           </h1>
+
+          <p className="mt-2 text-sm text-on-surface-variant">
+            Your upcoming and submitted assessments.
+          </p>
         </div>
 
         {hasAnyAssessment ? (
@@ -293,7 +308,7 @@ export default function StudentCourse() {
 
                   <NavLink
                     className="group inline-flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-outline-variant transition-colors hover:text-primary"
-                    to="/student/gradedAssessments"
+                    to={`/student/${courseId}/gradedAssessments`}
                   >
                     View past assessments
                     <span className="material-symbols-outlined text-sm transition-transform group-hover:translate-x-1">
@@ -316,6 +331,65 @@ export default function StudentCourse() {
 
                           <span className="rounded-full bg-tertiary-container/60 px-3 py-1 text-[10px] font-bold tracking-wider text-on-tertiary-container">
                             UNDER REVIEW
+                          </span>
+                        </div>
+
+                        <h3 className="mb-1 font-bold text-on-surface">
+                          {assessment.title || "Title Not Available."}
+                        </h3>
+
+                        <p className="mb-6 text-xs text-on-surface-variant">
+                          {assessment.description ||
+                            "Description not available."}
+                        </p>
+
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-outline">
+                          <span className="material-symbols-outlined text-[15px]">
+                            schedule
+                          </span>
+                          {assessment.total_time_minute} mins
+                          <span className="mx-1"></span>
+                          {assessment.main_question_num} main •{" "}
+                          {assessment.follow_up_num} each
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {missedAssessments.length > 0 && (
+              <>
+                <div
+                  className={`mb-8 flex items-end justify-between ${
+                    upcomingAssessments.length > 0 ||
+                    attemptedAssessments.length > 0
+                      ? "mt-16"
+                      : ""
+                  }`}
+                >
+                  <div className="flex gap-4">
+                    <button className="flex items-center gap-2 rounded-full bg-surface-container-highest px-4 py-2 text-xs font-bold text-primary">
+                      MISSED
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-12 gap-6">
+                  {missedAssessments.map((assessment) => (
+                    <div
+                      key={assessment.assessment_config_id}
+                      className="col-span-12 md:col-span-4 lg:col-span-3"
+                    >
+                      <div className="h-full rounded-xl border border-transparent bg-surface-container-lowest p-6 opacity-75">
+                        <div className="mb-2 flex items-start justify-between">
+                          <span className="material-symbols-outlined mb-4 text-on-surface-variant">
+                            event_busy
+                          </span>
+
+                          <span className="rounded-full bg-error/10 px-3 py-1 text-[10px] font-bold tracking-wider text-error">
+                            MISSED
                           </span>
                         </div>
 

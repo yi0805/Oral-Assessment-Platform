@@ -16,8 +16,11 @@ import Transcript from "./features/instructor/Transcript";
 import StudentManagement from "./features/instructor/StudentManagement";
 import ProtectedLayout from "./ui/ProtectedRoute";
 import Setting from "./features/instructor/Setting";
-import AssessmentManagement from "./features/instructor/AssessmentManagement"
+import AssessmentManagement from "./features/instructor/AssessmentManagement";
+import EditAssessment from "./features/instructor/EditAssessment";
+import GenerateAssessment from "./features/instructor/UploadMaterial";
 import InstructorCourseLayout from "./ui/InstructorCourseLayout";
+import StudentCourseLayout from "./ui/StudentCourseLayout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -39,40 +42,59 @@ function App() {
             <Route element={<AppLayout />}>
               <Route path="home" element={<Home />} />
 
-              <Route path="student/:courseId" element={<StudentCourse />} />
-              <Route
-                path="student/gradedAssessments"
-                element={<StudentGradedAssessment />}
-              />
+              <Route path="student" element={<StudentCourseLayout />}>
+                <Route
+                  path=":courseId"
+                  element={<Navigate replace to="assessments" />}
+                />
+                <Route
+                  path=":courseId/assessments"
+                  element={<StudentCourse />}
+                />
+                <Route
+                  path=":courseId/gradedAssessments"
+                  element={<StudentGradedAssessment />}
+                />
+              </Route>
 
               <Route
                 path="instructor/pendingGrades"
                 element={<InstructorPendingGrades />}
               />
+
               <Route
                 path="instructor/transcript/:sessionId"
                 element={<Transcript />}
               />
-              <Route
-                path="instructor/setting"
-                element={<Setting />}
-              />
+
+              <Route path="setting" element={<Setting />} />
+
               <Route path="instructor" element={<InstructorCourseLayout />}>
                 <Route
                   path=":courseId"
-                  element={<Navigate replace to="dashboard" />}
+                  element={<Navigate replace to="assessments" />}
                 />
+
                 <Route
                   path=":courseId/dashboard"
                   element={<InstructorDashboard />}
                 />
-                <Route
-                  path=":courseId/users"
-                  element={<StudentManagement />}
-                />
+
+                <Route path=":courseId/users" element={<StudentManagement />} />
+
                 <Route
                   path=":courseId/assessments"
                   element={<AssessmentManagement />}
+                />
+
+                <Route
+                  path=":courseId/assessments/generate"
+                  element={<GenerateAssessment />}
+                />
+
+                <Route
+                  path=":courseId/assessments/:assessmentId"
+                  element={<EditAssessment />}
                 />
               </Route>
             </Route>
@@ -84,6 +106,7 @@ function App() {
           </Route>
 
           <Route path="login" element={<Login />} />
+
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </BrowserRouter>

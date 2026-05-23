@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -35,6 +36,12 @@ class AssessmentConfig(Base):
 
     total_time_minute: Mapped[int] = mapped_column(
         Integer, nullable=False,
+    )
+    buffer_time_minute: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Extra minutes for technical issues, added to total_time_minute.",
     )
     main_question_num: Mapped[int] = mapped_column(
         Integer,
@@ -73,6 +80,12 @@ class AssessmentConfig(Base):
 
 class AssessmentSession(Base):
     __tablename__ = "assessment_sessions"
+    __table_args__ = (
+        UniqueConstraint(
+            "assessment_config_id", "user_s_id",
+            name="uq_assessment_sessions_config_user",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -96,6 +109,12 @@ class AssessmentSession(Base):
     )
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True,
+    )
+    resume_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Times the student re-entered the in-progress session.",
     )
 
     config = relationship("AssessmentConfig", back_populates="sessions")
@@ -133,6 +152,18 @@ class Notification(Base):
     blur_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
+    )
+    disconnect_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Number of network reconnects recorded during the session (best-effort, client-reported).",
+    )
+    resume_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default="0",
+        comment="Re-entries into the in-progress session, copied from AssessmentSession.resume_count at completion.",
     )
     is_read: Mapped[bool] = mapped_column(
         Boolean,

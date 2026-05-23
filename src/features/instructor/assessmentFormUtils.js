@@ -1,5 +1,6 @@
 export const MAX_QUESTIONS = 50;
 export const MAX_TIME_MIN = 120;
+export const MAX_BUFFER_MIN = 30;
 export const RUBRIC_TOTAL_POINTS = 100;
 
 export function makeBlankRubricRow() {
@@ -32,6 +33,19 @@ export function validateAssessmentTime(value) {
   return "";
 }
 
+export function validateBufferTime(value) {
+  // blank/null means no buffer (defaults to 0 on the backend).
+  if (value === "" || value == null) return "";
+
+  const t = Number(value);
+  if (!Number.isInteger(t)) return "Must be a whole number.";
+
+  if (t < 0 || t > MAX_BUFFER_MIN)
+    return `Must be between 0 and ${MAX_BUFFER_MIN}.`;
+
+  return "";
+}
+
 export function validateRubricRow(row) {
   return {
     title: row.title.trim() === "" ? "Required." : "",
@@ -57,10 +71,12 @@ export function isAssessmentConfigValid({
   assessmentName,
   numQuestions,
   assessmentTime,
+  bufferTime,
 }) {
   return (
     !validateAssessmentName(assessmentName) &&
     !validateNumQuestions(numQuestions) &&
-    !validateAssessmentTime(assessmentTime)
+    !validateAssessmentTime(assessmentTime) &&
+    !validateBufferTime(bufferTime)
   );
 }
