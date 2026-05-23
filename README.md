@@ -8,7 +8,7 @@ WhereRU
 
 ## Link to the Project Management tool
 
-https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git
+https://github.com/orgs/uoa-compsci399-s1-2026/projects/20
 
 ---
 
@@ -30,7 +30,7 @@ This project is an AI-powered assessment system designed to support instructors 
 
 ## Live Demo
 
-http://where-areyou.com
+https://where-areyou.com
 
 ## Deployment
 
@@ -51,7 +51,7 @@ The application is accessible via a custom domain:
 
 ### Backend
 
-Languague - Python 3.11+
+Language - Python 3.13
 
 #### Web framework
 
@@ -193,13 +193,15 @@ playwright/test 1.49.0
 
 ## System Architecture
 
+```text
 Frontend (React)
-↓
+       ↓
 FastAPI Backend
-↓
+       ↓
 AWS RDS PostgreSQL
-↓
+       ↓
 AWS Bedrock / OpenRouter
+```
 
 ---
 
@@ -209,40 +211,49 @@ AWS Bedrock / OpenRouter
 .
 ├── backend/
 │   ├── app/
-│   │   ├── api/          # FastAPI routes
-│   │   ├── core/         # Configurations and core logic
-│   │   ├── models/       # Database models
-│   │   ├── schemas/      # Pydantic schemas
-│   │   ├── services/     # Business logic
-│   │   ├── utils/        # Utility functions
+│   │   ├── api/              # FastAPI routes (router.py + routes/)
+│   │   ├── core/             # config, database, security, dependencies
+│   │   ├── models/           # SQLAlchemy models
+│   │   ├── schemas/          # Pydantic schemas
+│   │   ├── services/         # Business logic (AI gateway, S3, RAG, etc.)
+│   │   ├── utils/
 │   │   ├── __init__.py
-│   │   └── main.py       # Application entry point
+│   │   └── main.py           # Application entry point
 │   │
-│   ├── tests/            # Backend tests
-│   ├── .env.example      # Environment variables template
-│   ├── requirements.txt
+│   ├── tests/                # Backend tests
+│   ├── .env.example          # Environment variables template
 │   ├── pytest.ini
-│   └── README.md
+│   ├── requirements.txt
+│   └── README.md             # Deprecated — see root README.md
 │
-├── frontend/
-│   ├── public/           # Static assets
-│   ├── src/
-│   │   ├── features/     # Feature modules (auth, instructor, student)
-│   │   ├── hooks/        # Custom React hooks
-│   │   ├── pages/        # Page-level components
-│   │   ├── services/     # API calls
-│   │   ├── ui/           # Reusable UI components
-│   │   ├── utils/        # Utility functions
-│   │   ├── App.jsx
-│   │   ├── main.jsx
-│   │   └── index.css
-│   │
-│   ├── index.html
-│   ├── package.json
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   └── README.md
+├── src/                      # Frontend source (Vite + React)
+│   ├── features/             # Feature modules
+│   │   ├── authentication/
+│   │   ├── instructor/
+│   │   └── student/
+│   ├── hooks/                # Custom React hooks
+│   ├── pages/                # Home, Login, PageNotFound
+│   ├── services/             # API clients
+│   ├── ui/                   # Reusable UI components
+│   ├── utils/
+│   ├── App.jsx
+│   ├── main.jsx
+│   └── Index.css
 │
+├── public/                   # Static assets
+├── tests/                    # Playwright e2e + fixtures
+│   ├── e2e/
+│   └── fixtures/
+├── docs/
+├── index.html
+├── package.json
+├── vite.config.js
+├── tailwind.config.js
+├── playwright.config.js
+├── eslint.config.js
+├── prettier.config.js
+├── postcss.config.js
+├── .env.example              # Frontend environment variables template
 ├── .gitignore
 └── README.md
 
@@ -252,25 +263,42 @@ AWS Bedrock / OpenRouter
 
 ## Local Development Setup
 
+This guide covers two paths:
+
+- **Outside reviewers** — run everything locally (local database + AWS via IAM access keys)
+- **Team members** — connect to the shared AWS RDS database and use UoA AWS SSO
+
+The two paths differ at **Step 2 (database)**, **Step 3 (DATABASE_URL value)**, and **Step 5 (AWS access)**. All other steps are the same.
+
 ### Prerequisites
 
-- Python 3.11+
-- PostgreSQL 15+ with pgvector, or Docker
-- `psql`
+**Both paths need:**
 
-1. Clone Repository
+- Python 3.13
+- Node.js 18+
+
+**Outside reviewers also need:**
+
+- Docker (used to run PostgreSQL locally)
+
+**Team members also need:**
+
+- AWS CLI v2 (used to log in via UoA SSO)
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git
+cd capstone-project-s1-2026-team-8
 ```
 
-2. Configure environment variables
+### 2. Set up the database — pick your path
 
-```bash
-cp .env.example .env
-```
+#### For outside reviewers
 
-3. Start PostgreSQL
+Start a local PostgreSQL container with the pgvector extension:
+
+**macOS / Linux**
 
 ```bash
 docker run --name project20-db \
@@ -281,37 +309,182 @@ docker run --name project20-db \
   -d pgvector/pgvector:pg16
 ```
 
-4. Start Backend
+**Windows PowerShell**
+
+```powershell
+docker run --name project20-db `
+  -e POSTGRES_DB=project20_dev `
+  -e POSTGRES_USER=project20 `
+  -e POSTGRES_PASSWORD=localdev123 `
+  -p 5432:5432 `
+  -d pgvector/pgvector:pg16
+```
+
+Load the included `backend/schema.sql` into the container (same command on both platforms):
+
+```bash
+docker cp backend/schema.sql project20-db:/tmp/schema.sql
+docker exec project20-db psql -U project20 -d project20_dev -f /tmp/schema.sql
+```
+
+#### For team members
+
+Download the RDS SSL certificate into the `backend/` folder. The shared database requires SSL with `sslmode=verify-full`.
+
+**macOS / Linux**
 
 ```bash
 cd backend
+curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+cd ..
+```
 
-python -m venv venv
+**Windows PowerShell**
+
+```powershell
+cd backend
+Invoke-WebRequest -Uri "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" -OutFile "global-bundle.pem"
+cd ..
+```
+
+### 3. Configure backend environment variables
+
+```bash
+cd backend
+cp .env.example .env
+```
+
+Open `backend/.env` and fill in the `<...>` placeholders. Set `DATABASE_URL` based on your path:
+
+**For outside reviewers** (local database):
+
+```
+postgresql+psycopg://project20:localdev123@localhost:5432/project20_dev
+```
+
+**For team members** (shared RDS):
+
+```
+postgresql://project20:<password>@project20-db-pg16.cntu207sfdan.ap-southeast-2.rds.amazonaws.com:5432/postgres?sslmode=verify-full&sslrootcert=./global-bundle.pem
+```
+
+Generate a value for `JWT_SECRET_KEY`:
+
+```bash
+python3.13 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+```powershell
+py -3.13 -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### 4. Configure frontend environment variables
+
+From the project root:
+
+```bash
+cd ..
+cp .env.example .env
+```
+
+Fill in `VITE_GOOGLE_CLIENT_ID`.
+
+### 5. Set up AWS credentials — pick your path
+
+The backend needs AWS to call S3, Bedrock, and Transcribe.
+
+#### For outside reviewers
+
+Use the IAM access key pair.
+
+In `backend/.env`:
+
+1. Comment out the line `AWS_PROFILE_NAME=uoa-sso`
+2. Uncomment and fill in:
+   ```
+   AWS_ACCESS_KEY_ID=<aws-access-key-id>
+   AWS_SECRET_ACCESS_KEY=<aws-secret-access-key>
+   ```
+
+That's all. You do **not** need to install or configure the AWS CLI.
+
+#### For team members
+
+Install the AWS CLI v2:
+
+**macOS**
+
+```bash
+brew install awscli
+aws --version
+```
+
+**Windows PowerShell**
+
+```powershell
+winget install Amazon.AWSCLI
+aws --version
+```
+
+**Linux** — follow the [official installer](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+
+Set up the AWS CLI to use UoA SSO:
+
+```bash
+aws configure sso
+```
+
+Use these values:
+
+- SSO start URL: `https://uoa-sso.awsapps.com/start/#`
+- SSO region: `ap-southeast-2`
+- Profile name: `uoa-sso`
+
+Then log in (re-run this every ~8 hours):
+
+```bash
+aws sso login --profile uoa-sso
+```
+
+Keep `AWS_PROFILE_NAME=uoa-sso` in `backend/.env` (this is the default in `.env.example`).
+
+### 6. Start the backend
+
+**macOS / Linux**
+
+```bash
+cd backend
+python3.13 -m venv venv
 source venv/bin/activate
-
 pip install -r requirements.txt
-
 uvicorn app.main:app --reload
 ```
 
-5. Frontend Setup:
+**Windows PowerShell**
+
+```powershell
+cd backend
+# Only needed once if you have never enabled PowerShell scripts:
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+py -3.13 -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+### 7. Start the frontend
+
+Open a new terminal in the project root:
 
 ```bash
-cd src
-
 npm install
 npm run dev
 ```
 
-6. Link
+### 8. Open the app
 
-#### Frontend
-
-http://localhost:5173
-
-#### Backend Swagger UI
-
-http://127.0.0.1:8000/docs
+- Frontend: http://localhost:5173
+- Backend Swagger UI: http://127.0.0.1:8000/docs
 
 ---
 
@@ -359,7 +532,7 @@ Example workflow for instructors:
 Example workflow for students:
 
 1. Login as student
-2. View assessment requirment
+2. View assessment requirement
 3. Start assessment session
 4. Answer AI-generated oral questions by recording audio
 5. Adjust the transcribed text answer before submitting
