@@ -32,6 +32,11 @@ This project is an AI-powered assessment system designed to support instructors 
 
 https://where-areyou.com
 
+### Login Requirements
+
+- Gmail login credentials for a student account
+- UoA email login credentials for an instructor account. If you do not have one, please feel free to contact me.
+
 ## Deployment
 
 The application is deployed on an AWS EC2 instance and is accessible via a public URL for demonstration and evaluation purposes.
