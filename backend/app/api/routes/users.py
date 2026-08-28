@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from urllib.parse import quote, unquote
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.services import s3_client
@@ -16,10 +18,20 @@ from app.models import User
 
 logger = logging.getLogger(__name__)
 
-S3_BASE_URL = "https://team8-project20-materials.s3.ap-southeast-2.amazonaws.com/"
 MAX_PICTURE_BYTES = 5 * 1024 * 1024
 
 router = APIRouter()
+
+
+def _s3_base_url() -> str:
+    """Return the public, virtual-hosted S3 endpoint for this deployment."""
+    return f"https://{settings.s3_bucket_name}.s3.{settings.aws_region}.amazonaws.com/"
+
+
+def _public_s3_url(storage_key: str) -> str:
+    """Build a browser-safe public URL while retaining S3 key separators."""
+    return f"{_s3_base_url()}{quote(storage_key, safe='/')}"
+
 
 @router.put("/updateUsername",
             summary = "Change the current users full name.")
@@ -75,7 +87,7 @@ async def update_picture(
 
     safe_filename = Path(filename).name
     storage_key = f"users/{user.id}/images/{image_id}/{safe_filename}"
-    public_url = f"{S3_BASE_URL}{storage_key}"
+    public_url = _public_s3_url(storage_key)
     content_type = file.content_type
     previous_image_url = user.image
 
@@ -118,8 +130,9 @@ async def update_picture(
             detail="Profile picture could not be saved.",
         ) from e
 
-    if previous_image_url and previous_image_url.startswith(S3_BASE_URL):
-        previous_key = previous_image_url[len(S3_BASE_URL):]
+    s3_base_url = _s3_base_url()
+    if previous_image_url and previous_image_url.startswith(s3_base_url):
+        previous_key = unquote(previous_image_url[len(s3_base_url):])
 
         if previous_key and previous_key != storage_key:
             try:
