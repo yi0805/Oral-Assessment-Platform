@@ -8,7 +8,6 @@
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -200,7 +199,7 @@ CREATE TABLE public.course_enrollments (
 --
 
 CREATE TABLE public.course_join_requests (
-    id uuid NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     course_id uuid NOT NULL,
     requester_user_id uuid NOT NULL,
     status character varying DEFAULT 'pending'::character varying NOT NULL,
@@ -296,7 +295,7 @@ COMMENT ON COLUMN public.materials.material_category IS 'course_material | rubri
 --
 
 CREATE TABLE public.notifications (
-    id uuid NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     session_id uuid NOT NULL,
     user_id uuid NOT NULL,
     blur_count integer NOT NULL,
@@ -365,7 +364,7 @@ CREATE TABLE public.questions (
 --
 
 CREATE TABLE public.rubrics (
-    id uuid NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     course_id uuid NOT NULL,
     total_points integer NOT NULL,
     criteria_data jsonb NOT NULL
@@ -377,7 +376,7 @@ CREATE TABLE public.rubrics (
 --
 
 CREATE TABLE public.session_feedback (
-    id uuid NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     session_id uuid NOT NULL,
     user_i_id uuid NOT NULL,
     comments text,
@@ -734,6 +733,9 @@ ALTER TABLE ONLY public.users
 --
 -- Name: uq_one_pending_join_request; Type: INDEX; Schema: public; Owner: -
 --
+
+CREATE INDEX ix_material_chunks_embedding_hnsw ON public.material_chunks USING hnsw (embedding public.vector_cosine_ops);
+
 
 CREATE UNIQUE INDEX uq_one_pending_join_request ON public.course_join_requests USING btree (course_id, requester_user_id) WHERE ((status)::text = 'pending'::text);
 
