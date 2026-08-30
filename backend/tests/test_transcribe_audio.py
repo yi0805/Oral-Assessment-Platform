@@ -75,6 +75,10 @@ def client(fake_student, mock_db, monkeypatch):
     app.dependency_overrides[get_db] = lambda: mock_db
     app.dependency_overrides[require_student] = lambda: fake_student
 
+    # The existing endpoint behaviour is tested with the feature enabled;
+    # production defaults to disabled and has a separate regression test.
+    monkeypatch.setattr("app.api.routes.sessions.settings.transcribe_enabled", True)
+
     monkeypatch.setattr(
         "app.api.routes.sessions.s3_client.upload_file",
         MagicMock(return_value="stub-key"),
@@ -108,6 +112,30 @@ def client(fake_student, mock_db, monkeypatch):
     yield TestClient(app)
 
     app.dependency_overrides.clear()
+
+
+def test_transcribe_returns_503_when_feature_is_disabled(
+    fake_student, mock_db, session_id, monkeypatch
+):
+    from app.main import app
+    from app.core.database import get_db
+    from app.core.dependencies import require_student
+
+    app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[require_student] = lambda: fake_student
+    monkeypatch.setattr("app.api.routes.sessions.settings.transcribe_enabled", False)
+
+    try:
+        with TestClient(app) as disabled_client:
+            response = disabled_client.post(
+                f"/api/sessions/{session_id}/transcribe/audio",
+                files={"audio": ("answer.webm", b"audio", "audio/webm")},
+            )
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Voice transcription is currently unavailable."
+        mock_db.query.assert_not_called()
+    finally:
+        app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------

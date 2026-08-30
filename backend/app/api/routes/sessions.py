@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
@@ -14,6 +12,7 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
+    Request,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
@@ -26,6 +25,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import require_instructor, require_student
+from app.core.limiter import limiter
 from app.core.ws_auth import authenticate_ws_student
 from app.services import s3_client
 from app.services._prompt_safety import sanitize_untrusted
@@ -1069,12 +1069,19 @@ _AUDIO_MIME_MAP = {
     response_model=AudioTranscriptionResponse,
     summary="Transcribe a student's voice answer without persisting it",
 )
+@limiter.limit("20/minute")
 async def transcribe_response_audio(
+    request: Request,
     session_id: UUID,
     audio: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_student),
 ):
+    if not settings.transcribe_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Voice transcription is currently unavailable.",
+        )
     # Validate audio extension up-front (cheap fail; route-specific so
     # not part of _validate_session_for_transcribe).
     filename = audio.filename or ""
@@ -1233,11 +1240,11 @@ async def transcribe_response_stream(
     session_id: UUID,
     db: Session = Depends(get_db),
 ):
-    # 1. Feature flag. Reject before doing any work so an accidentally
+    # 1. Feature flags. Reject before doing any work so an accidentally
     # exposed endpoint doesn't burn AWS quotas in unfinished deployments.
-    if not settings.stt_streaming_enabled:
+    if not settings.transcribe_enabled or not settings.stt_streaming_enabled:
         await websocket.close(
-            code=1008, reason="streaming transcription not enabled"
+            code=1008, reason="voice transcription not available"
         )
         return
 

@@ -1,13 +1,16 @@
 import json
 import logging
 
-from fastapi import FastAPI
+from sqlalchemy import text
+from fastapi import FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.database import engine
 from app.core.limiter import limiter
 
 logging.basicConfig(
@@ -43,5 +46,33 @@ app.add_middleware(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.include_router(api_router, prefix="/api")
+
+
+@app.get("/health/live", include_in_schema=False)
+def health_live():
+    """Report only that this application process can serve requests."""
+    return {"status": "ok"}
+
+
+@app.get("/health/ready", include_in_schema=False)
+def health_ready(response: Response):
+    """Verify the database connection without exposing connection details."""
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+    except Exception:  # Dependency configuration and driver errors are also not ready.
+        logging.getLogger(__name__).warning("Readiness check failed", exc_info=True)
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+        return {"status": "unavailable"}
+    return {"status": "ok"}
+
+
+@app.get("/version", include_in_schema=False)
+def version():
+    return {
+        "version": settings.app_version,
+        "git_commit": settings.git_commit,
+    }

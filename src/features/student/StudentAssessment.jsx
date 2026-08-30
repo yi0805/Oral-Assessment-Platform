@@ -12,12 +12,11 @@ import { useStudentSpeechStream } from "./useStudentSpeechStream";
 import { useRecordBlurNotification } from "./useRecordBlurNotification";
 import { useRecordReconnect } from "./useRecordReconnect";
 
-// [STT #72] Streaming path is the default after the rollout in
-// commit 28 of feature/audio-to-text. Set VITE_STT_STREAMING=0 in
-// .env.local to force the legacy batch-only behaviour for debugging
-// (the batch path is intact and used as the automatic fallback when
-// the WebSocket errors — see useStudentSpeechStream.js).
-const STREAMING_ENABLED = import.meta.env.VITE_STT_STREAMING !== "0";
+// Voice input is separately controlled because disabling streaming alone
+// would still allow the batch Transcribe endpoint to be called.
+const VOICE_INPUT_ENABLED = import.meta.env.VITE_VOICE_INPUT_ENABLED === "true";
+const STREAMING_ENABLED =
+  VOICE_INPUT_ENABLED && import.meta.env.VITE_STT_STREAMING !== "0";
 
 import Loading from "../../ui/Loading";
 import ConfirmModal from "../../ui/ConfirmModal";
@@ -539,6 +538,7 @@ export default function StudentAssessment() {
   // handleSubmitAnswer. This function never persists or advances the
   // session by itself.
   async function handleAudioSubmit(blob) {
+    if (!VOICE_INPUT_ENABLED) return;
     // [STT #72] Reset the cancel flag for this attempt. Pressing Esc
     // during the await below will flip it back to true and we'll
     // discard the result when it finally arrives.
@@ -659,6 +659,7 @@ export default function StudentAssessment() {
   // recorder and producing a Blob; persistence is delegated to
   // handleAudioSubmit so the two halves can evolve independently.
   async function handleMicClick() {
+    if (!VOICE_INPUT_ENABLED) return;
     if (!currentQuestion) return;
     if (isSubmitting) return;
 
@@ -920,7 +921,9 @@ export default function StudentAssessment() {
               <div className="space-y-6">
                 <div className="flex flex-col items-center justify-center rounded-xl border border-outline-variant/10 bg-surface-container-low p-10">
                   <p className="mb-8 font-medium text-on-surface-variant">
-                    {isTranscribing ? (
+                    {!VOICE_INPUT_ENABLED ? (
+                      "Voice input is temporarily unavailable. Please type your answer."
+                    ) : isTranscribing ? (
                       <>
                         Transcribing your answer…{" "}
                         <span
@@ -946,6 +949,8 @@ export default function StudentAssessment() {
                     )}
                   </p>
 
+                  {VOICE_INPUT_ENABLED && (
+                    <>
                   {isTranscribing && (
                     <div
                       className="mb-8 h-1 w-48 overflow-hidden rounded-full bg-surface-container-high"
@@ -1025,6 +1030,8 @@ export default function StudentAssessment() {
                     <p className="mt-6 max-w-md text-center text-sm text-error">
                       {audioError}
                     </p>
+                  )}
+                    </>
                   )}
                 </div>
 
