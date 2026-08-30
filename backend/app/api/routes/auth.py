@@ -2,12 +2,13 @@ import logging
 
 import httpx
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Header, Request, Response
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
+from app.core.limiter import limiter
 from app.core.security import create_access_token, is_login_domain_allowed, resolve_role_for_new_user
 
 from app.models import User, CourseEnrollment
@@ -73,7 +74,9 @@ def _upsert_user(db: Session, email: str, full_name: str, upi: str, image: str |
     response_model=GoogleLoginResponse,
     summary="Login or sign up a new user if not existing",
 )
+@limiter.limit("10/minute")
 def login_with_google(
+    request: Request,
     response: Response,
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
@@ -91,6 +94,12 @@ def login_with_google(
 
     if not email or not full_name:
         raise HTTPException(status_code=400, detail="Missing required Google user info")
+
+    if userinfo.get("email_verified") is not True:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Google account email must be verified.",
+        )
 
     # Fetch upi from student email
     upi = email.split("@")[0]

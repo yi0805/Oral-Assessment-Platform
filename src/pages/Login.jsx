@@ -33,9 +33,11 @@ function Login() {
           </p>
         </header>
 
-        <div className="grid w-full max-w-4xl grid-cols-1 gap-8 md:grid-cols-2">
-          <LoginButton role="student" login={login} />
-          <LoginButton role="instructor" login={login} />
+        <div className="w-full max-w-md">
+          <LoginButton login={login} />
+          <p className="mt-4 text-center text-sm text-on-surface-variant">
+            Your approved account determines the portal you can access.
+          </p>
         </div>
 
         <footer className="mt-20 flex flex-col items-center gap-4 text-center">
