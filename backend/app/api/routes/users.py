@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from urllib.parse import quote, unquote
 from uuid import uuid4
 
@@ -13,12 +12,11 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.services import s3_client
+from app.utils.upload_validation import read_profile_image
 
 from app.models import User
 
 logger = logging.getLogger(__name__)
-
-MAX_PICTURE_BYTES = 5 * 1024 * 1024
 
 router = APIRouter()
 
@@ -64,31 +62,10 @@ async def update_picture(
     db: Session = Depends(get_db)
 ):
 
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-
-    filename = file.filename or "unknown"
-
-    file_bytes = await file.read()
-
-    if not file_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The uploaded file is empty.",
-        )
-
-    if len(file_bytes) > MAX_PICTURE_BYTES:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="Profile picture must be 5 MB or smaller.",
-        )
-
     image_id = uuid4()
-
-    safe_filename = Path(filename).name
-    storage_key = f"users/{user.id}/images/{image_id}/{safe_filename}"
+    file_bytes, content_type, extension = await read_profile_image(file)
+    storage_key = f"users/{user.id}/images/{image_id}{extension}"
     public_url = _public_s3_url(storage_key)
-    content_type = file.content_type
     previous_image_url = user.image
 
     try:
@@ -99,14 +76,15 @@ async def update_picture(
             metadata={
                 "user_id": str(user.id),
                 "image_id": str(image_id),
-                "filename": filename,
+                "filename": file.filename or f"profile{extension}",
             },
         )
 
     except RuntimeError as e:
+        logger.warning("Profile image storage upload failed", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Storage upload failed: {e}",
+            detail="Profile image storage is currently unavailable.",
         ) from e
 
     try:
