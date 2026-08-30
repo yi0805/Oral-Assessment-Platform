@@ -1,0 +1,14 @@
+[Unit]
+Description=Whereru FastAPI API
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/opt/whereru/backend
+EnvironmentFile=/opt/whereru/backend/.env
+ExecStart=/opt/whereru/backend/venv/bin/gunicorn app.main:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --timeout 330 --access-logfile - --error-logfile -
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

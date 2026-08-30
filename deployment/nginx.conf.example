@@ -1,0 +1,82 @@
+# Base HTTP configuration for where-areyou.com.
+# Install as /etc/nginx/sites-available/whereru, enable it, and validate it
+# before reloading Nginx. Certbot may add the HTTPS listen and certificate
+# directives after where-areyou.com DNS resolves to this EC2 instance.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name where-areyou.com;
+
+    root /var/www/whereru/dist;
+    index index.html;
+    client_max_body_size 50m;
+
+    # The FastAPI application already owns the /api prefix.
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # Direct browser -> Nginx -> localhost FastAPI: overwrite any
+        # client-supplied X-Forwarded-For so the limiter sees $remote_addr.
+        # If a trusted proxy is added later, configure Nginx real_ip for that
+        # proxy before forwarding a client address.
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Retained for WebSocket routes. Streaming STT is disabled in the
+        # documented production configuration, but this does not block other
+        # WebSocket-capable API endpoints.
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 330s;
+        proxy_send_timeout 330s;
+    }
+
+    # FastAPI serves its documentation outside the /api router prefix.
+    location = /docs {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 330s;
+        proxy_send_timeout 330s;
+    }
+
+    location = /openapi.json {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 330s;
+        proxy_send_timeout 330s;
+    }
+
+    # Operational probes are intentionally outside the API prefix.
+    location ^~ /health/ {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /version {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # React Router client-side routes must resolve to the Vite entry point.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
