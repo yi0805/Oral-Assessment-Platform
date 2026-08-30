@@ -3,7 +3,8 @@
 This is the reproducible production layout for this repository. It documents
 the supplied production configuration; it does not provision AWS resources or
 contain any credentials. Run commands on the target EC2 instance only after
-reviewing them for that environment.
+reviewing them for that environment, unless a command is explicitly labelled
+as running on the local workstation.
 
 ## 1. Architecture
 
@@ -95,8 +96,12 @@ psql "$DATABASE_URL" -f backend/schema.sql
 extensions and the cosine HNSW index for `material_chunks.embedding`. It also
 creates an `alembic_version` table, but Alembic migrations are not tracked in
 this repository. The database principal executing the schema must therefore
-be permitted to create those extensions. Take an RDS snapshot before schema
-work or any change to an existing database.
+be permitted to create those extensions.
+
+Never run `backend/schema.sql` against an existing database. Before any
+existing-database migration, take and verify an RDS snapshot. Use the tracked
+incremental SQL migration with `ON_ERROR_STOP` instead; the update procedure
+and verification queries are in section 13.
 
 Use a production `DATABASE_URL` with SSL verification and the CA path above,
 for example (replace every placeholder):
@@ -159,6 +164,7 @@ S3_BUCKET_NAME=whereru-materials-yt-prod
 AWS_REGION=ap-southeast-2
 STT_STREAMING_ENABLED=false
 TRANSCRIBE_ENABLED=false
+MATERIAL_PROCESSING_STALE_SECONDS=1800
 CORS_ORIGINS=["https://where-areyou.com"]
 COOKIE_SECURE=true
 APP_VERSION=<deployment-version>
@@ -172,11 +178,10 @@ Bedrock and sends chat requests directly to OpenRouter. Do not include secret
 values for database passwords, JWTs, Gemini/OpenRouter keys, AWS keys, Google
 OAuth credentials or any bearer token in version control or this runbook.
 
-`MATERIAL_PROCESSING_STALE_SECONDS` is optional and defaults to `900` (15
-minutes). It controls when an interrupted `processing` material becomes
-eligible for an instructor-authorised retry. Set it longer than the maximum
-expected uninterrupted processing time; only stale, not arbitrary current,
-processing rows are retryable.
+`MATERIAL_PROCESSING_STALE_SECONDS=1800` is the validated production value
+(30 minutes). It controls when an interrupted `processing` material becomes
+eligible for an instructor-authorised retry. Only stale, not arbitrary
+current, processing rows are retryable.
 
 ## 8. Current AI and STT state
 
@@ -224,18 +229,32 @@ VITE_VOICE_INPUT_ENABLED=false
 VITE_STT_STREAMING=0
 ```
 
-Then build and publish the static files:
+Build the frontend **locally**, where the production Vite environment file is
+present. Vite substitutes these values at build time, so changing one requires
+a new local build. Do not build the frontend on EC2.
 
 ```bash
-cd /opt/whereru
+# local workstation, repository root
 npm ci
 npm run build
-sudo install -d -o root -g root /var/www/whereru/dist
-sudo rsync -a --delete dist/ /var/www/whereru/dist/
 ```
 
-`rsync --delete` removes files no longer present in `dist`; back up the
-current directory or deploy a timestamped copy first if rollback is needed.
+Transfer the resulting `dist/` directory to a temporary directory on EC2, for
+example with an approved `scp` or `rsync` command. On EC2, preserve the current
+static release before replacing it:
+
+```bash
+# EC2
+cd /opt/whereru
+sudo install -d -o root -g root /var/www/whereru
+if [ -d /var/www/whereru/dist ]; then sudo mv /var/www/whereru/dist /var/www/whereru/dist-previous-<release-id>; fi
+sudo mv /tmp/whereru-dist-new /var/www/whereru/dist
+sudo chown -R www-data:www-data /var/www/whereru/dist
+```
+
+`/var/www/whereru/dist-previous-<release-id>` is the immediate frontend
+rollback copy. Use a unique release identifier and temporary upload directory
+for each release, and verify its contents before the move.
 
 ## 11. Nginx, DNS and HTTPS
 
@@ -257,9 +276,11 @@ sudo systemctl reload nginx
 
 Before requesting a certificate, point the `where-areyou.com` DNS record to
 the EC2 Elastic IP and confirm public DNS propagation. Then use Certbot's
-Nginx integration for that domain. Certbot adds the concrete certificate paths
-to the Nginx configuration after validation; they are intentionally absent
-from the base example. Re-run `sudo nginx -t` and reload Nginx afterwards.
+Nginx integration for that domain. The production state must have a
+Certbot-managed HTTPS server block for the domain and an HTTP-to-HTTPS
+redirect. Certbot adds the concrete certificate paths after validation; they
+are intentionally absent from the repository. Re-run `sudo nginx -t` before
+reloading Nginx afterwards.
 
 Confirm the Google OAuth application's authorised JavaScript origin and
 redirect URI settings include the HTTPS production domain. Those Google-side
@@ -290,9 +311,16 @@ sudo reboot
 sudo systemctl is-active whereru-api nginx
 ```
 
-Also perform a browser login and an authorised material upload/read test;
-these exercise OAuth, cookies, the API, RDS and S3. Do not use STT as a
-production acceptance test in its current state.
+Production smoke-test checklist:
+
+- Confirm browser HTTPS, Google login, and authenticated API calls.
+- Confirm `/health/live`, `/health/ready`, and `/version` return successfully.
+- Upload and read an authorised material; confirm it reaches `ready` or
+  exposes `failed` status without remaining silently in `processing`.
+- Generate a question and inspect its supporting context as the course
+  instructor.
+- Confirm typed assessment answers work. Do not use STT as an acceptance test:
+  voice UI and Transcribe are intentionally disabled in production.
 
 ## 13. Update and rollback
 
@@ -303,26 +331,50 @@ cd /opt/whereru
 git rev-parse HEAD
 ```
 
-For an update, fetch the intended commit, inspect its changes, update Python
-dependencies if `backend/requirements.txt` changed, rebuild the frontend, and
-restart only after successful checks:
+For an update, fetch the intended commit and inspect its changes. If the
+release includes a database migration, take and verify an RDS snapshot first.
+An existing database uses only its incremental migration—never `schema.sql`.
+For the migration in this repository, apply it before restarting the API and
+stop on the first SQL error. Skip this command when the intended release does
+not include that migration:
 
 ```bash
+# EC2
 cd /opt/whereru
 git pull --ff-only
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f backend/sql/20260830_material_processing_and_question_provenance.sql
 ./backend/venv/bin/pip install -r backend/requirements.txt
-npm ci
-npm run build
-sudo rsync -a --delete dist/ /var/www/whereru/dist/
 sudo systemctl restart whereru-api
-sudo nginx -t && sudo systemctl reload nginx
+curl -fsS http://127.0.0.1:8000/health/live
+curl -fsS http://127.0.0.1:8000/health/ready
+curl -fsS http://127.0.0.1:8000/version
 ```
 
-Do not apply `schema.sql` to an existing database as an update mechanism.
-There are no tracked Alembic migrations to upgrade it. If a release fails,
-return the repository to the recorded, previously working commit, restore the
-matching frontend build, restart `whereru-api`, and use the pre-change RDS
-snapshot only through a separately reviewed database-recovery procedure.
+Update `/opt/whereru/backend/.env` before the dependency installation/restart
+when the release requires backend configuration changes; protect its ownership
+and permissions. Build the frontend locally with the four production Vite
+variables from section 10, transfer its `dist/` directory, then replace
+`/var/www/whereru/dist` while retaining `dist-previous`. Validate and reload
+Nginx only after the static release is in place:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Run the smoke-test checklist from section 12 after the deployment.
+
+Rollback procedure:
+
+1. If the migration fails, it stops at the failing statement. Do not restart
+   the backend; investigate from the error and use the pre-change RDS snapshot
+   only through a separately reviewed database-recovery procedure.
+2. If backend startup or readiness fails, restore the previously recorded Git
+   revision, restore the matching backend `.env` if it changed, reinstall its
+   matching dependencies, then restart `whereru-api` and re-check health.
+3. If frontend deployment fails, move the matching
+   `dist-previous-<release-id>` directory back to
+   `/var/www/whereru/dist`, run `sudo nginx -t`, then reload Nginx.
 
 For this release, apply the checked-in, idempotent SQL upgrade to an existing
 database before restarting the API. It marks a historical material `ready` only
@@ -331,7 +383,7 @@ or zero-vector embedding. All other historical materials become `failed`; new up
 as `processing`.
 
 ```bash
-psql "$DATABASE_URL" -f backend/sql/20260830_material_processing_and_question_provenance.sql
+psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f backend/sql/20260830_material_processing_and_question_provenance.sql
 ```
 
 Immediately verify the classification before allowing question generation:

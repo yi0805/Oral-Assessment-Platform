@@ -42,6 +42,24 @@ def test_limiter_uses_the_sanitized_nginx_client_identity():
     assert get_trusted_client_ip(request) == "203.0.113.10"
 
 
+def test_limiter_ignores_spoofed_forwarded_for_from_non_proxy_peer():
+    from app.core.limiter import get_trusted_client_ip
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/",
+            "headers": [(b"x-forwarded-for", b"203.0.113.10")],
+            "client": ("198.51.100.20", 8000),
+        }
+    )
+
+    # Only loopback Nginx is trusted to supply the sanitized header.
+    assert get_trusted_client_ip(request) == "198.51.100.20"
+
+
 def test_migration_classifies_historical_materials_conservatively():
     migration = (
         Path(__file__).resolve().parents[1]

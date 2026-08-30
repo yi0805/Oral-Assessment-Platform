@@ -361,17 +361,15 @@ cp .env.example .env
 
 Open `backend/.env` and fill in the `<...>` placeholders. Set `DATABASE_URL` based on your path:
 
-**For outside reviewers** (local database):
+Use a deployment-specific PostgreSQL 16 connection URL in the psycopg 3
+SQLAlchemy format:
 
 ```
-postgresql+psycopg://project20:localdev123@localhost:5432/project20_dev
+postgresql+psycopg://<user>:<password>@<host>:5432/<database>
 ```
 
-**For team members** (shared RDS):
-
-```
-postgresql://project20:<password>@project20-db-pg16.cntu207sfdan.ap-southeast-2.rds.amazonaws.com:5432/postgres?sslmode=verify-full&sslrootcert=./global-bundle.pem
-```
+For an RDS deployment, add the SSL parameters and CA path required by that
+environment. Do not commit a real endpoint, username, password, or CA path.
 
 Generate a value for `JWT_SECRET_KEY`:
 

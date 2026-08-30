@@ -7,7 +7,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import pytest
+from fastapi import HTTPException, Response
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 from starlette.datastructures import UploadFile
 
 
@@ -56,6 +59,102 @@ def test_cross_course_material_is_rejected_for_question_generation():
         assert materials_query.args, "The material lookup must be constrained in SQL."
     finally:
         app.dependency_overrides.clear()
+
+
+def test_cross_course_supporting_context_is_rejected():
+    """Supporting context must use the question pool's course enrollment."""
+    from app.main import app
+    from app.core.database import get_db
+    from app.core.dependencies import require_instructor
+
+    question_id = uuid4()
+    instructor = SimpleNamespace(id=uuid4(), role="instructor")
+    question = SimpleNamespace(id=question_id, generation_provenance={})
+    config = SimpleNamespace(course_id=uuid4())
+    db = MagicMock()
+    question_query = MagicMock()
+    question_query.join.return_value.join.return_value.filter.return_value.first.return_value = (
+        question,
+        config,
+    )
+    enrollment_query = MagicMock()
+    enrollment_query.filter.return_value.first.return_value = None
+    db.query.side_effect = [question_query, enrollment_query]
+    app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[require_instructor] = lambda: instructor
+
+    try:
+        with TestClient(app) as client:
+            response = client.get(f"/api/questions/{question_id}/supporting-context")
+        assert response.status_code == 403
+        assert "not an instructor" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.parametrize(
+    "userinfo",
+    [
+        {"email": "student@example.edu", "name": "Student"},
+        {"email": "student@example.edu", "name": "Student", "email_verified": None},
+        {"email": "student@example.edu", "name": "Student", "email_verified": False},
+        {"email": "student@example.edu", "name": "Student", "email_verified": "true"},
+    ],
+)
+def test_google_login_fails_closed_without_boolean_verified_email(monkeypatch, userinfo):
+    from app.api.routes import auth
+
+    monkeypatch.setattr(
+        auth,
+        "_fetch_google_userinfo",
+        lambda _token: userinfo,
+    )
+
+    request = Request({"type": "http", "method": "POST", "path": "/"})
+    with pytest.raises(HTTPException) as exc_info:
+        auth.login_with_google(
+            request=request,
+            response=Response(),
+            authorization="Bearer token",
+            db=MagicMock(),
+        )
+    assert exc_info.value.status_code == 403
+
+
+def test_google_login_accepts_only_boolean_verified_email(monkeypatch):
+    from app.api.routes import auth
+
+    user = SimpleNamespace(
+        id=uuid4(),
+        role="student",
+        email="student@example.edu",
+        full_name="Student",
+        upi="student",
+        image=None,
+    )
+    monkeypatch.setattr(
+        auth,
+        "_fetch_google_userinfo",
+        lambda _token: {
+            "email": user.email,
+            "name": "Student",
+            "email_verified": True,
+        },
+    )
+    monkeypatch.setattr(auth, "is_login_domain_allowed", lambda _email: True)
+    monkeypatch.setattr(auth, "_upsert_user", lambda *_args, **_kwargs: user)
+    monkeypatch.setattr(auth, "create_access_token", lambda **_kwargs: "test-token")
+
+    db = MagicMock()
+    response = auth.login_with_google(
+        request=Request({"type": "http", "method": "POST", "path": "/"}),
+        response=Response(),
+        authorization="Bearer token",
+        db=db,
+    )
+
+    assert response.user.id == user.id
+    db.commit.assert_called_once()
 
 
 def test_generation_fails_closed_when_rag_returns_no_context(monkeypatch):

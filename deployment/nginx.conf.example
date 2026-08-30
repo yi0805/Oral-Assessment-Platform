@@ -1,7 +1,8 @@
 # Base HTTP configuration for where-areyou.com.
 # Install as /etc/nginx/sites-available/whereru, enable it, and validate it
-# before reloading Nginx. Certbot may add the HTTPS listen and certificate
-# directives after where-areyou.com DNS resolves to this EC2 instance.
+# before reloading Nginx. In production, Certbot manages the HTTPS server
+# block and certificate paths, plus the HTTP-to-HTTPS redirect. Those
+# machine-specific certificate paths are intentionally not committed here.
 server {
     listen 80;
     listen [::]:80;
@@ -56,7 +57,8 @@ server {
         proxy_send_timeout 330s;
     }
 
-    # Operational probes are intentionally outside the API prefix.
+    # Operational probes are intentionally outside the API prefix. This routes
+    # both /health/live and /health/ready to FastAPI.
     location ^~ /health/ {
         proxy_pass http://127.0.0.1:8000;
         proxy_http_version 1.1;
