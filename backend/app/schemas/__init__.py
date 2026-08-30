@@ -26,9 +26,11 @@ from app.schemas.assessment import (
 )
 
 from app.schemas.question import (
-   QuestionGenerationRequest, QuestionCreate, QuestionUpdate, QuestionOut, QuestionGenerationResponse
+   QuestionGenerationRequest, QuestionCreate, QuestionUpdate, QuestionOut,
+   QuestionGenerationResponse, QuestionSupportingContextOut,
+   SupportingContextItemOut,
 )
 
 from app.schemas.rubric import (RubricCriteriaItem, RubricCreate, RubricOut)
 
-from app.schemas.material import (GithubImportBody)
+from app.schemas.material import (GithubImportBody, MaterialUploadOut, MaterialStatusOut)

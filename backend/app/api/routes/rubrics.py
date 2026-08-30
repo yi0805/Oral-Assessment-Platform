@@ -1,12 +1,15 @@
 import logging
+from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
+from app.core.limiter import limiter
+from app.utils.upload_validation import read_pdf_upload
 
 from app.services import s3_client, material_pipeline
 from app.models import Course, CourseEnrollment, Material, User, Rubric, AssessmentConfig
@@ -14,13 +17,6 @@ from app.schemas import RubricCreate, RubricOut
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-MIME_MAP = {
-    "pdf": "application/pdf",
-    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "txt": "text/plain",
-}
 
 # helper function
 def _load_rubric_for_config(
@@ -62,7 +58,9 @@ def _load_rubric_for_config(
     status_code=status.HTTP_201_CREATED,
     summary="Upload a rubric",
 )
+@limiter.limit("10/minute")
 async def upload_rubric(
+    request: Request,
     course_id: UUID,
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
@@ -91,8 +89,7 @@ async def upload_rubric(
         )
 
     # Check for existing rubric 
-    filename = file.filename or "unknown"
-    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    filename = file.filename or "unknown.pdf"
 
     existing_rubric = (
         db.query(Material)
@@ -107,19 +104,12 @@ async def upload_rubric(
     if existing_rubric:
         return existing_rubric.id
 
-    # Read file bytes 
-    file_bytes = await file.read()
-
-    if not file_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="The uploaded file is empty.",
-        )
+    file_bytes = await read_pdf_upload(file)
 
     # Upload to storage 
     material_id = uuid4()
     storage_key = s3_client.generate_key(course_id, material_id, filename)
-    content_type = file.content_type or MIME_MAP.get(extension, "application/octet-stream")
+    content_type = "application/pdf"
 
     try:
         s3_client.upload_file(
@@ -135,9 +125,10 @@ async def upload_rubric(
         )
         
     except RuntimeError as exc:
+        logger.warning("Rubric storage upload failed", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Storage upload failed: {exc}",
+            detail="Rubric storage is currently unavailable.",
         ) from exc
 
     # Save material record 
@@ -148,6 +139,8 @@ async def upload_rubric(
         mime_type=content_type,
         storage_key=storage_key,
         material_category="rubric",
+        processing_status="processing",
+        processing_started_at=datetime.now(timezone.utc),
     )
 
     try:

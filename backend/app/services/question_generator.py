@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -11,12 +12,16 @@ from app.services._prompt_safety import (
     sanitize_untrusted,
     truncate_for_prompt,
 )
-from app.services.ai_gateway import smart_chat_complete
+from app.services.ai_gateway import OPENROUTER_MODEL, smart_chat_complete
 
 
 from app.models import AssessmentConfig, Question, QuestionPool, Material, MaterialChunk, Rubric
 
 logger = logging.getLogger(__name__)
+
+
+class QuestionGenerationError(RuntimeError):
+    """A safe, expected failure that must not create publishable questions."""
 
 _SYSTEM_PROMPT = """\
 You are an expert university educator designing oral assessment questions.
@@ -109,7 +114,7 @@ async def generate_pool(
     except Exception as exc:  # noqa: BLE001
         rag_error = f"{type(exc).__name__}: {exc}"
         logger.warning(
-            "generate_pool %s: RAG vector search raised %s — will try text fallback",
+            "generate_pool %s: RAG vector search raised %s",
             pool_id, rag_error,
         )
         all_chunks = []
@@ -132,37 +137,14 @@ async def generate_pool(
         f" (RAG error: {rag_error})" if rag_error else "",
     )
 
-    text_fallback_excerpts: list[dict] = []
-
     if not unique_chunks:
         logger.warning(
-            "generate_pool %s: RAG returned 0 usable chunks. "
-            "Falling back to extracted_text from materials table. "
-            "To enable vector RAG, ensure GEMINI_API_KEY is set and re-upload materials.",
+            "generate_pool %s: no usable retrieved chunks for selected materials",
             pool_id,
         )
-        
-        remaining_chars = 12000
-        for mid in material_ids:
-            if remaining_chars <= 0:
-                break
-
-            excerpts = rag_search.get_extracted_text_chunks(
-                db=db,
-                material_id=mid,
-                max_chars=remaining_chars,
-            )
-
-            for ex in excerpts:
-                text_fallback_excerpts.append(ex)
-                remaining_chars -= len(ex["text"])
-
-        if not text_fallback_excerpts:
-            logger.error(
-                "generate_pool %s: No extracted_text found for materials %s. "
-                "Materials may not have completed the Extract pipeline stage.",
-                pool_id, material_ids,
-            )
+        raise QuestionGenerationError(
+            "Selected materials do not have usable retrieved context. Retry processing them before generating questions."
+        )
 
 
     if rubric_text.strip():
@@ -170,30 +152,11 @@ async def generate_pool(
     else:
         rubric_section = "No rubric provided — generate generally applicable questions."
 
-    if unique_chunks:
-        
-        # Vector RAG path — semantically ranked excerpts
-        chunks_section = "\n\n---\n\n".join(
-            f"[Excerpt {i+1} | relevance score {c.score:.2f}]\n{c.chunk_text}"
-            for i, c in enumerate(unique_chunks)
-        )
-        context_source = f"vector RAG ({len(unique_chunks)} chunks)"
-
-    elif text_fallback_excerpts:
-
-        # Text fallback path — raw extracted text
-        chunks_section = "\n\n---\n\n".join(
-            f"[Material: {ex['file_name']}]\n{ex['text']}"
-            for ex in text_fallback_excerpts
-        )
-        context_source = f"extracted_text fallback ({len(text_fallback_excerpts)} materials)"
-
-    else:
-        chunks_section = (
-            "No course material context available. "
-            "Generate questions appropriate for a university-level course on this topic."
-        )
-        context_source = "no context (no materials processed)"
+    chunks_section = "\n\n---\n\n".join(
+        f"[Excerpt {i+1} | relevance score {c.score:.2f}]\n{c.chunk_text}"
+        for i, c in enumerate(unique_chunks)
+    )
+    context_source = f"vector RAG ({len(unique_chunks)} chunks)"
 
     logger.info("generate_pool %s: building prompt using %s", pool_id, context_source)
 
@@ -215,12 +178,16 @@ async def generate_pool(
     except (RuntimeError, ValueError) as exc:
         logger.error("Question generation LLM call failed: %s", exc)
 
-        # Fall back to clearly labelled placeholder questions
-        questions_data = _fallback_questions(num_main_questions)
+        raise QuestionGenerationError("Question generation provider failed. Please try again.") from exc
 
 
-    # Clear existing questions (idempotent retry)
-    db.query(Question).filter(Question.question_pool_id == pool_id).delete()
+    provenance = {
+        "source_material_ids": [str(material_id) for material_id in material_ids],
+        "source_chunk_ids": [str(chunk.chunk_id) for chunk in unique_chunks],
+        "model": OPENROUTER_MODEL,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "prompt_version": "question-generation-v1",
+    }
 
     config = db.query(AssessmentConfig).filter(AssessmentConfig.id == config_id).first()
 
@@ -232,11 +199,9 @@ async def generate_pool(
             question_pool_id=pool_id,
             question_text=qdata["main_question"],
             question_index = order,
+            generation_provenance=provenance,
         )
         db.add(main_q)
-
-    db.commit()
-    db.refresh(pool)
 
     logger.info(
         "generate_pool %s: %d main questions saved (follow-ups generated dynamically during sessions)",
@@ -291,17 +256,17 @@ def _parse_llm_response(
 
     except ValueError as exc:
         logger.error("LLM response JSON parse failed: %s\nRaw: %.500s", exc, raw)
-        return _fallback_questions(expected_main)
+        raise QuestionGenerationError("AI returned an invalid question format.") from exc
 
     if not isinstance(data, list) or not data:
         logger.warning("LLM returned non-list or empty JSON: %.200s", raw)
-        return _fallback_questions(expected_main)
+        raise QuestionGenerationError("AI returned no usable questions.")
 
     # Validate / normalise each item (main questions only)
     validated: list[dict] = []
     for item in data[:expected_main]:
-        if not isinstance(item, dict) or "main_question" not in item:
-            continue
+        if not isinstance(item, dict) or not str(item.get("main_question", "")).strip():
+            raise QuestionGenerationError("AI returned an incomplete question set.")
 
         validated.append({
             "main_question": str(item["main_question"]),
@@ -310,19 +275,7 @@ def _parse_llm_response(
             "answer_style": str(item.get("answer_style", "long")),
         })
 
-    if not validated:
-        return _fallback_questions(expected_main)
+    if len(validated) != expected_main:
+        raise QuestionGenerationError("AI returned an incomplete question set.")
 
     return validated
-
-
-def _fallback_questions(num_main: int) -> list[dict]:
-    return [
-        {
-            "main_question": f"[AI generation failed — main question {i+1}. Check OPENROUTER_API_KEY.]",
-            "learning_objective": "Pending AI integration",
-            "difficulty": "medium",
-            "answer_style": "long",
-        }
-        for i in range(num_main)
-    ]

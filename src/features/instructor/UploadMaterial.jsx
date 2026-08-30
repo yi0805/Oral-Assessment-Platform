@@ -10,6 +10,12 @@ import { useQuestionGenerate } from "./useQuestionGenerate";
 import { useDeleteQuestion } from "./useDeleteQuestion";
 import { useUpdateQuestion } from "./useUpdateQuestion";
 import { usePublishAssessment } from "./usePublishAssessment";
+import {
+  getMaterialStatus,
+  retryMaterialProcessing,
+} from "../../services/apiMaterial";
+import { getQuestionSupportingContext } from "../../services/apiQuestion";
+import { getErrorMessage } from "../../utils/getErrorMessage";
 
 import AssessmentConfigForm from "./AssessmentConfigForm";
 import RubricEditor from "./RubricEditor";
@@ -50,6 +56,8 @@ function GeneratePanel() {
   const [loading, setLoading] = useState(false);
 
   const [questions, setQuestions] = useState([]);
+  const [materialStates, setMaterialStates] = useState([]);
+  const [supportingContexts, setSupportingContexts] = useState({});
 
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
@@ -88,6 +96,63 @@ function GeneratePanel() {
 
   const isValid = configValid && materialReady && isRubricValid(rubricRows);
 
+  function updateMaterialStates(nextStatuses) {
+    setMaterialStates((previous) => {
+      const byId = new Map(previous.map((item) => [item.id, item]));
+      nextStatuses.forEach((item) => byId.set(item.id, { ...byId.get(item.id), ...item }));
+      return [...byId.values()];
+    });
+  }
+
+  async function waitForMaterialsReady(materials) {
+    for (let attempt = 0; attempt < 120; attempt += 1) {
+      const statuses = await Promise.all(
+        materials.map(({ id }) => getMaterialStatus(courseId, id)),
+      );
+      updateMaterialStates(statuses);
+
+      if (statuses.some(({ processing_status: state }) => state === "failed")) {
+        throw new Error(
+          "One or more materials could not be processed. Retry the failed material before generating questions.",
+        );
+      }
+      if (statuses.some((material) => material.is_processing_stale)) {
+        throw new Error(
+          "Processing appears to have been interrupted. Retry the material before generating questions.",
+        );
+      }
+      if (statuses.every(({ processing_status: state }) => state === "ready")) {
+        return statuses;
+      }
+
+      setStatusMessage("Processing material. Question generation will start when it is ready...");
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+    throw new Error("Material processing is taking longer than expected. Please try again shortly.");
+  }
+
+  async function handleRetryMaterial(materialId) {
+    try {
+      setLoading(true);
+      const status = await retryMaterialProcessing(courseId, materialId);
+      updateMaterialStates([status]);
+      toast.success("Material processing retry started.");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not restart material processing."));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleViewSupportingContext(questionId) {
+    try {
+      const context = await getQuestionSupportingContext(questionId);
+      setSupportingContexts((previous) => ({ ...previous, [questionId]: context }));
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Supporting context is unavailable."));
+    }
+  }
+
   async function handleSubmit() {
     try {
       setLoading(true);
@@ -97,18 +162,25 @@ function GeneratePanel() {
           : "Uploading material...",
       );
 
-      const materialIds =
-        source === "pdf"
-          ? await Promise.all(
-              materialFiles.map((file) => uploadMaterial({ courseId, file })),
-            )
-          : [
-              await uploadGithubRepo({
-                courseId,
-                url: githubUrl.trim(),
-                ref: githubRef.trim() || null,
-              }),
-            ];
+      const uploadedMaterials = [];
+      if (source === "pdf") {
+        for (const file of materialFiles) {
+          const uploaded = await uploadMaterial({ courseId, file });
+          uploadedMaterials.push({ ...uploaded, filename: file.name });
+          updateMaterialStates(uploadedMaterials);
+        }
+      } else {
+        const uploaded = await uploadGithubRepo({
+          courseId,
+          url: githubUrl.trim(),
+          ref: githubRef.trim() || null,
+        });
+        uploadedMaterials.push({ ...uploaded, filename: "GitHub repository" });
+        updateMaterialStates(uploadedMaterials);
+      }
+
+      const readyMaterials = await waitForMaterialsReady(uploadedMaterials);
+      const materialIds = readyMaterials.map(({ id }) => id);
 
       setStatusMessage("Creating rubric...");
       const rubricPayload = {
@@ -144,6 +216,8 @@ function GeneratePanel() {
       setQuestions(updateResponse.questions);
       setAssessmentConfigId(updateResponse.assessment_config);
       setPhase("review");
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Could not generate questions."));
     } finally {
       setStatusMessage("");
       setLoading(false);
@@ -228,15 +302,57 @@ function GeneratePanel() {
             </span>
 
             {statusMessage}
-            <button
-              className="ml-4 font-bold underline"
-              onClick={() => {
-                setStatusMessage("");
-                setLoading(false);
-              }}
-            >
-              Dismiss
-            </button>
+          </div>
+        )}
+
+        {materialStates.length > 0 && phase === "setup" && (
+          <div className="mb-6 rounded-xl border border-outline-variant/15 bg-surface-container-low p-4">
+            <p className="mb-3 text-sm font-bold text-on-surface">Material processing</p>
+            <div className="space-y-2">
+              {materialStates.map((material) => (
+                <div key={material.id} className="text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-on-surface-variant">
+                      {material.filename || "Material"}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                        material.processing_status === "ready"
+                          ? "bg-primary/10 text-primary"
+                          : material.processing_status === "failed" || material.is_processing_stale
+                            ? "bg-error/10 text-error"
+                            : "bg-surface-container-high text-on-surface-variant"
+                      }`}
+                    >
+                      {material.processing_status === "ready"
+                        ? "Ready"
+                        : material.processing_status === "failed"
+                          ? "Failed"
+                          : material.is_processing_stale
+                            ? "Interrupted"
+                          : "Processing"}
+                    </span>
+                    {(material.processing_status === "failed" || material.is_processing_stale) && (
+                      <button
+                        type="button"
+                        className="rounded-lg px-2 py-1 text-xs font-bold text-primary hover:bg-primary/10"
+                        onClick={() => handleRetryMaterial(material.id)}
+                        disabled={loading}
+                      >
+                        Retry
+                      </button>
+                    )}
+                    </div>
+                  </div>
+                  {material.is_processing_stale && (
+                    <p className="text-xs text-error">
+                      Processing appears to have been interrupted.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -610,6 +726,14 @@ function GeneratePanel() {
                     <div className="flex gap-2">
                       {editingId !== question.id && (
                         <>
+                          {question.generation_provenance && (
+                            <button
+                              className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
+                              onClick={() => handleViewSupportingContext(question.id)}
+                            >
+                              View supporting context
+                            </button>
+                          )}
                           <button
                             className="rounded-lg px-3 py-1 text-xs font-bold text-primary transition-all hover:bg-primary/10"
                             onClick={() => {
@@ -668,6 +792,30 @@ function GeneratePanel() {
                     <p className="mt-2 text-[11px] text-on-surface-variant">
                       Objective: {question.learning_objective}
                     </p>
+                  )}
+
+                  {supportingContexts[question.id] && (
+                    <div className="mt-4 rounded-xl bg-surface-container-low p-4 text-sm">
+                      <p className="font-bold text-on-surface">
+                        Supporting context used for generation
+                      </p>
+                      <p className="mt-1 text-xs text-on-surface-variant">
+                        {supportingContexts[question.id].model &&
+                          `Model: ${supportingContexts[question.id].model}`}
+                        {supportingContexts[question.id].generated_at &&
+                          ` · Generated: ${new Date(supportingContexts[question.id].generated_at).toLocaleString()}`}
+                      </p>
+                      <div className="mt-3 space-y-3">
+                        {supportingContexts[question.id].contexts.map((context) => (
+                          <div key={context.chunk_id} className="rounded-lg bg-surface-container-lowest p-3">
+                            <p className="mb-1 text-xs font-semibold text-on-surface-variant">
+                              {context.material_filename} · section {context.chunk_index + 1}
+                            </p>
+                            <p className="whitespace-pre-wrap text-on-surface">{context.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               ))}

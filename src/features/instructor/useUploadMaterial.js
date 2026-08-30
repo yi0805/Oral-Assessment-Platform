@@ -7,8 +7,8 @@ export function useUploadMaterial() {
   const { mutateAsync: uploadMaterial, isPending } = useMutation({
     mutationFn: ({ courseId, file }) => uploadMaterialApi(courseId, file),
 
-    onSuccess: (data) => {
-      toast.success(data?.message || "Material uploaded successfully.");
+    onSuccess: () => {
+      toast.success("Material uploaded. Processing has started.");
     },
 
     onError: (error) => {

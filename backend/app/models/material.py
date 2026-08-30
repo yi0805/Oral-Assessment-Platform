@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
-    String, Text, Integer, ForeignKey,
+    DateTime, String, Text, Integer, ForeignKey,
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -30,6 +31,18 @@ class Material(Base):
         String, nullable=False, 
         server_default="course_material",
         comment="course_material | rubric"
+    )
+    processing_status: Mapped[str] = mapped_column(
+        String,
+        nullable=False,
+        default="processing",
+        server_default="processing",
+        comment="processing | ready | failed",
+    )
+    processing_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+        comment="UTC time at which the current processing attempt began; null when terminal",
     )
 
     course = relationship("Course", back_populates="materials")

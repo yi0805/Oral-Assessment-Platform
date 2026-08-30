@@ -1,11 +1,13 @@
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 from io import BytesIO
 from uuid import UUID
 
 from sqlalchemy import text as sa_text
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.models import Material, MaterialChunk
 
@@ -18,6 +20,33 @@ from app.utils.text_chunker import chunk_text
 # 3-stage pipeline (after upload): EXTRACT → CHUNK → EMBED
 
 logger = logging.getLogger(__name__)
+
+
+def mark_material_processing(material: Material, *, now: datetime | None = None) -> None:
+    """Start a processing attempt and record the time used for stale recovery."""
+    material.processing_status = "processing"
+    material.processing_started_at = now or datetime.now(timezone.utc)
+
+
+def is_material_processing_stale(
+    material: Material, *, now: datetime | None = None
+) -> bool:
+    """Return true only for an old, non-terminal processing attempt."""
+    if material.processing_status != "processing" or material.processing_started_at is None:
+        return False
+
+    started_at = material.processing_started_at
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    current_time = now or datetime.now(timezone.utc)
+    threshold = timedelta(seconds=settings.material_processing_stale_seconds)
+    return started_at <= current_time - threshold
+
+
+def can_retry_material_processing(material: Material, *, now: datetime | None = None) -> bool:
+    return material.processing_status == "failed" or is_material_processing_stale(
+        material, now=now
+    )
 
 
 def _get_db() -> Session:
@@ -90,22 +119,49 @@ def _extract_pptx(file_bytes: bytes) -> tuple[str, int]:
 
 
 def run_pipeline(material_id: UUID) -> None:
-
+    """Run the existing pipeline and publish one truthful terminal status."""
     logger.info("Pipeline start for material %s", material_id)
+    _set_material_status(material_id, "processing")
 
-    # Stage 1: Extract
-    extracted_text = _stage_extract(material_id)
-    if extracted_text is None:
-        return
+    try:
+        extracted_text = _stage_extract(material_id)
+        if extracted_text is None:
+            _set_material_status(material_id, "failed")
+            return
 
-    # Stage 2: Chunk
-    if not _stage_chunk(material_id, extracted_text):
-        return
+        if not _stage_chunk(material_id, extracted_text):
+            _set_material_status(material_id, "failed")
+            return
 
-    # Stage 3: Embed
-    _stage_embed(material_id)
+        if not _stage_embed(material_id):
+            _set_material_status(material_id, "failed")
+            return
 
-    logger.info("Pipeline finished for material %s", material_id)
+        _set_material_status(material_id, "ready")
+        logger.info("Pipeline finished for material %s", material_id)
+    except Exception:
+        logger.exception("Unexpected pipeline failure for material %s", material_id)
+        _set_material_status(material_id, "failed")
+
+
+def _set_material_status(material_id: UUID, processing_status: str) -> None:
+    db = _get_db()
+    try:
+        material = db.query(Material).filter(Material.id == material_id).first()
+        if material:
+            if processing_status == "processing":
+                mark_material_processing(material)
+            else:
+                material.processing_status = processing_status
+                material.processing_started_at = None
+            db.commit()
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Could not set processing status for material %s", material_id
+        )
+    finally:
+        db.close()
 
 
 def _stage_extract(material_id: UUID) -> str | None:
@@ -220,7 +276,7 @@ def _stage_chunk(material_id: UUID, extracted_text: str) -> bool:
 
 
 
-def _stage_embed(material_id: UUID) -> None:
+def _stage_embed(material_id: UUID) -> bool:
 
     db = _get_db()
 
@@ -234,11 +290,9 @@ def _stage_embed(material_id: UUID) -> None:
 
         if not chunks:
             logger.warning("Material %s: no chunks to embed", material_id)
-            return
+            return False
 
         texts = [c.chunk_text for c in chunks]
-        ZERO = [0.0] * 768
-
         try:
             embeddings = _run_async(embed_batch(texts))
 
@@ -249,13 +303,12 @@ def _stage_embed(material_id: UUID) -> None:
                 )
             
         except Exception as exc:
-            logger.warning(
-                "Material %s: embedding failed (%s) — storing zero vectors. "
-                "RAG will return no results for this material.",
-                material_id, exc,
-            )
+            logger.warning("Material %s: embedding failed: %s", material_id, exc)
+            return False
 
-            embeddings = [list(ZERO) for _ in chunks]
+        if any(len(vec) != 768 or all(value == 0.0 for value in vec) for vec in embeddings):
+            logger.warning("Material %s: embedding response is unusable", material_id)
+            return False
 
         for chunk, vec in zip(chunks, embeddings):
             chunk.embedding = vec
@@ -266,9 +319,11 @@ def _stage_embed(material_id: UUID) -> None:
             "Material %s: pipeline complete — %d chunks embedded (768-dim Gemini)",
             material_id, len(chunks),
         )
+        return True
 
     except Exception as exc:  
         logger.exception("Unexpected error in _stage_embed for %s", material_id)
+        return False
     finally:
         try:
             db.close()

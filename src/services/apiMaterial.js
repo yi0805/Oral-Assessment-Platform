@@ -20,3 +20,17 @@ export async function uploadGithubRepo(courseId, url, ref) {
 
   return response.data;
 }
+
+export async function getMaterialStatus(courseId, materialId) {
+  const response = await api.get(
+    `/courses/${courseId}/materials/${materialId}/status`,
+  );
+  return response.data;
+}
+
+export async function retryMaterialProcessing(courseId, materialId) {
+  const response = await api.post(
+    `/courses/${courseId}/materials/${materialId}/retry`,
+  );
+  return response.data;
+}

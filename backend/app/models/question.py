@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import Column, ForeignKey, Integer, String, Table, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -58,6 +58,11 @@ class Question(Base):
     question_text: Mapped[str] = mapped_column(Text, nullable=False)
 
     question_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    generation_provenance: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True,
+        comment="AI generation context metadata; null for manually created questions",
+    )
 
     pool = relationship("QuestionPool", back_populates="questions")
 

@@ -272,7 +272,10 @@ CREATE TABLE public.materials (
     storage_key character varying NOT NULL,
     material_category character varying DEFAULT 'course_material'::character varying NOT NULL,
     filename character varying NOT NULL,
-    CONSTRAINT ck_materials_category CHECK (((material_category)::text = ANY ((ARRAY['course_material'::character varying, 'rubric'::character varying])::text[])))
+    processing_status character varying DEFAULT 'processing'::character varying NOT NULL,
+    processing_started_at timestamp with time zone,
+    CONSTRAINT ck_materials_category CHECK (((material_category)::text = ANY ((ARRAY['course_material'::character varying, 'rubric'::character varying])::text[]))),
+    CONSTRAINT ck_materials_processing_status CHECK (((processing_status)::text = ANY ((ARRAY['processing'::character varying, 'ready'::character varying, 'failed'::character varying])::text[])))
 );
 
 
@@ -288,6 +291,10 @@ COMMENT ON COLUMN public.materials.storage_key IS 'S3 key: courses/{course_id}/m
 --
 
 COMMENT ON COLUMN public.materials.material_category IS 'course_material | rubric';
+
+COMMENT ON COLUMN public.materials.processing_status IS 'processing | ready | failed';
+
+COMMENT ON COLUMN public.materials.processing_started_at IS 'UTC time at which the current processing attempt began; null when terminal';
 
 
 --
@@ -355,7 +362,8 @@ CREATE TABLE public.questions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     question_pool_id uuid NOT NULL,
     question_text text NOT NULL,
-    question_index integer NOT NULL
+    question_index integer NOT NULL,
+    generation_provenance jsonb
 );
 
 

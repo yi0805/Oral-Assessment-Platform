@@ -101,6 +101,31 @@ def release_assessment(
     if question_pool.status != "draft":
         raise HTTPException(status_code=422, detail="Question pool was already published.")
 
+    question_count = (
+        db.query(Question)
+        .filter(Question.question_pool_id == question_pool.id)
+        .count()
+    )
+    if question_count < config.main_question_num:
+        raise HTTPException(
+            status_code=422,
+            detail="Question pool does not contain enough reviewable questions to publish.",
+        )
+
+    legacy_placeholder = (
+        db.query(Question)
+        .filter(
+            Question.question_pool_id == question_pool.id,
+            Question.question_text.startswith("[AI generation failed"),
+        )
+        .first()
+    )
+    if legacy_placeholder:
+        raise HTTPException(
+            status_code=422,
+            detail="Question pool contains a failed AI-generation placeholder and cannot be published.",
+        )
+
     # Publish config and question pool
     question_pool.status = "published"
 
@@ -483,6 +508,10 @@ def copy_assessment(
                     mime_type=src.mime_type,
                     storage_key=spec["new_storage_key"],
                     material_category=src.material_category,
+                    # Chunks and embeddings are copied in this same transaction,
+                    # so this is already a usable material rather than a new job.
+                    processing_status="ready",
+                    processing_started_at=None,
                 )
                 
                 db.add(new_material)

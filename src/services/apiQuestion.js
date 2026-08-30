@@ -58,3 +58,8 @@ export async function publishAssessment(courseId, assessmentConfigId) {
   );
   return response.data;
 }
+
+export async function getQuestionSupportingContext(questionId) {
+  const response = await api.get(`/questions/${questionId}/supporting-context`);
+  return response.data;
+}

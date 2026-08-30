@@ -13,6 +13,24 @@ class QuestionOut(BaseModel):
     question_pool_id: UUID
     question_text: str
     question_index: int
+    generation_provenance: dict | None = None
+
+
+class SupportingContextItemOut(BaseModel):
+    material_id: UUID
+    material_filename: str
+    chunk_id: UUID
+    chunk_index: int
+    text: str
+
+
+class QuestionSupportingContextOut(BaseModel):
+    source_material_ids: list[UUID]
+    source_chunk_ids: list[UUID]
+    model: str | None = None
+    generated_at: str | None = None
+    prompt_version: str | None = None
+    contexts: list[SupportingContextItemOut]
 
 class QuestionUpdate(BaseModel):
     question_text: str | None = None

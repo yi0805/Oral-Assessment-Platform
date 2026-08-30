@@ -8,8 +8,8 @@ export function useUploadGithubRepo() {
     mutationFn: ({ courseId, url, ref }) =>
       uploadGithubRepoApi(courseId, url, ref),
 
-    onSuccess: (data) => {
-      toast.success(data?.message || "GitHub repo imported successfully.");
+    onSuccess: () => {
+      toast.success("Repository imported. Processing has started.");
     },
 
     onError: (error) => {

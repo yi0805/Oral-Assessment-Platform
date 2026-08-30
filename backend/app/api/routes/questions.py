@@ -1,24 +1,27 @@
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.database import get_db
 from app.core.dependencies import require_instructor
-from app.services.question_generator import generate_pool
+from app.core.limiter import limiter
+from app.services.question_generator import QuestionGenerationError, generate_pool
 
-from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material, Rubric
+from app.models import AssessmentConfig, Course, CourseEnrollment, Question, QuestionPool, User, Material, MaterialChunk, Rubric
 from app.schemas import (
     QuestionGenerationRequest,
     QuestionCreate,
     QuestionUpdate,
     QuestionOut,
-    QuestionGenerationResponse,
+    QuestionGenerationResponse, QuestionSupportingContextOut,
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # Generate question pool
@@ -29,7 +32,9 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="Generate question pool from material and rubric",
 )
+@limiter.limit("5/minute")
 async def generate_question(
+    request: Request,
     course_id: UUID,
     payload: QuestionGenerationRequest,
     db: Session = Depends(get_db),
@@ -58,6 +63,7 @@ async def generate_question(
         db.query(Rubric)
         .filter(
             Rubric.id == payload.rubric_id,
+            Rubric.course_id == course_id,
         )
         .first()
     )
@@ -72,13 +78,18 @@ async def generate_question(
         db.query(Material)
         .filter(
             Material.id.in_(unique_material_ids),
+            Material.course_id == course_id,
             Material.material_category == "course_material",
+            Material.processing_status == "ready",
         )
         .all()
     )
 
     if len(materials) != len(unique_material_ids):
-        raise HTTPException(status_code=404, detail="One or more materials not found, please upload them again")
+        raise HTTPException(
+            status_code=409,
+            detail="Selected materials are unavailable, belong to another course, or are not ready.",
+        )
 
     published = (
         db.query(AssessmentConfig)
@@ -138,11 +149,18 @@ async def generate_question(
             config_id=config.id,
         )
 
-    except ValueError as exc:
+    except QuestionGenerationError as exc:
+        db.rollback()
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail="Question generation request is invalid.") from exc
     except RuntimeError as exc:
-        raise HTTPException(status_code=502, detail=f"AI generation service error: {exc}") from exc
+        db.rollback()
+        raise HTTPException(
+            status_code=502,
+            detail="Question generation service is currently unavailable.",
+        ) from exc
 
     try:
         db.commit()
@@ -162,6 +180,62 @@ async def generate_question(
     return QuestionGenerationResponse(
         assessment_config=config.id,
         questions=[QuestionOut.model_validate(q) for q in questions],
+    )
+
+
+@router.get(
+    "/questions/{question_id}/supporting-context",
+    response_model=QuestionSupportingContextOut,
+    summary="View supporting context used for AI question generation",
+)
+def get_question_supporting_context(
+    question_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_instructor),
+):
+    question, config = _get_question_with_config_or_403(db, question_id, current_user)
+    provenance = question.generation_provenance
+    if not provenance:
+        raise HTTPException(
+            status_code=404,
+            detail="Supporting context is unavailable for this manually created question.",
+        )
+
+    try:
+        source_material_ids = [UUID(value) for value in provenance.get("source_material_ids", [])]
+        source_chunk_ids = [UUID(value) for value in provenance.get("source_chunk_ids", [])]
+    except (TypeError, ValueError) as exc:
+        logger.warning("Question %s has invalid provenance", question.id)
+        raise HTTPException(status_code=404, detail="Supporting context is unavailable.") from exc
+
+    rows = (
+        db.query(Material, MaterialChunk)
+        .join(MaterialChunk, MaterialChunk.material_id == Material.id)
+        .filter(
+            Material.course_id == config.course_id,
+            Material.id.in_(source_material_ids),
+            MaterialChunk.id.in_(source_chunk_ids),
+        )
+        .order_by(Material.filename, MaterialChunk.chunk_index)
+        .all()
+    )
+    contexts = [
+        {
+            "material_id": material.id,
+            "material_filename": material.filename,
+            "chunk_id": chunk.id,
+            "chunk_index": chunk.chunk_index,
+            "text": chunk.chunk_text,
+        }
+        for material, chunk in rows
+    ]
+    return QuestionSupportingContextOut(
+        source_material_ids=source_material_ids,
+        source_chunk_ids=source_chunk_ids,
+        model=provenance.get("model"),
+        generated_at=provenance.get("generated_at"),
+        prompt_version=provenance.get("prompt_version"),
+        contexts=contexts,
     )
 
 
