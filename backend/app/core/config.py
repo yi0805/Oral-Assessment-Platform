@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # BackgroundTasks are in-process. Only a processing row older than this
     # threshold is eligible for instructor-authorised recovery.
-    material_processing_stale_seconds: int = Field(default=900, ge=60)
+    material_processing_stale_seconds: int = Field(default=1800, ge=60)
 
     gemini_api_key: str
     openrouter_api_key: str
