@@ -8,6 +8,12 @@ WhereRU is a full-stack AI assessment platform for creating and running adaptive
 
 > The original capstone implementation includes AWS Transcribe streaming and Bedrock/OpenRouter-based AI paths. The current public demo is deployed with a lower-cost production configuration; see [Current Demo Deployment](#current-demo-deployment) for the exact runtime.
 
+<p align="center">
+  <img src="docs/portfolio/instructor-dashboard.png" alt="WhereRU instructor dashboard showing assessment scores, submissions, and review status" width="100%">
+</p>
+
+<p align="center"><sub>Instructor dashboard: AI-assisted scoring, submission progress, and review workflow in one view.</sub></p>
+
 ---
 
 ## Why this project is interesting
@@ -22,6 +28,30 @@ WhereRU goes beyond a basic LLM wrapper. It combines a real assessment workflow 
 - **Measured performance optimisation** — reduced median time-to-first-text from **18.21 s** in the original batch baseline to **~1.85 s** for the streaming path.
 - **Production deployment** — React and FastAPI deployed behind Nginx on AWS EC2 with RDS PostgreSQL and S3 storage.
 - **Engineering safeguards** — rate limiting, authentication, prompt-safety handling, recovery paths, backend tests, and Playwright end-to-end coverage.
+
+---
+
+## Product tour
+
+### 1. Generate rubric-aligned questions from course material
+
+Instructors can upload learning material, define assessment criteria, review AI-generated questions, and inspect supporting source context before publishing.
+
+![AI-assisted question generation](docs/portfolio/ai-question-generation.png)
+
+### 2. Run a timed oral assessment
+
+Students answer spoken questions in a focused assessment flow with progress tracking, transcription, and adaptive follow-up support.
+
+![Student oral assessment](docs/portfolio/student-oral-assessment.png)
+
+### 3. Review evidence before releasing a grade
+
+Instructors can inspect the transcript, AI-assisted rubric breakdown, final comments, and grade before publication.
+
+![Instructor transcript and feedback review](docs/portfolio/transcript-feedback-review.png)
+
+*Screenshots use fictional data and contain no production student records.*
 
 ---
 
