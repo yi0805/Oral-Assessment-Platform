@@ -1,5 +1,7 @@
 # WhereRU — AI-Powered Oral Assessment Platform
 
+[![CI](https://github.com/yi0805/Oral-Assessment-Platform/actions/workflows/ci.yml/badge.svg)](https://github.com/yi0805/Oral-Assessment-Platform/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/yi0805/Oral-Assessment-Platform?label=release)](https://github.com/yi0805/Oral-Assessment-Platform/releases/latest)
+
 WhereRU is a full-stack AI assessment platform for creating and running adaptive oral assessments from course materials. Instructors can generate and edit question pools, define rubrics, review student sessions, and release feedback; students complete timed oral assessments with transcript confirmation and AI-assisted follow-up questions.
 
 **Live demo:** https://where-areyou.com  
@@ -391,7 +393,7 @@ Potential next steps include:
 - adaptive question difficulty
 - stronger role-based access control
 - broader automated test coverage
-- CI/CD automation
+- automated deployment pipeline
 - infrastructure as code
 - production monitoring and observability
 - additional AI evaluation / regression datasets
