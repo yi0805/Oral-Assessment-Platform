@@ -1,312 +1,262 @@
-# WhereRU - Team 8 COMPSCI 399 Capstone Project
+# WhereRU — AI-Powered Oral Assessment Platform
 
-## Name of the project
+WhereRU is a full-stack AI assessment platform for creating and running adaptive oral assessments from course materials. Instructors can generate and edit question pools, define rubrics, review student sessions, and release feedback; students complete timed oral assessments with transcript confirmation and AI-assisted follow-up questions.
 
-WhereRU
+**Live demo:** https://where-areyou.com  
+**University of Auckland:** COMPSCI 399 Capstone Project — Team 8  
+**Core stack:** React · FastAPI · PostgreSQL · pgvector · AWS · WebSockets · LLM/RAG
 
----
-
-## Link to the Project Management tool
-
-https://github.com/orgs/uoa-compsci399-s1-2026/projects/20
+> The original capstone implementation includes AWS Transcribe streaming and Bedrock/OpenRouter-based AI paths. The current public demo is deployed with a lower-cost production configuration; see [Current Demo Deployment](#current-demo-deployment) for the exact runtime.
 
 ---
 
-## Project Overview
+## Why this project is interesting
 
-This project is an AI-powered assessment system designed to support instructors in creating assessments and students in completing them within a controlled, timed environment. The system integrates large language models (LLMs) to create questions, evaluate answers and generate feedback.
+WhereRU goes beyond a basic LLM wrapper. It combines a real assessment workflow with document ingestion, retrieval, structured AI output, live speech processing, instructor review, authentication, persistence, production deployment, and automated tests.
 
-### Key Features
+### Engineering highlights
 
-- Upload course materials and generate a pool of questions which is editable by instructor
-- Rubric table for instructors to define precise evaluation dimensions, ensuring grading consistency
-- Short text-based chat assessment with adaptive follow-up questions
-- Secure recording and storage of full conversation transcripts
-- Instructor dashboard to review sessions and add manual judgement and feedback comments
-- Automatic summary of each student’s demonstrated understanding (advisory only)
-- Integrated with AWS Transcribe for Speech-to-Text feature with a user-confirmation loop to ensure transcript accuracy before evaluation
-
----
-
-## Live Demo
-
-https://where-areyou.com
-
-### Login Requirements
-
-- Gmail login credentials for a student account
-- UoA email login credentials for an instructor account. If you do not have one, please feel free to contact me.
-
-## Deployment
-
-The application is deployed on an AWS EC2 instance and is accessible via a public URL for demonstration and evaluation purposes.
-
-### Domain Configuration
-
-The application is accessible via a custom domain:
-
-- **Current Version**: v1.0.0
-- **Domain**: where-areyou.com
-- **DNS**: A record pointing to EC2 public IP
-- **Hosting**: AWS EC2 instance
+- **Adaptive oral assessment workflow** — generates questions from course materials and supports follow-up questions based on student responses.
+- **RAG-backed course context** — stores and retrieves material embeddings with PostgreSQL + pgvector.
+- **Real-time speech-to-text work** — implements AWS Transcribe Streaming over WebSockets with a batch fallback path.
+- **Measured performance optimisation** — reduced median time-to-first-text from **18.21 s** in the original batch baseline to **~1.85 s** for the streaming path.
+- **Production deployment** — React and FastAPI deployed behind Nginx on AWS EC2 with RDS PostgreSQL and S3 storage.
+- **Engineering safeguards** — rate limiting, authentication, prompt-safety handling, recovery paths, backend tests, and Playwright end-to-end coverage.
 
 ---
 
-## Tech Stack
+## Performance highlight: speech-to-text latency
 
-### Backend
+The original assessment flow used batch transcription, which could leave the UI waiting for many seconds before any transcript appeared. The streaming implementation returns partial text while the student is still speaking.
 
-Language - Python 3.13
+| Path | Median / typical result | User-visible behaviour |
+| --- | ---: | --- |
+| Original batch baseline | **18.21 s** median total | Transcript appears after processing completes |
+| Batch after polling improvement | **7.79 s** median total | Faster completion, but still batch-oriented |
+| Streaming | **~1.85 s** median time-to-first-partial | Text begins appearing close to real time |
 
-#### Web framework
+That is roughly an **89.8% reduction in time to first visible text** compared with the original batch baseline.
 
-fastapi==0.115.0
-uvicorn[standard]==0.30.0
+The repository includes the measurement methodology, raw timing model, caveats, and benchmark design in [`docs/stt-baseline.md`](docs/stt-baseline.md).
 
-#### Database
+---
 
-sqlalchemy==2.0.35
-psycopg[binary]==3.2.10
-alembic==1.13.2
-pgvector==0.3.5
+## My contributions
 
-#### Data validation
+This was a six-person capstone project. The following are selected contributions I worked on and later strengthened in this portfolio repository:
 
-pydantic==2.9.0
-pydantic-settings==2.5.0
+- Optimised and benchmarked the speech-to-text pipeline, including streaming behaviour, timing instrumentation, and fallback handling.
+- Added a reproducible STT benchmark harness and documented matched measurements instead of relying on subjective performance claims.
+- Hardened WebSocket/audio-stream lifecycle behaviour and authentication-related helpers around the streaming path.
+- Added and refined AWS deployment configuration, Nginx/systemd production setup, environment safeguards, and deployment documentation.
+- Improved production-readiness checks around material processing and application configuration.
 
-#### Auth
+For the STT optimisation details, see [`docs/stt-baseline.md`](docs/stt-baseline.md). For deployment details, see [`deployment/README.md`](deployment/README.md).
 
-python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+---
 
-#### AWS
+## Product workflow
 
-boto3==1.43.6
-amazon-transcribe==0.6.2
+```text
+Instructor uploads course materials and defines a rubric
+        ↓
+System processes materials and builds retrieval context
+        ↓
+AI generates an editable question pool
+        ↓
+Instructor publishes the assessment
+        ↓
+Student completes a timed oral assessment
+        ↓
+Speech is transcribed and confirmed by the student
+        ↓
+AI evaluates responses and generates follow-up questions / feedback
+        ↓
+Instructor reviews the session and releases feedback
+```
 
-#### File processing
+### Instructor features
 
-pandas==3.0.2
-python-multipart==0.0.12
-pdfplumber==0.11.4
-python-docx==1.1.2
-python-pptx==1.0.2
+- Create courses and manage enrolments
+- Upload learning materials
+- Define rubric criteria
+- Generate and edit AI-assisted question pools
+- Publish assessments
+- Review transcripts, AI evaluation, and session history
+- Add manual judgement and feedback before release
 
-#### HTTP client
+### Student features
 
-httpx==0.27.0
+- Sign in with Google authentication
+- View available assessments
+- Complete timed oral responses
+- Confirm or correct transcribed text before evaluation
+- Respond to adaptive follow-up questions
+- Review released feedback and previous results
 
-#### Environment
+---
 
-python-dotenv==1.0.1
+## Architecture
 
-#### Rate limiting
+```mermaid
+flowchart TD
+    A[Browser] -->|HTTPS| B[Nginx on AWS EC2]
+    B --> C[React / Vite Frontend]
+    B --> D[FastAPI Backend]
+    D --> E[(PostgreSQL / Amazon RDS)]
+    E --> F[pgvector]
+    D --> G[Amazon S3]
+    D --> H[LLM Gateway]
+    H --> I[OpenRouter / Gemini]
+    H -. capstone path .-> J[AWS Bedrock]
+    D -. optional STT path .-> K[AWS Transcribe Streaming]
+```
 
-slowapi==0.1.9
+The backend uses a layered structure with API routes, services, database models, Pydantic schemas, and infrastructure integrations separated by responsibility.
 
-#### Testing
+---
 
-pytest==8.3.0
-pytest-asyncio==0.24.0
-pytest-mock==3.14.0
-httpx==0.27.0
-moto[s3]==5.0.0
-
-#### Production server
-
-gunicorn==23.0.0
+## Tech stack
 
 ### Frontend
 
-#### Core Frontend Frameworks
+- React 19
+- React Router
+- TanStack React Query
+- Axios
+- Tailwind CSS
+- Recharts
+- Google OAuth
+- Playwright
 
-react 19.2.4
-react-dom 19.2.4
-react-router 7.13.1
-vite 8.0.0
-vitejs/plugin-react 6.0.0
+### Backend
 
-#### API & State Management
+- Python 3.13
+- FastAPI + Uvicorn / Gunicorn
+- SQLAlchemy 2
+- Pydantic
+- PostgreSQL
+- pgvector
+- JWT-based application authentication
+- SlowAPI rate limiting
+- pytest
 
-tanstack/react-query 4.44.0
-tanstack/react-query-devtools 4.44.0
-axios 1.14.0
+### AI / data
 
-#### Authentication
+- Retrieval-augmented generation over uploaded course materials
+- PostgreSQL + pgvector for vector search
+- Structured JSON output for AI responses
+- OpenRouter / Gemini integration
+- AWS Bedrock integration retained from the capstone implementation
 
-react-oauth/google 0.13.4
+### Cloud / infrastructure
 
-#### UI Components & User Experience
-
-react-datepicker 9.1.0
-react-hot-toast 2.6.0
-tailwind-datepicker-react 1.4.3
-recharts 3.8.1
-
-#### Styling & CSS Tools
-
-tailwindcss 3.4.19
-postcss 8.5.8
-autoprefixer 10.4.27
-prettier-plugin-tailwindcss 0.7.2
-
-#### Formatting
-
-eslint/js9.39.4
-types/react 19.2.14
-types/react-dom 19.2.3
-eslint 9.39.4
-eslint-plugin-react-hooks 7.0.1
-eslint-plugin-react-refresh 0.5.2
-globals 17.4.0
-prettier 3.8.1
-
-#### Testing
-
-playwright/test 1.49.0
-
-### Database
-
-- PostgreSQL (via Amazon RDS)
-- pgvector (extension for vector database)
-
-### Cloud / Infrastructure
-
-- Amazon RDS (PostgreSQL database)
-- Amazon S3 (file storage)
-- Amazon Bedrock (Claude 3 Haiku as primary LLM)
-- Amazon Transcribe (Speech-to-Text feature)
-- Amazon EC2 (Deployment and security group)
-- Amazon IAM (Identity and Access Management)
-
-### AI Integration
-
-- AWS Bedrock – Claude 3 Haiku as Primary Model:
-  - Generate questions
-  - Answer evaluation
-  - Feedback generation
-  - Follow-up questions
-- Embeddings support (e.g., Gemini)
-- OpenRouter (Free Models) as Fallback Model:
-  - Used as a backup when:
-    - Primary model fails
-    - API limits are reached
-    - Network or service issues occur
+- AWS EC2
+- Amazon RDS PostgreSQL
+- Amazon S3
+- AWS IAM
+- Nginx
+- systemd
+- TLS via Let's Encrypt / Certbot
+- AWS Transcribe Streaming implementation retained in the repository
 
 ---
 
-## System Architecture
+## Current demo deployment
 
-```text
-Frontend (React)
-       ↓
-FastAPI Backend
-       ↓
-AWS RDS PostgreSQL
-       ↓
-AWS Bedrock / OpenRouter
+The public demo at https://where-areyou.com runs on AWS EC2 behind Nginx with a FastAPI backend, RDS PostgreSQL, and S3 storage.
+
+The production runbook intentionally documents the exact current runtime separately from the broader capstone feature set. In the current low-cost demo configuration:
+
+- chat requests use OpenRouter with a Gemini model
+- embeddings use Gemini
+- AWS Transcribe is disabled in the public production configuration
+- the Transcribe streaming implementation, tests, and benchmark evidence remain in the repository
+
+This separation keeps the demo inexpensive while preserving the engineering work and reproducible measurements from the original speech-to-text implementation.
+
+See [`deployment/README.md`](deployment/README.md) for the production layout and safeguards.
+
+---
+
+## Testing
+
+### Backend
+
+The backend test suite covers areas including:
+
+- audio streaming behaviour
+- transcription flows
+- material-processing recovery
+- production safeguards
+- response validation
+
+Run:
+
+```bash
+cd backend
+pytest
+```
+
+### End-to-end
+
+Playwright coverage includes the streaming assessment flow.
+
+```bash
+npm run test:e2e
+```
+
+Frontend quality checks:
+
+```bash
+npm run lint
+npm run build
 ```
 
 ---
 
-## Project Structure
+## Project structure
 
-```plaintext
+```text
 .
 ├── backend/
 │   ├── app/
-│   │   ├── api/              # FastAPI routes (router.py + routes/)
-│   │   ├── core/             # config, database, security, dependencies
+│   │   ├── api/              # FastAPI routes
+│   │   ├── core/             # configuration, database, auth, dependencies
 │   │   ├── models/           # SQLAlchemy models
 │   │   ├── schemas/          # Pydantic schemas
-│   │   ├── services/         # Business logic (AI gateway, S3, RAG, etc.)
-│   │   ├── utils/
-│   │   ├── __init__.py
-│   │   └── main.py           # Application entry point
-│   │
-│   ├── tests/                # Backend tests
-│   ├── .env.example          # Environment variables template
-│   ├── pytest.ini
-│   ├── requirements.txt
-│   └── README.md             # Deprecated — see root README.md
-│
-├── src/                      # Frontend source (Vite + React)
-│   ├── features/             # Feature modules
-│   │   ├── authentication/
-│   │   ├── instructor/
-│   │   └── student/
-│   ├── hooks/                # Custom React hooks
-│   ├── pages/                # Home, Login, PageNotFound
-│   ├── services/             # API clients
-│   ├── ui/                   # Reusable UI components
-│   ├── utils/
-│   ├── App.jsx
-│   ├── main.jsx
-│   └── Index.css
-│
-├── public/                   # Static assets
-├── tests/                    # Playwright e2e + fixtures
-│   ├── e2e/
-│   └── fixtures/
-├── docs/
-├── index.html
+│   │   ├── services/         # AI, RAG, S3 and application services
+│   │   └── utils/            # shared utilities, including audio/STT helpers
+│   └── tests/                # backend test suite
+├── deployment/               # Nginx, systemd and production runbook
+├── docs/                     # engineering notes and benchmarks
+├── src/                      # React frontend
+├── tests/e2e/                # Playwright tests
 ├── package.json
-├── vite.config.js
-├── tailwind.config.js
-├── playwright.config.js
-├── eslint.config.js
-├── prettier.config.js
-├── postcss.config.js
-├── .env.example              # Frontend environment variables template
-├── .gitignore
 └── README.md
-
 ```
 
 ---
 
-## Local Development Setup
-
-This guide covers two paths:
-
-- **Outside reviewers** — run everything locally (local database + AWS via IAM access keys)
-- **Team members** — connect to the shared AWS RDS database and use UoA AWS SSO
-
-The two paths differ at **Step 2 (database)**, **Step 3 (DATABASE_URL value)**, and **Step 5 (AWS access)**. All other steps are the same.
+## Local development
 
 ### Prerequisites
 
-**Both paths need:**
-
 - Python 3.13
 - Node.js 18+
+- Docker for a local PostgreSQL + pgvector database
 
-**Outside reviewers also need:**
-
-- Docker (used to run PostgreSQL locally)
-
-**Team members also need:**
-
-- AWS CLI v2 (used to log in via UoA SSO)
-
-### 1. Clone the repository
+### 1. Clone
 
 ```bash
-git clone https://github.com/uoa-compsci399-s1-2026/capstone-project-s1-2026-team-8.git
-cd capstone-project-s1-2026-team-8
+git clone https://github.com/yi0805/Oral-Assessment-Platform.git
+cd Oral-Assessment-Platform
 ```
 
-### 2. Set up the database — pick your path
-
-#### For outside reviewers
-
-Start a local PostgreSQL container with the pgvector extension:
-
-**macOS / Linux**
+### 2. Start PostgreSQL + pgvector
 
 ```bash
-docker run --name project20-db \
+docker run --name whereru-db \
   -e POSTGRES_DB=project20_dev \
   -e POSTGRES_USER=project20 \
   -e POSTGRES_PASSWORD=localdev123 \
@@ -314,146 +264,45 @@ docker run --name project20-db \
   -d pgvector/pgvector:pg16
 ```
 
-**Windows PowerShell**
-
-```powershell
-docker run --name project20-db `
-  -e POSTGRES_DB=project20_dev `
-  -e POSTGRES_USER=project20 `
-  -e POSTGRES_PASSWORD=localdev123 `
-  -p 5432:5432 `
-  -d pgvector/pgvector:pg16
-```
-
-Load the included `backend/schema.sql` into the container (same command on both platforms):
+Load the repository schema:
 
 ```bash
-docker cp backend/schema.sql project20-db:/tmp/schema.sql
-docker exec project20-db psql -U project20 -d project20_dev -f /tmp/schema.sql
+docker cp backend/schema.sql whereru-db:/tmp/schema.sql
+docker exec whereru-db psql -U project20 -d project20_dev -f /tmp/schema.sql
 ```
 
-#### For team members
-
-Download the RDS SSL certificate into the `backend/` folder. The shared database requires SSL with `sslmode=verify-full`.
-
-**macOS / Linux**
-
-```bash
-cd backend
-curl -o global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
-cd ..
-```
-
-**Windows PowerShell**
-
-```powershell
-cd backend
-Invoke-WebRequest -Uri "https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem" -OutFile "global-bundle.pem"
-cd ..
-```
-
-### 3. Configure backend environment variables
+### 3. Configure the backend
 
 ```bash
 cd backend
 cp .env.example .env
 ```
 
-Open `backend/.env` and fill in the `<...>` placeholders. Set `DATABASE_URL` based on your path:
+Use a local SQLAlchemy connection URL such as:
 
-Use a deployment-specific PostgreSQL 16 connection URL in the psycopg 3
-SQLAlchemy format:
-
-```
-postgresql+psycopg://<user>:<password>@<host>:5432/<database>
+```text
+postgresql+psycopg://project20:localdev123@localhost:5432/project20_dev
 ```
 
-For an RDS deployment, add the SSL parameters and CA path required by that
-environment. Do not commit a real endpoint, username, password, or CA path.
-
-Generate a value for `JWT_SECRET_KEY`:
+Generate a JWT secret:
 
 ```bash
 python3.13 -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-```powershell
-py -3.13 -c "import secrets; print(secrets.token_hex(32))"
-```
+Fill the remaining provider settings you intend to use in `backend/.env`. Do not commit credentials.
 
-### 4. Configure frontend environment variables
+### 4. Configure the frontend
 
 From the project root:
 
 ```bash
-cd ..
 cp .env.example .env
 ```
 
-Fill in `VITE_GOOGLE_CLIENT_ID`.
+Set the required frontend environment variables such as the Google OAuth client ID.
 
-### 5. Set up AWS credentials — pick your path
-
-The backend needs AWS to call S3, Bedrock, and Transcribe.
-
-#### For outside reviewers
-
-Use the IAM access key pair.
-
-In `backend/.env`:
-
-1. Comment out the line `AWS_PROFILE_NAME=uoa-sso`
-2. Uncomment and fill in:
-   ```
-   AWS_ACCESS_KEY_ID=<aws-access-key-id>
-   AWS_SECRET_ACCESS_KEY=<aws-secret-access-key>
-   ```
-
-That's all. You do **not** need to install or configure the AWS CLI.
-
-#### For team members
-
-Install the AWS CLI v2:
-
-**macOS**
-
-```bash
-brew install awscli
-aws --version
-```
-
-**Windows PowerShell**
-
-```powershell
-winget install Amazon.AWSCLI
-aws --version
-```
-
-**Linux** — follow the [official installer](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
-
-Set up the AWS CLI to use UoA SSO:
-
-```bash
-aws configure sso
-```
-
-Use these values:
-
-- SSO start URL: `https://uoa-sso.awsapps.com/start/#`
-- SSO region: `ap-southeast-2`
-- Profile name: `uoa-sso`
-
-Then log in (re-run this every ~8 hours):
-
-```bash
-aws sso login --profile uoa-sso
-```
-
-Keep `AWS_PROFILE_NAME=uoa-sso` in `backend/.env` (this is the default in `.env.example`).
-
-### 6. Start the backend
-
-**macOS / Linux**
+### 5. Start the backend
 
 ```bash
 cd backend
@@ -463,141 +312,77 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-**Windows PowerShell**
+On Windows PowerShell, activate with:
 
 ```powershell
-cd backend
-# Only needed once if you have never enabled PowerShell scripts:
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-py -3.13 -m venv venv
 .\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-uvicorn app.main:app --reload
 ```
 
-### 7. Start the frontend
-
-Open a new terminal in the project root:
+### 6. Start the frontend
 
 ```bash
 npm install
 npm run dev
 ```
 
-### 8. Open the app
+Then open:
 
 - Frontend: http://localhost:5173
-- Backend Swagger UI: http://127.0.0.1:8000/docs
+- FastAPI docs: http://127.0.0.1:8000/docs
+
+For the full AWS production procedure, use [`deployment/README.md`](deployment/README.md).
 
 ---
 
-## Assessment Workflow
+## Design decisions
 
-```text
-Instructor uploads materials and fill out rubric form
-        ↓
-AI generates question pool
-        ↓
-Instructor reviews and edits questions
-        ↓
-Assessment published
-        ↓
-Student completes timed session
-        ↓
-AI evaluates responses
-        ↓
-Instructor reviews and releases feedback
-        ↓
-Student reviews the results
-```
+### Structured AI output
+
+AI responses are constrained to structured output so the application can validate results, render them consistently, and reduce brittle free-text parsing.
+
+### Retrieval instead of prompt stuffing
+
+Uploaded materials are processed into retrievable chunks rather than sending all source content with every request. This keeps the assessment flow more scalable and makes course context easier to control.
+
+### Human-in-the-loop assessment
+
+AI-generated grading and summaries are advisory. Instructors can review session evidence and add manual judgement before feedback is released.
+
+### Streaming with recovery paths
+
+The speech-to-text work was designed around user-visible latency, not only final transcription time. The streaming path therefore exposes partial results early while retaining recovery/fallback behaviour when streaming fails.
 
 ---
 
-## Usage Examples
+## Further improvements
 
-### Instructor Workflow
+Potential next steps include:
 
-Example workflow for instructors:
-
-1. Login as instructor using Google Auth
-2. Create a course
-3. Enrol students and instructors to the course
-4. Upload learning materials and fill out rubric table
-5. Create an assessment
-6. Review and edit AI-generated questions
-7. Save the draft assessment
-8. Release assessment to students
-9. Detect potential cheating by anti-cheating system
-10. Review AI-generated grading and feedback
-
-### Student Workflow
-
-Example workflow for students:
-
-1. Login as student
-2. View assessment requirement
-3. Start assessment session
-4. Answer AI-generated oral questions by recording audio
-5. Adjust the transcribed text answer before submitting
-6. Respond to adaptive follow-up questions
-7. Submit assessment
-8. View released feedback and results
-9. Review previous assessment feedback and results
+- adaptive question difficulty
+- stronger role-based access control
+- broader automated test coverage
+- CI/CD automation
+- infrastructure as code
+- production monitoring and observability
+- additional AI evaluation / regression datasets
 
 ---
 
-## Design Decisions
+## Authors and contributors
 
-### Structured Output
+**COMPSCI 399 — Team 8 Next Level**
 
-AI responses are enforced in structured JSON format to:
+- Bess Zhang
+- Joanne Chen
+- Yihuan Tang
+- Henry Song
+- Whilin Zhao
+- James Wilner
 
-- simplify frontend rendering
-- improve response consistency
-- reduce parsing errors
+### Acknowledgements
 
-### LLM Fallback Strategy
+People consulted during the capstone project:
 
-- reliability under failure
-
-### Layered Architecture
-
-The backend follows a layered architecture:
-
-- API layer
-- service layer
-- database layer
-
----
-
-## Future Improvements
-
-- Adaptive question difficulty
-- Better anti-cheating mechanisms
-- Improved prompt optimization
-- Course management
-- Timer for each question
-- Real-time monitoring dashboard
-- Role-Based Access Control for instructors
-- Concurrency
-
----
-
-## Authors & Contributors
-
-COMPSCI 399 – Team 8 Next Level
-
-- **Bess Zhang**
-- **Joanne Chen**
-- **Yihuan Tang**
-- **Henry Song**
-- **Whilin Zhao**
-- **James Wilner**
-
-## Acknowledgements
-
-People consulted:
-
-- **Shyamli Sindhwani**
-- **Anna Trofimova**
-- **Tony Feng**
+- Shyamli Sindhwani
+- Anna Trofimova
+- Tony Feng
