@@ -30,10 +30,13 @@ const queryClient = new QueryClient({
   },
 });
 
+const showQueryDevtools =
+  import.meta.env.DEV && import.meta.env.VITE_QUERY_DEVTOOLS === "true";
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ReactQueryDevtools initialIsOpen={false} />
+      {showQueryDevtools && <ReactQueryDevtools initialIsOpen={false} />}
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Navigate replace to="/login" />} />
