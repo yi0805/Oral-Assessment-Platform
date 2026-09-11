@@ -1,5 +1,39 @@
 # WhereRU - Team 8 COMPSCI 399 Capstone Project
 
+## Portfolio demo mode
+
+The frontend includes an environment-controlled portfolio mode with fictional
+course, assessment, student, transcript, rubric, and AI feedback data. It uses
+the existing UI and intercepts requests at the frontend transport boundary, so
+demo mode does not contact the configured API.
+
+To enable it locally, create a local `.env` file (do not commit it) with:
+
+```bash
+VITE_DEMO_MODE=true
+```
+
+Then start the frontend:
+
+```bash
+npm install
+npm run dev
+```
+
+Open these routes for the portfolio views (the demo instructor session is
+provided automatically):
+
+- `/instructor/demo-course-220/dashboard` — instructor dashboard
+- `/instructor/demo-course-220/assessments/generate` — material upload, rubric, and AI question generation
+- `/student/demo-course-220/demo-assessment-oral-1` — student oral assessment workflow
+- `/instructor/transcript/demo-session-2` — instructor transcript and feedback review
+
+To return to normal API-backed behaviour, set the local value to
+`VITE_DEMO_MODE=false` (or remove it), restart Vite, and sign in normally.
+
+The demo fixtures live under `src/mocks/` and contain no production records or
+credentials.
+
 ## Name of the project
 
 WhereRU
